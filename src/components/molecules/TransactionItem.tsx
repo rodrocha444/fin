@@ -1,6 +1,6 @@
 // src/components/molecules/TransactionItem.tsx — Item de linha de transação
 import { Trash2, Pencil } from 'lucide-react'
-import { formatCurrency, formatDate } from '@/utils/format'
+import { formatCurrency, formatDate, formatTime } from '@/utils/format'
 import Badge from '@/components/atoms/Badge'
 import type { Transaction } from '@/types'
 
@@ -27,6 +27,8 @@ export default function TransactionItem({
   const totalAmount =
     installmentGroup?.totalAmount ?? (tx.installmentTotal ? tx.installmentTotal * tx.amount : undefined)
 
+  const timeStr = tx.createdAt ? formatTime(tx.createdAt) : formatTime(tx.date)
+
   return (
     <div className="flex items-center gap-3 px-3 sm:px-4 py-3 border-b border-slate-800/30 hover:bg-slate-800/20 active:bg-slate-800/40 transition-colors">
       <div className="flex-1 min-w-0">
@@ -44,7 +46,10 @@ export default function TransactionItem({
           )}
         </div>
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          <span className="text-[10px] text-slate-500">{formatDate(tx.date)}</span>
+          <span className="text-[10px] text-slate-500">
+            {formatDate(tx.date)}
+            {timeStr && !tx.isScheduledProjection ? ` às ${timeStr}` : ''}
+          </span>
           <span className="text-[10px] text-slate-600">·</span>
           <span className="text-[10px] text-slate-500 truncate">
             {tx.type === 'transfer' ? 'Transferência' : categoryName ?? <span className="italic">Sem categoria</span>}

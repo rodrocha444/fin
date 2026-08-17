@@ -37,6 +37,13 @@ export function formatDate(date: Date | string): string {
   return format(d, 'dd/MM/yyyy', { locale: ptBR })
 }
 
+/** Formata a hora como HH:mm */
+export function formatTime(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  if (!isValid(d)) return ''
+  return format(d, 'HH:mm', { locale: ptBR })
+}
+
 /** Formata Date como 'ago 2025' */
 export function formatMonthLabel(month: string): string {
   const [year, mon] = month.split('-').map(Number)

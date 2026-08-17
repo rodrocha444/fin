@@ -1,6 +1,6 @@
 // src/components/molecules/CreditCardPurchaseItem.tsx — Item de linha de compra no cartão de crédito
 import { Trash2 } from 'lucide-react'
-import { formatCurrency, formatDate } from '@/utils/format'
+import { formatCurrency, formatDate, formatTime } from '@/utils/format'
 import Badge from '@/components/atoms/Badge'
 import type { CreditCardPurchase } from '@/hooks/useTransactions'
 
@@ -17,6 +17,7 @@ export default function CreditCardPurchaseItem({
 }: CreditCardPurchaseItemProps) {
   const isExpense = purchase.type === 'expense'
   const amtColor = isExpense ? 'text-rose-400' : 'text-emerald-400'
+  const timeStr = purchase.createdAt ? formatTime(purchase.createdAt) : formatTime(purchase.date)
 
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-800/40 transition-colors">
@@ -31,7 +32,10 @@ export default function CreditCardPurchaseItem({
           )}
         </div>
         <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-          <span>{formatDate(purchase.date)}</span>
+          <span>
+            {formatDate(purchase.date)}
+            {timeStr ? ` às ${timeStr}` : ''}
+          </span>
           <span>·</span>
           <span className="truncate">
             {purchase.type === 'transfer' ? 'Transferência / Pagamento' : categoryName ?? 'Sem categoria'}

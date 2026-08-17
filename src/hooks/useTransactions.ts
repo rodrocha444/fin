@@ -71,6 +71,7 @@ export interface CreditCardPurchase {
   transactionId?: number
   payee: string
   date: Date
+  createdAt?: Date
   amount: number
   installmentCount?: number
   installmentAmount?: number
@@ -124,6 +125,7 @@ export function useCreditCardPurchases(accountId: number | undefined) {
             groupId: tx.installmentGroupId,
             payee: cleanPayee,
             date: earliestDate,
+            createdAt: tx.createdAt,
             amount: totalAmount,
             installmentCount: count,
             installmentAmount: instAmount,
@@ -138,6 +140,7 @@ export function useCreditCardPurchases(accountId: number | undefined) {
             transactionId: tx.id,
             payee: tx.payee,
             date: tx.date,
+            createdAt: tx.createdAt,
             amount: tx.amount,
             categoryId: tx.categoryId,
             notes: tx.notes,
