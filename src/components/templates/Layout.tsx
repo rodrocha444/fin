@@ -26,7 +26,7 @@ export default function Layout() {
     <div className="flex h-full">
 
       {/* ── Sidebar (apenas desktop, lg+) ─────────────────── */}
-      <aside className="hidden lg:flex w-56 flex-shrink-0 flex-col bg-slate-900 border-r border-slate-800">
+      <aside className="hidden lg:flex w-56 flex-shrink-0 flex-col bg-slate-900 border-r border-slate-800 print:hidden">
         {/* Logo */}
         <div className="px-4 py-4 border-b border-slate-800/80">
           <Logo size="sm" />
@@ -52,17 +52,17 @@ export default function Layout() {
       </aside>
 
       {/* ── Conteúdo ─────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden print:overflow-visible print:h-auto print:block">
 
         {/* Área de conteúdo */}
-        <main className="flex-1 overflow-y-auto bg-slate-950 pb-safe-bottom" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)' }}>
-          <div className="lg:pb-0 h-full">
+        <main className="flex-1 overflow-y-auto bg-slate-950 pb-safe-bottom print:p-0 print:m-0 print:overflow-visible print:h-auto print:bg-white print:block" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)' }}>
+          <div className="lg:pb-0 h-full print:h-auto print:p-0 print:m-0">
             <Outlet />
           </div>
         </main>
 
         {/* ── Bottom Nav mobile (sm/md) ─────────────────── */}
-        <nav className="lg:hidden flex items-center bg-slate-900 border-t border-slate-800 flex-shrink-0">
+        <nav className="lg:hidden flex items-center bg-slate-900 border-t border-slate-800 flex-shrink-0 print:hidden">
           {NAV.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}

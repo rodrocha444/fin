@@ -106,11 +106,12 @@ export default function DebtsPage() {
 
   return (
     <div className="fade-in">
-      {/* Header */}
-      <div
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-3 sm:px-6 pb-4 border-b border-slate-800 bg-slate-900"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
-      >
+      <div className="print:hidden">
+        {/* Header */}
+        <div
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-3 sm:px-6 pb-4 border-b border-slate-800 bg-slate-900"
+          style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
+        >
         <div>
           <h1 className="text-lg sm:text-xl font-semibold text-slate-100 flex items-center gap-2">
             <HandCoins className="w-5 h-5 text-indigo-400" />
@@ -546,6 +547,7 @@ export default function DebtsPage() {
 
           </div>
         )}
+      </div>
       </div>
 
       {/* Modais */}

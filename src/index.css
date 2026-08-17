@@ -190,64 +190,42 @@
   html, body {
     height: auto !important;
     min-height: 0 !important;
+    max-height: none !important;
     margin: 0 !important;
     padding: 0 !important;
     overflow: visible !important;
     background: #ffffff !important;
     color: #0f172a !important;
-    font-size: 10.5pt !important;
+    font-size: 10pt !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  #root {
+  #root,
+  #root > div,
+  main,
+  main > div {
     height: auto !important;
     min-height: 0 !important;
+    max-height: none !important;
     overflow: visible !important;
     margin: 0 !important;
     padding: 0 !important;
+    background: transparent !important;
+    display: block !important;
   }
 
-  /* Ocultar navegação, sidebars e overlays ao imprimir */
-  body > * {
-    visibility: hidden !important;
-  }
-
-  aside, nav, header, button, .no-print, .print\:hidden {
+  /* Ocultar qualquer elemento de navegação ou painel de fundo */
+  aside,
+  nav,
+  header,
+  button,
+  .no-print,
+  .print\:hidden {
     display: none !important;
   }
 
-  /* O container de impressão torna-se visível e ocupa toda a folha */
-  #printable-debt-container {
-    visibility: visible !important;
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: #ffffff !important;
-    color: #0f172a !important;
-    border: none !important;
-    box-shadow: none !important;
-    border-radius: 0 !important;
-    display: block !important;
-    z-index: 999999 !important;
-    page-break-after: avoid !important;
-    break-after: avoid !important;
-  }
-
-  #printable-debt-container * {
-    visibility: visible !important;
-  }
-
-  /* Evitar quebras de página indesejadas */
-  tr, .print-avoid-break {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-
-  /* Resetar container modal pai */
+  /* Modal e container do extrato */
   .fixed.inset-0 {
     position: static !important;
     background: transparent !important;
@@ -258,5 +236,44 @@
     overflow: visible !important;
     height: auto !important;
     min-height: 0 !important;
+    max-height: none !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .fixed.inset-0 > div {
+    position: static !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+  }
+
+  #printable-debt-container {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    display: block !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  /* Evitar quebras de página indesejadas */
+  tr, .print-avoid-break, table, thead, tbody {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }
