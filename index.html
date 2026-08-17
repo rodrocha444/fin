@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/pwa-192x192.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="FinPlan" />
+    <meta name="description" content="App de finanças pessoais com orçamento por envelope, contas, cartão de crédito e agendamentos" />
+    <title>FinPlan – Gestão Financeira</title>
+    <script>
+      // Garante que o modo standalone no iOS Safari permaneça no escopo do PWA ao navegar
+      if (('standalone' in window.navigator) && window.navigator.standalone) {
+        document.addEventListener('click', function(e) {
+          var node = e.target;
+          while (node && node.nodeName !== 'A' && node.nodeName !== 'HTML') {
+            node = node.parentNode;
+          }
+          if (node && node.nodeName === 'A' && node.href && node.getAttribute('target') !== '_blank') {
+            if (node.href.indexOf(location.host) !== -1) {
+              var href = node.getAttribute('href');
+              if (href && href.startsWith('/')) {
+                e.preventDefault();
+                window.history.pushState(null, '', href);
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }
+            }
+          }
+        }, false);
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
