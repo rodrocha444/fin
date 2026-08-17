@@ -60,16 +60,22 @@ export default function DebtPrintModal({
 
         {/* Documento Formatado (Folha A4 / Extrato) */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-950 print:bg-white print:p-0 print:text-black print:overflow-visible">
-          <div id="printable-debt-statement" className="bg-slate-900 print:bg-white text-slate-100 print:text-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-800 print:border-none space-y-6">
+          <div id="printable-debt-container" className="bg-slate-900 print:bg-white text-slate-100 print:text-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-800 print:border-none space-y-6 print:space-y-4">
 
             {/* Cabeçalho do Extrato */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 print:border-slate-300 pb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 print:border-slate-300 pb-6 print:pb-4">
               <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-6 h-6 rounded-lg bg-indigo-600 print:bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">
+                    F
+                  </div>
+                  <span className="font-bold text-sm text-slate-100 print:text-slate-900 tracking-tight">FinPlan</span>
+                </div>
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-indigo-400 print:text-indigo-900">
                   Extrato de Contas e Pendências
                 </h1>
                 <p className="text-xs text-slate-400 print:text-slate-600 mt-1">
-                  Gerado em {formatDate(new Date())} via FinPlan
+                  Gerado em {formatDate(new Date())} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>
 
