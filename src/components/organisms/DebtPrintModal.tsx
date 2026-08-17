@@ -205,9 +205,8 @@ export default function DebtPrintModal({
             )}
 
             {/* Assinatura / Rodapé */}
-            <div className="pt-8 print:pt-3 border-t border-slate-800 print:border-slate-300 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 print:text-slate-600 gap-4 print:gap-1 print-avoid-break">
-              <p>FinPlan — Gestão Financeira Pessoal e Familiar</p>
-              <p>Documento gerado automaticamente para conferência de dívidas e acertos.</p>
+            <div className="pt-8 print:pt-3 border-t border-slate-800 print:border-slate-300 flex items-center justify-between text-[11px] text-slate-500 print:text-slate-600 print-avoid-break">
+              <p>FinPlan — Gestão Financeira</p>
             </div>
 
           </div>
