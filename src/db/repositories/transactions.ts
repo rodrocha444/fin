@@ -244,6 +244,51 @@ export async function getTransactionsByAccountAndMonth(
     .toArray()
 }
 
+export async function getTransactionsByCategoryAndMonth(
+  categoryId: number,
+  month: string
+): Promise<Transaction[]> {
+  const [year, mon] = month.split('-').map(Number)
+  const start = startOfMonth(new Date(year, mon - 1))
+  const end = endOfMonth(new Date(year, mon - 1))
+
+  const [allTxs, allScheduled] = await Promise.all([
+    db.transactions
+      .where('categoryId')
+      .equals(categoryId)
+      .filter(t => t.date >= start && t.date <= end)
+      .toArray(),
+    db.scheduledTransactions
+      .filter(s => s.categoryId === categoryId && s.isActive !== false)
+      .toArray(),
+  ])
+
+  const projected = getProjectedScheduledForMonth(allScheduled, month)
+  const projectedTxs: Transaction[] = projected.map(p => ({
+    accountId: p.accountId,
+    transferAccountId: p.transferAccountId,
+    date: p.date,
+    amount: p.amount,
+    payee: p.payee,
+    categoryId: p.categoryId,
+    notes: p.notes,
+    cleared: false,
+    type: p.type,
+    isScheduledProjection: true,
+    scheduledId: p.scheduledId,
+    createdAt: p.date,
+  }))
+
+  const combined = [...allTxs, ...projectedTxs]
+  combined.sort((a, b) => {
+    const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
+    const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
+    return timeB - timeA
+  })
+
+  return combined
+}
+
 // Retorna transações de um mês agrupadas por tipo (para relatórios)
 export async function getMonthSummary(month: string) {
   const [txs, scheduled] = await Promise.all([

@@ -39,6 +39,7 @@ interface TransactionFormProps {
   transaction?: Transaction
   defaultAccountId?: number
   defaultTransferAccountId?: number
+  defaultCategoryId?: number
   defaultMode?: TxMode | 'installment'
   defaultAmount?: number
   defaultPayee?: string
@@ -49,6 +50,7 @@ export default function TransactionForm({
   transaction,
   defaultAccountId,
   defaultTransferAccountId,
+  defaultCategoryId,
   defaultMode = 'expense',
   defaultAmount,
   defaultPayee,
@@ -83,7 +85,7 @@ export default function TransactionForm({
       transferAccountId: transaction?.transferAccountId ?? defaultTransferAccountId,
       amount: transaction?.amount ?? defaultAmount,
       payee: transaction?.payee ?? defaultPayee,
-      categoryId: transaction?.categoryId,
+      categoryId: transaction?.categoryId ?? defaultCategoryId,
       notes: transaction?.notes,
       installmentCount: 2,
     },

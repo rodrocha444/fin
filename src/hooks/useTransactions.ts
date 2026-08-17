@@ -1,7 +1,7 @@
 // src/hooks/useTransactions.ts
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/db/schema'
-import { getTransactionsByAccount, getTransactionsByMonth, getMonthSummary } from '@/db/repositories/transactions'
+import { getTransactionsByAccount, getTransactionsByMonth, getMonthSummary, getTransactionsByCategoryAndMonth } from '@/db/repositories/transactions'
 import { getProjectedScheduledForMonth } from '@/db/repositories/scheduled'
 import { startOfMonth, endOfMonth } from 'date-fns'
 import type { Transaction } from '@/types'
@@ -14,6 +14,17 @@ export function useAccountTransactions(accountId: number | undefined) {
       return getTransactionsByAccount(accountId)
     },
     [accountId]
+  )
+}
+
+/** Transações de uma categoria em um mês específico */
+export function useCategoryMonthTransactions(categoryId: number | undefined, month: string) {
+  return useLiveQuery(
+    async () => {
+      if (categoryId === undefined) return []
+      return getTransactionsByCategoryAndMonth(categoryId, month)
+    },
+    [categoryId, month]
   )
 }
 

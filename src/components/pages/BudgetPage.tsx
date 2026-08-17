@@ -7,12 +7,22 @@ import { formatCurrency, currentMonth } from '@/utils/format'
 import PriceInput from '@/components/atoms/PriceInput'
 import MonthNavigator from '@/components/atoms/MonthNavigator'
 import PendingIssuesCard from '@/components/organisms/PendingIssuesCard'
+import CategoryTransactionsModal from '@/components/organisms/CategoryTransactionsModal'
 import type {
+  Category,
   CategoryBudgetRow,
   GroupBudgetRow,
   IncomeCategoryBudgetRow,
   IncomeGroupBudgetRow,
 } from '@/types'
+
+export interface CategoryModalData {
+  category: Category
+  budgeted?: number
+  activity?: number
+  available?: number
+  isIncome?: boolean
+}
 
 // ── Célula editável inline ────────────────────────────────────
 
@@ -59,11 +69,29 @@ function BudgetCell({ value, onSave }: { value: number; onSave: (v: number) => v
 
 // ── Linhas de Receitas / Renda ────────────────────────────────
 
-function IncomeCategoryRow({ row }: { row: IncomeCategoryBudgetRow }) {
+function IncomeCategoryRow({
+  row,
+  onSelectCategory,
+}: {
+  row: IncomeCategoryBudgetRow
+  onSelectCategory: (data: CategoryModalData) => void
+}) {
   return (
-    <tr className="group hover:bg-slate-800/30 transition-colors">
+    <tr
+      onClick={() =>
+        onSelectCategory({
+          category: row.category,
+          activity: row.received,
+          isIncome: true,
+        })
+      }
+      className="group hover:bg-slate-800/40 active:bg-slate-800/60 cursor-pointer transition-colors"
+      title="Clique para ver as transações desta categoria no mês"
+    >
       <td className="py-2.5 pl-6 sm:pl-10 pr-2 text-xs sm:text-sm text-slate-300 truncate">
-        <span className="truncate block" title={row.category.name}>{row.category.name}</span>
+        <span className="truncate block group-hover:text-emerald-300 transition-colors" title={row.category.name}>
+          {row.category.name}
+        </span>
       </td>
       <td colSpan={3} className="py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm text-emerald-400 font-medium tabular-nums">
         {row.received > 0
@@ -74,7 +102,13 @@ function IncomeCategoryRow({ row }: { row: IncomeCategoryBudgetRow }) {
   )
 }
 
-function IncomeGroupRow({ row }: { row: IncomeGroupBudgetRow }) {
+function IncomeGroupRow({
+  row,
+  onSelectCategory,
+}: {
+  row: IncomeGroupBudgetRow
+  onSelectCategory: (data: CategoryModalData) => void
+}) {
   const [open, setOpen] = useState(true)
 
   return (
@@ -94,7 +128,7 @@ function IncomeGroupRow({ row }: { row: IncomeGroupBudgetRow }) {
         </td>
       </tr>
       {open && row.categories.map(cat => (
-        <IncomeCategoryRow key={cat.category.id} row={cat} />
+        <IncomeCategoryRow key={cat.category.id} row={cat} onSelectCategory={onSelectCategory} />
       ))}
     </>
   )
@@ -102,7 +136,15 @@ function IncomeGroupRow({ row }: { row: IncomeGroupBudgetRow }) {
 
 // ── Linha de categoria de Despesas ────────────────────────────
 
-function CategoryRow({ row, month }: { row: CategoryBudgetRow; month: string }) {
+function CategoryRow({
+  row,
+  month,
+  onSelectCategory,
+}: {
+  row: CategoryBudgetRow
+  month: string
+  onSelectCategory: (data: CategoryModalData) => void
+}) {
   const handleSave = useCallback(
     async (v: number) => {
       if (row.category.id !== undefined) await setBudget(month, row.category.id, v)
@@ -117,21 +159,59 @@ function CategoryRow({ row, month }: { row: CategoryBudgetRow; month: string }) 
   return (
     <tr className="group hover:bg-slate-800/30 transition-colors">
       {/* Nome da categoria */}
-      <td className="py-2.5 pl-6 sm:pl-10 pr-2 text-xs sm:text-sm text-slate-300 truncate">
-        <span className="truncate block" title={row.category.name}>{row.category.name}</span>
+      <td
+        onClick={() =>
+          onSelectCategory({
+            category: row.category,
+            budgeted: row.budgeted,
+            activity: row.activity,
+            available: row.available,
+            isIncome: false,
+          })
+        }
+        className="py-2.5 pl-6 sm:pl-10 pr-2 text-xs sm:text-sm text-slate-300 truncate cursor-pointer"
+        title="Clique para ver as transações desta categoria no mês"
+      >
+        <span className="truncate block group-hover:text-indigo-300 transition-colors" title={row.category.name}>
+          {row.category.name}
+        </span>
       </td>
       {/* Orçado */}
       <td className="py-2.5 px-2 text-right">
         <BudgetCell value={row.budgeted} onSave={handleSave} />
       </td>
       {/* Gasto */}
-      <td className="py-2.5 px-2 text-right text-xs sm:text-sm text-slate-400 tabular-nums font-normal">
+      <td
+        onClick={() =>
+          onSelectCategory({
+            category: row.category,
+            budgeted: row.budgeted,
+            activity: row.activity,
+            available: row.available,
+            isIncome: false,
+          })
+        }
+        className="py-2.5 px-2 text-right text-xs sm:text-sm text-slate-400 tabular-nums font-normal cursor-pointer hover:bg-slate-800/50"
+        title="Clique para ver as transações desta categoria no mês"
+      >
         {row.activity > 0
-          ? <span className="text-rose-400">{formatCurrency(row.activity)}</span>
+          ? <span className="text-rose-400 font-medium">{formatCurrency(row.activity)}</span>
           : <span className="text-slate-600">—</span>}
       </td>
       {/* Disponível */}
-      <td className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums ${availColor}`}>
+      <td
+        onClick={() =>
+          onSelectCategory({
+            category: row.category,
+            budgeted: row.budgeted,
+            activity: row.activity,
+            available: row.available,
+            isIncome: false,
+          })
+        }
+        className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums cursor-pointer hover:bg-slate-800/50 ${availColor}`}
+        title="Clique para ver as transações desta categoria no mês"
+      >
         {formatCurrency(Math.abs(row.available))}
       </td>
     </tr>
@@ -140,7 +220,15 @@ function CategoryRow({ row, month }: { row: CategoryBudgetRow; month: string }) 
 
 // ── Linha de grupo de Despesas ────────────────────────────────
 
-function GroupRow({ row, month }: { row: GroupBudgetRow; month: string }) {
+function GroupRow({
+  row,
+  month,
+  onSelectCategory,
+}: {
+  row: GroupBudgetRow
+  month: string
+  onSelectCategory: (data: CategoryModalData) => void
+}) {
   const [open, setOpen] = useState(true)
 
   return (
@@ -168,7 +256,7 @@ function GroupRow({ row, month }: { row: GroupBudgetRow; month: string }) {
         </td>
       </tr>
       {open && row.categories.map(cat => (
-        <CategoryRow key={cat.category.id} row={cat} month={month} />
+        <CategoryRow key={cat.category.id} row={cat} month={month} onSelectCategory={onSelectCategory} />
       ))}
     </>
   )
@@ -179,6 +267,8 @@ function GroupRow({ row, month }: { row: GroupBudgetRow; month: string }) {
 export default function BudgetPage() {
   const [month, setMonth] = useState(currentMonth)
   const [showMenu, setShowMenu] = useState(false)
+  const [selectedCategoryModal, setSelectedCategoryModal] = useState<CategoryModalData | null>(null)
+
   const rows = useBudgetRows(month)
   const incomeRows = useIncomeBudgetRows(month)
   const summary = useBudgetSummary(month)
@@ -317,7 +407,7 @@ export default function BudgetPage() {
                     <th className="py-2 pl-2 pr-3 sm:pr-6 text-right">Disponível</th>
                   </tr>
                   {rows.map(row => (
-                    <GroupRow key={row.group.id} row={row} month={month} />
+                    <GroupRow key={row.group.id} row={row} month={month} onSelectCategory={setSelectedCategoryModal} />
                   ))}
                 </>
               )}
@@ -330,7 +420,7 @@ export default function BudgetPage() {
                     <th colSpan={3} className="py-2 pl-2 pr-3 sm:pr-6 text-right">Recebido</th>
                   </tr>
                   {incomeRows.map(row => (
-                    <IncomeGroupRow key={row.group.id} row={row} />
+                    <IncomeGroupRow key={row.group.id} row={row} onSelectCategory={setSelectedCategoryModal} />
                   ))}
                 </>
               )}
@@ -338,6 +428,19 @@ export default function BudgetPage() {
           </table>
         )}
       </div>
+
+      {/* Modal de Transações da Categoria */}
+      {selectedCategoryModal && (
+        <CategoryTransactionsModal
+          category={selectedCategoryModal.category}
+          month={month}
+          budgeted={selectedCategoryModal.budgeted}
+          activity={selectedCategoryModal.activity}
+          available={selectedCategoryModal.available}
+          isIncome={selectedCategoryModal.isIncome}
+          onClose={() => setSelectedCategoryModal(null)}
+        />
+      )}
     </div>
   )
 }
