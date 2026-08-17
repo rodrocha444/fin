@@ -14,6 +14,7 @@ import type {
   BudgetSummary,
 } from '@/types'
 import { getActivityByCategory, getIncomeByCategory } from './transactions'
+import { getProjectedScheduledForMonth } from './scheduled'
 import { format, subMonths } from 'date-fns'
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -185,13 +186,14 @@ export async function computeIncomeBudgetRows(month: string): Promise<IncomeGrou
 // ── Resumo de "A Orçar" (Zero-Sum Budgeting) ──────────────────
 
 export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
-  const [allIncomeTxs, allExpenseTxs, allBudgets, allAccounts, allGroups, allCategories] = await Promise.all([
+  const [allIncomeTxs, allExpenseTxs, allBudgets, allAccounts, allGroups, allCategories, allScheduled] = await Promise.all([
     db.transactions.filter(t => t.type === 'income').toArray(),
     db.transactions.filter(t => t.type === 'expense').toArray(),
     db.budgetMonths.toArray(),
     db.accounts.toArray(),
     db.categoryGroups.toArray(),
     db.categories.toArray(),
+    db.scheduledTransactions.filter(s => s.isActive !== false).toArray(),
   ])
 
   // Identificar categorias de despesa (apenas elas deduzem do "A orçar")
@@ -276,6 +278,28 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
   }
   for (const b of allBudgets) {
     if (b.categoryId && !incomeCategoryIds.has(b.categoryId)) expenseCategoryIds.add(b.categoryId)
+  }
+
+  // 6. Integrar projeções de transações agendadas (recorrentes / futuras)
+  const scheduledOccurrences = getProjectedScheduledForMonth(allScheduled, month)
+  for (const p of scheduledOccurrences) {
+    const pMonth = toMonthKey(p.date)
+    if (pMonth === month) {
+      if (p.type === 'income') {
+        totalIncome += p.amount
+      } else if (p.type === 'expense') {
+        if (p.categoryId && !incomeCategoryIds.has(p.categoryId)) {
+          const key = `${month}:${p.categoryId}`
+          expensesByMonthCategory.set(key, (expensesByMonthCategory.get(key) || 0) + p.amount)
+          expenseCategoryIds.add(p.categoryId)
+        } else if (!p.categoryId) {
+          uncategorizedExpensesByMonth.set(
+            month,
+            (uncategorizedExpensesByMonth.get(month) || 0) + p.amount
+          )
+        }
+      }
+    }
   }
 
   // 6. Calcular compromissos efetivos dos meses anteriores: Math.max(orçado, despesas/parcelas)

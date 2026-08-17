@@ -6,6 +6,7 @@
 import { db } from '../schema'
 import type { Transaction, InstallmentGroup } from '@/types'
 import { addMonths, startOfMonth, endOfMonth, format } from 'date-fns'
+import { getProjectedScheduledForMonth } from './scheduled'
 
 // ── Tipos de entrada ─────────────────────────────────────────
 
@@ -245,7 +246,12 @@ export async function getTransactionsByAccountAndMonth(
 
 // Retorna transações de um mês agrupadas por tipo (para relatórios)
 export async function getMonthSummary(month: string) {
-  const txs = await getTransactionsByMonth(month)
+  const [txs, scheduled] = await Promise.all([
+    getTransactionsByMonth(month),
+    db.scheduledTransactions.filter(s => s.isActive !== false).toArray(),
+  ])
+
+  const projected = getProjectedScheduledForMonth(scheduled, month)
 
   let income = 0
   let expense = 0
@@ -253,15 +259,24 @@ export async function getMonthSummary(month: string) {
   for (const tx of txs) {
     if (tx.type === 'income') income += tx.amount
     else if (tx.type === 'expense') expense += tx.amount
-    // transfers não contam no summary
+  }
+
+  for (const p of projected) {
+    if (p.type === 'income') income += p.amount
+    else if (p.type === 'expense') expense += p.amount
   }
 
   return { income, expense, net: income - expense }
 }
 
-// Agrupa activity por categoryId para um mês
+// Agrupa activity por categoryId para um mês (incluindo transações reais e agendamentos futuros)
 export async function getActivityByCategory(month: string): Promise<Map<number, number>> {
-  const txs = await getTransactionsByMonth(month)
+  const [txs, scheduled] = await Promise.all([
+    getTransactionsByMonth(month),
+    db.scheduledTransactions.filter(s => s.isActive !== false).toArray(),
+  ])
+
+  const projected = getProjectedScheduledForMonth(scheduled, month)
   const map = new Map<number, number>()
 
   for (const tx of txs) {
@@ -270,18 +285,35 @@ export async function getActivityByCategory(month: string): Promise<Map<number, 
     map.set(tx.categoryId, prev + tx.amount)
   }
 
+  for (const p of projected) {
+    if (p.type !== 'expense' || !p.categoryId) continue
+    const prev = map.get(p.categoryId) ?? 0
+    map.set(p.categoryId, prev + p.amount)
+  }
+
   return map
 }
 
-// Agrupa income por categoryId para um mês
+// Agrupa income por categoryId para um mês (incluindo receitas reais e agendamentos futuros)
 export async function getIncomeByCategory(month: string): Promise<Map<number, number>> {
-  const txs = await getTransactionsByMonth(month)
+  const [txs, scheduled] = await Promise.all([
+    getTransactionsByMonth(month),
+    db.scheduledTransactions.filter(s => s.isActive !== false).toArray(),
+  ])
+
+  const projected = getProjectedScheduledForMonth(scheduled, month)
   const map = new Map<number, number>()
 
   for (const tx of txs) {
     if (tx.type !== 'income' || !tx.categoryId) continue
     const prev = map.get(tx.categoryId) ?? 0
     map.set(tx.categoryId, prev + tx.amount)
+  }
+
+  for (const p of projected) {
+    if (p.type !== 'income' || !p.categoryId) continue
+    const prev = map.get(p.categoryId) ?? 0
+    map.set(p.categoryId, prev + p.amount)
   }
 
   return map

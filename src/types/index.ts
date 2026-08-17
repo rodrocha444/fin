@@ -81,6 +81,9 @@ export interface Transaction {
   installmentGroupId?: number
   installmentNumber?: number
   installmentTotal?: number
+  /** Se essa transação é uma projeção de agendamento futuro */
+  isScheduledProjection?: boolean
+  scheduledId?: number
   createdAt: Date
 }
 

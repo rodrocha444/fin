@@ -37,6 +37,11 @@ export default function TransactionItem({
               {tx.installmentNumber}/{tx.installmentTotal}x
             </Badge>
           )}
+          {tx.isScheduledProjection && (
+            <Badge variant="info">
+              Agendado
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[10px] text-slate-500">{formatDate(tx.date)}</span>

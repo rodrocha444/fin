@@ -4,9 +4,10 @@
 // ─────────────────────────────────────────────────────────────
 
 import { db } from '../schema'
-import type { ScheduledTransaction } from '@/types'
+import type { ScheduledTransaction, TransactionType } from '@/types'
 import { createTransaction, createTransfer } from './transactions'
 import {
+  format,
   addDays,
   addWeeks,
   addMonths,
@@ -15,6 +16,21 @@ import {
   isAfter,
   startOfDay,
 } from 'date-fns'
+
+// ── Tipos de Projeção ────────────────────────────────────────
+
+export interface ProjectedScheduledOccurrence {
+  scheduledId: number
+  accountId: number
+  transferAccountId?: number
+  type: TransactionType
+  amount: number
+  categoryId?: number
+  payee: string
+  notes?: string
+  date: Date
+  isScheduledProjection: true
+}
 
 // ── CRUD ─────────────────────────────────────────────────────
 
@@ -50,6 +66,56 @@ export async function getUpcomingScheduled(daysAhead = 30): Promise<ScheduledTra
     .between(today, future, true, true)
     .filter(s => s.isActive !== false)
     .toArray()
+}
+
+/**
+ * Retorna todas as ocorrências projetadas de agendamentos para um mês específico
+ * que ainda não se tornaram transações no banco (data > hoje).
+ */
+export function getProjectedScheduledForMonth(
+  scheduledList: ScheduledTransaction[],
+  month: string, // 'yyyy-MM'
+  afterDateExclusive: Date = new Date()
+): ProjectedScheduledOccurrence[] {
+  const projected: ProjectedScheduledOccurrence[] = []
+  const todayThreshold = new Date(afterDateExclusive)
+
+  for (const s of scheduledList) {
+    if (s.isActive === false) continue
+    let current = new Date(s.nextDate)
+    const end = s.endDate ? new Date(s.endDate) : null
+
+    // Avançar até o mês alvo
+    while (true) {
+      const curMonth = format(current, 'yyyy-MM')
+      if (curMonth > month) break
+      if (end && current > end) break
+
+      if (curMonth === month && current > todayThreshold) {
+        projected.push({
+          scheduledId: s.id!,
+          accountId: s.accountId,
+          transferAccountId: s.transferAccountId,
+          type: s.type,
+          amount: s.amount,
+          categoryId: s.categoryId,
+          payee: s.payee || (s.type === 'transfer' ? 'Transferência agendada' : 'Transação agendada'),
+          notes: s.notes,
+          date: new Date(current),
+          isScheduledProjection: true,
+        })
+      }
+
+      if (s.frequency === 'once') break
+      else if (s.frequency === 'weekly') current = addWeeks(current, 1)
+      else if (s.frequency === 'biweekly') current = addWeeks(current, 2)
+      else if (s.frequency === 'monthly') current = addMonths(current, 1)
+      else if (s.frequency === 'yearly') current = addYears(current, 1)
+      else current = addMonths(current, 1)
+    }
+  }
+
+  return projected
 }
 
 // ── Lógica de avanço de data ─────────────────────────────────

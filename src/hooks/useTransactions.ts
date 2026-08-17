@@ -2,7 +2,9 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/db/schema'
 import { getTransactionsByAccount, getTransactionsByMonth, getMonthSummary } from '@/db/repositories/transactions'
+import { getProjectedScheduledForMonth } from '@/db/repositories/scheduled'
 import { startOfMonth, endOfMonth } from 'date-fns'
+import type { Transaction } from '@/types'
 
 /** Transações de uma conta (todas ordenadas por createdAt desc) */
 export function useAccountTransactions(accountId: number | undefined) {
@@ -15,9 +17,32 @@ export function useAccountTransactions(accountId: number | undefined) {
   )
 }
 
-/** Transações de um mês (YYYY-MM) */
+/** Transações de um mês (YYYY-MM), incluindo ocorrências futuras de agendamentos */
 export function useMonthTransactions(month: string) {
-  return useLiveQuery(() => getTransactionsByMonth(month), [month])
+  return useLiveQuery(async () => {
+    const [txs, scheduled] = await Promise.all([
+      getTransactionsByMonth(month),
+      db.scheduledTransactions.filter(s => s.isActive !== false).toArray(),
+    ])
+
+    const projected = getProjectedScheduledForMonth(scheduled, month)
+    const projectedTxs: Transaction[] = projected.map(p => ({
+      accountId: p.accountId,
+      transferAccountId: p.transferAccountId,
+      date: p.date,
+      amount: p.amount,
+      payee: p.payee,
+      categoryId: p.categoryId,
+      notes: p.notes,
+      cleared: false,
+      type: p.type,
+      isScheduledProjection: true,
+      scheduledId: p.scheduledId,
+      createdAt: p.date,
+    }))
+
+    return [...txs, ...projectedTxs]
+  }, [month])
 }
 
 /** Resumo (income / expense) de um mês */
