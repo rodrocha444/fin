@@ -57,7 +57,7 @@ export class FinPlanDB extends Dexie {
     // ── v2: contas a receber / pagar e pendências ───────────
     this.version(2).stores({
       debtAccounts: '++id, name, isActive',
-      debtItems: '++id, debtAccountId, type, status, dueDate, createdAt',
+      debtItems: '++id, debtAccountId, type, status, dueDate, installmentGroupId, createdAt',
     })
   }
 }

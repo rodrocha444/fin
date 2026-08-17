@@ -226,6 +226,10 @@ export interface DebtItem {
   settledDate?: Date
   status: DebtStatus
   notes?: string
+  installmentGroupId?: string
+  installmentNumber?: number
+  installmentTotal?: number
+  totalAmount?: number
   createdAt: Date
 }
 

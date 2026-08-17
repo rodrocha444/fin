@@ -1,11 +1,11 @@
-// src/components/organisms/DebtItemForm.tsx — Modal para lançar pendência / dívida
 import { useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { X, ArrowDownLeft, ArrowUpRight, Plus, Pencil } from 'lucide-react'
+import { X, ArrowDownLeft, ArrowUpRight, Plus, Pencil, Layers } from 'lucide-react'
 import { format } from 'date-fns'
-import { createDebtItem, updateDebtItem } from '@/db/repositories/debts'
+import { createDebtItem, updateDebtItem, createDebtInstallments } from '@/db/repositories/debts'
+import { formatCurrency } from '@/utils/format'
 import PriceInput from '@/components/atoms/PriceInput'
 import type { DebtItem, DebtType } from '@/types'
 
@@ -37,11 +37,13 @@ export default function DebtItemForm({
 }: DebtItemFormProps) {
   const isEdit = !!item
   const [type, setType] = useState<DebtType>(item?.type || defaultType)
+  const [installmentCount, setInstallmentCount] = useState<number>(item?.installmentTotal || 1)
 
   const {
     register,
     handleSubmit,
     control,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -55,13 +57,15 @@ export default function DebtItemForm({
       : {
           description: '',
           amount: 0,
-          dueDate: '',
+          dueDate: format(new Date(), 'yyyy-MM-dd'),
           notes: '',
         },
   })
 
+  const currentAmount = watch('amount') || 0
+
   const onSubmit = async (data: FormData) => {
-    const dueDateParsed = data.dueDate ? new Date(data.dueDate + 'T12:00:00') : undefined
+    const dueDateParsed = data.dueDate ? new Date(data.dueDate + 'T12:00:00') : new Date()
 
     if (isEdit && item.id) {
       await updateDebtItem(item.id, {
@@ -69,6 +73,16 @@ export default function DebtItemForm({
         type,
         amount: data.amount,
         dueDate: dueDateParsed,
+        notes: data.notes?.trim() || undefined,
+      })
+    } else if (installmentCount > 1) {
+      await createDebtInstallments({
+        debtAccountId,
+        description: data.description,
+        type,
+        totalAmount: data.amount,
+        installmentCount,
+        startDate: dueDateParsed,
         notes: data.notes?.trim() || undefined,
       })
     } else {
@@ -160,7 +174,9 @@ export default function DebtItemForm({
 
           {/* Valor */}
           <div>
-            <label className="label">Valor da pendência</label>
+            <label className="label">
+              {!isEdit && installmentCount > 1 ? 'Valor Total Parcelado' : 'Valor da pendência'}
+            </label>
             <Controller
               name="amount"
               control={control}
@@ -175,6 +191,36 @@ export default function DebtItemForm({
             />
             {errors.amount && <p className="text-rose-400 text-xs mt-1">{errors.amount.message}</p>}
           </div>
+
+          {/* Parcelamento (apenas no modo de criação) */}
+          {!isEdit && (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="label !mb-0 flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Parcelamento</span>
+                </label>
+                {installmentCount > 1 && currentAmount > 0 && (
+                  <span className="text-xs text-indigo-400 font-semibold tabular-nums">
+                    {installmentCount}x de {formatCurrency(Math.round((currentAmount / installmentCount) * 100) / 100)}
+                  </span>
+                )}
+              </div>
+              <select
+                value={installmentCount}
+                onChange={e => setInstallmentCount(Number(e.target.value))}
+                style={{ colorScheme: 'dark' }}
+                className="input-base"
+              >
+                <option value={1} className="bg-slate-900 text-slate-100">À vista / Parcela única (1x)</option>
+                {Array.from({ length: 35 }, (_, i) => i + 2).map(n => (
+                  <option key={n} value={n} className="bg-slate-900 text-slate-100">
+                    {n}x parcelas mensais
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Descrição */}
           <div>
@@ -191,7 +237,9 @@ export default function DebtItemForm({
 
           {/* Prazo / Data de Vencimento */}
           <div>
-            <label className="label">Data limite / Prazo de acerto (opcional)</label>
+            <label className="label">
+              {!isEdit && installmentCount > 1 ? 'Vencimento da 1ª Parcela' : 'Data limite / Prazo de acerto'}
+            </label>
             <input
               {...register('dueDate')}
               type="date"

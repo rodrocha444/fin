@@ -4,7 +4,20 @@
 // ─────────────────────────────────────────────────────────────
 
 import { db } from '../schema'
-import type { DebtAccount, DebtItem, DebtSummary, DebtStatus } from '@/types'
+import type { DebtAccount, DebtItem, DebtSummary, DebtStatus, DebtType } from '@/types'
+import { addMonths } from 'date-fns'
+
+// ── Tipos de Parcelamento de Dívida ──────────────────────────
+
+export interface CreateDebtInstallmentsInput {
+  debtAccountId: number
+  description: string
+  type: DebtType
+  totalAmount: number
+  installmentCount: number
+  startDate: Date
+  notes?: string
+}
 
 // ── Contas de Devedores / Cobranças ───────────────────────────
 
@@ -81,6 +94,54 @@ export async function createDebtItem(
     status: data.status || 'pending',
     createdAt: new Date(),
   }) as Promise<number>
+}
+
+export async function createDebtInstallments(input: CreateDebtInstallmentsInput): Promise<void> {
+  const installmentCount = Math.max(1, Math.round(input.installmentCount))
+  const installmentAmount = Math.round((input.totalAmount / installmentCount) * 100) / 100
+  const groupId = `debt-inst-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  const now = new Date()
+
+  if (installmentCount === 1) {
+    await createDebtItem({
+      debtAccountId: input.debtAccountId,
+      description: input.description,
+      type: input.type,
+      amount: input.totalAmount,
+      dueDate: input.startDate,
+      notes: input.notes,
+      status: 'pending',
+    })
+    return
+  }
+
+  await db.transaction('rw', db.debtItems, async () => {
+    let accumulated = 0
+    for (let i = 1; i <= installmentCount; i++) {
+      const isLast = i === installmentCount
+      const amount = isLast
+        ? Math.round((input.totalAmount - accumulated) * 100) / 100
+        : installmentAmount
+      accumulated += amount
+
+      const dueDate = addMonths(input.startDate, i - 1)
+
+      await db.debtItems.add({
+        debtAccountId: input.debtAccountId,
+        description: input.description.trim(),
+        type: input.type,
+        amount,
+        dueDate,
+        status: 'pending',
+        notes: input.notes?.trim() || undefined,
+        installmentGroupId: groupId,
+        installmentNumber: i,
+        installmentTotal: installmentCount,
+        totalAmount: input.totalAmount,
+        createdAt: now,
+      })
+    }
+  })
 }
 
 export async function updateDebtItem(

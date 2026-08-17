@@ -32,9 +32,11 @@ import {
   setDebtItemStatus,
 } from '@/db/repositories/debts'
 import { formatCurrency, formatDate } from '@/utils/format'
+import Badge from '@/components/atoms/Badge'
 import DebtAccountForm from '@/components/organisms/DebtAccountForm'
 import DebtItemForm from '@/components/organisms/DebtItemForm'
 import DebtPrintModal from '@/components/organisms/DebtPrintModal'
+import DebtSettleConfirmModal from '@/components/organisms/DebtSettleConfirmModal'
 import type { DebtAccount, DebtItem } from '@/types'
 
 export default function DebtsPage() {
@@ -58,6 +60,7 @@ export default function DebtsPage() {
   const [showItemModal, setShowItemModal] = useState(false)
   const [editingItem, setEditingItem] = useState<DebtItem | null>(null)
   const [showPrintModal, setShowPrintModal] = useState(false)
+  const [settleConfirmItem, setSettleConfirmItem] = useState<DebtItem | null>(null)
 
   // Filtragem de contas por busca
   const filteredAccounts = accounts.filter(acc => {
@@ -84,14 +87,19 @@ export default function DebtsPage() {
 
   const handleDeleteItem = async (item: DebtItem) => {
     if (!item.id) return
-    if (!confirm(`Excluir a pendência "${item.description}"?`)) return
+    if (!confirm(`Excluir ${item.installmentTotal ? `esta parcela (${item.installmentNumber}/${item.installmentTotal}x)` : 'esta pendência'}?`)) return
     await deleteDebtItem(item.id)
   }
 
-  const handleToggleItemStatus = async (item: DebtItem) => {
-    if (!item.id) return
-    const nextStatus = item.status === 'pending' ? 'settled' : 'pending'
-    await setDebtItemStatus(item.id, nextStatus)
+  const handleToggleItemStatus = (item: DebtItem) => {
+    setSettleConfirmItem(item)
+  }
+
+  const handleConfirmSettle = async () => {
+    if (!settleConfirmItem?.id) return
+    const nextStatus = settleConfirmItem.status === 'pending' ? 'settled' : 'pending'
+    await setDebtItemStatus(settleConfirmItem.id, nextStatus)
+    setSettleConfirmItem(null)
   }
 
   const today = new Date()
@@ -447,6 +455,11 @@ export default function DebtsPage() {
                                   <p className={`font-semibold text-sm text-slate-200 truncate ${isSettled ? 'line-through text-slate-400' : ''}`}>
                                     {item.description}
                                   </p>
+                                  {item.installmentTotal && (
+                                    <Badge variant="violet">
+                                      {item.installmentNumber}/{item.installmentTotal}x
+                                    </Badge>
+                                  )}
                                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                                     item.type === 'receivable'
                                       ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/50'
@@ -493,6 +506,9 @@ export default function DebtsPage() {
                                 }`}>
                                   {item.type === 'receivable' ? '+' : '-'}{formatCurrency(item.amount)}
                                 </p>
+                                {item.totalAmount && item.installmentTotal && item.installmentTotal > 1 && (
+                                  <p className="text-[10px] text-slate-500 tabular-nums">Total {formatCurrency(item.totalAmount)}</p>
+                                )}
                               </div>
 
                               <div className="flex items-center gap-0.5">
@@ -566,6 +582,15 @@ export default function DebtsPage() {
           payable={selectedAccountData.payable}
           balance={selectedAccountData.balance}
           onClose={() => setShowPrintModal(false)}
+        />
+      )}
+
+      {settleConfirmItem && selectedAccountData && (
+        <DebtSettleConfirmModal
+          item={settleConfirmItem}
+          accountName={selectedAccountData.account.name}
+          onClose={() => setSettleConfirmItem(null)}
+          onConfirm={handleConfirmSettle}
         />
       )}
     </div>

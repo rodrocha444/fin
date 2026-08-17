@@ -134,7 +134,14 @@ export default function DebtPrintModal({
                       {pendingItems.map(item => (
                         <tr key={item.id} className="hover:bg-slate-800/30 print:hover:bg-transparent">
                           <td className="py-2 px-3 text-slate-400 print:text-slate-600 whitespace-nowrap">{formatDate(item.createdAt)}</td>
-                          <td className="py-2 px-3 font-medium text-slate-200 print:text-slate-900">{item.description}</td>
+                          <td className="py-2 px-3 font-medium text-slate-200 print:text-slate-900">
+                            {item.description}
+                            {item.installmentTotal && (
+                              <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-950/80 text-violet-300 print:bg-slate-200 print:text-slate-800">
+                                {item.installmentNumber}/{item.installmentTotal}x
+                              </span>
+                            )}
+                          </td>
                           <td className="py-2 px-3 whitespace-nowrap">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                               item.type === 'receivable'
@@ -180,7 +187,10 @@ export default function DebtPrintModal({
                     <tbody className="divide-y divide-slate-800 print:divide-slate-200">
                       {settledItems.map(item => (
                         <tr key={item.id}>
-                          <td className="py-2 px-3 text-slate-400 print:text-slate-700 line-through">{item.description}</td>
+                          <td className="py-2 px-3 text-slate-400 print:text-slate-700 line-through">
+                            {item.description}
+                            {item.installmentTotal && ` (${item.installmentNumber}/${item.installmentTotal}x)`}
+                          </td>
                           <td className="py-2 px-3 text-slate-400 print:text-slate-600">{item.type === 'receivable' ? 'A Receber' : 'A Pagar'}</td>
                           <td className="py-2 px-3 text-slate-400 print:text-slate-600">{item.settledDate ? formatDate(item.settledDate) : '—'}</td>
                           <td className="py-2 px-3 text-right font-medium text-slate-400 print:text-slate-700 tabular-nums">
