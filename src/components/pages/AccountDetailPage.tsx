@@ -14,6 +14,9 @@ import {
   ArrowUpRight,
   Calendar,
   Printer,
+  CheckCircle2,
+  AlertCircle,
+  ArrowDownLeft,
 } from 'lucide-react'
 import { useAccount, useAccountBalance } from '@/hooks/useAccounts'
 import {
@@ -21,6 +24,7 @@ import {
   useCreditCardPurchases,
   type CreditCardPurchase,
 } from '@/hooks/useTransactions'
+import { usePaidInvoices, useClosedUnpaidInvoices } from '@/hooks/useInvoices'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
 import { deleteTransaction, deleteInstallmentGroup } from '@/db/repositories/transactions'
 import { deleteAccount } from '@/db/repositories/accounts'
@@ -35,6 +39,7 @@ import {
 import TransactionForm from '@/components/organisms/TransactionForm'
 import AccountForm from '@/components/organisms/AccountForm'
 import InvoicePrintModal from '@/components/organisms/InvoicePrintModal'
+import ConfirmInvoicePaidModal from '@/components/organisms/ConfirmInvoicePaidModal'
 import SearchBar from '@/components/atoms/SearchBar'
 import CreditCardPurchaseItem from '@/components/molecules/CreditCardPurchaseItem'
 import TransactionItem from '@/components/molecules/TransactionItem'
@@ -65,6 +70,11 @@ export default function AccountDetailPage() {
   const [showAccForm, setShowAccForm] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [printingInvoice, setPrintingInvoice] = useState<InvoiceData | null>(null)
+  const [payModalInvoice, setPayModalInvoice] = useState<InvoiceData | null>(null)
+  const [confirmPaidModalData, setConfirmPaidModalData] = useState<{ invoice: InvoiceData; targetStatus: boolean } | null>(null)
+
+  const closedUnpaidInvoices = useClosedUnpaidInvoices(account, transactions)
+  const { setPaidStatus } = usePaidInvoices()
 
   if (accountId === undefined || (account === undefined && transactions === undefined)) {
     return (
@@ -261,9 +271,94 @@ export default function AccountDetailPage() {
           </div>
         </div>
 
-        {/* Card de Acesso Rápido à Fatura Aberta (para Cartão de Crédito) */}
+        {/* Card de Faturas Fechadas Pendentes de Pagamento e Fatura Aberta (para Cartão de Crédito) */}
         {isCreditCard && (
           <div className="space-y-3">
+            {/* Alerta de Faturas Fechadas Pendentes */}
+            {closedUnpaidInvoices.length > 0 && (
+              <div className="space-y-2.5">
+                {closedUnpaidInvoices.map(unpaidInv => {
+                  const isOverdue = new Date() > unpaidInv.cycle.dueDate
+
+                  return (
+                    <div
+                      key={unpaidInv.cycle.monthKey}
+                      className="card p-4 bg-gradient-to-r from-amber-950/40 via-slate-900 to-amber-950/20 border-amber-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden"
+                    >
+                      <div className="flex items-start sm:items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0">
+                          <AlertCircle className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-bold text-slate-100">
+                              Fatura Fechada — {unpaidInv.cycle.label}
+                            </p>
+                            <span className="badge bg-amber-950 text-amber-300 border border-amber-600/50 text-[10px]">
+                              Pendente
+                            </span>
+                            {isOverdue && (
+                              <span className="badge bg-rose-950 text-rose-300 border border-rose-600/50 text-[10px]">
+                                Vencida
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-baseline gap-2 mt-1 flex-wrap">
+                            <span className="text-base sm:text-lg font-extrabold text-amber-300 tabular-nums">
+                              {formatCurrency(unpaidInv.totalAmount)}
+                            </span>
+                            <span className="text-xs text-slate-400">
+                              · Venceu em {formatDate(unpaidInv.cycle.dueDate)} (fechou em {formatDate(unpaidInv.cycle.closingDate)})
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Ações para a fatura fechada */}
+                      <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-amber-500/20">
+                        <button
+                          type="button"
+                          onClick={() => setConfirmPaidModalData({ invoice: unpaidInv, targetStatus: true })}
+                          className="btn-primary py-2 px-3.5 text-xs font-semibold flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 border-emerald-500 shadow-md shadow-emerald-900/30 flex-1 sm:flex-initial"
+                          title="Marcar esta fatura como paga"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Marcar como Paga</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setPayModalInvoice(unpaidInv)}
+                          className="btn-secondary py-2 px-3 text-xs font-semibold flex items-center justify-center gap-1.5 flex-1 sm:flex-initial"
+                          title="Registrar pagamento desta fatura"
+                        >
+                          <ArrowDownLeft className="w-4 h-4 text-emerald-400" />
+                          <span className="hidden sm:inline">Pagar</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setPrintingInvoice(unpaidInv)}
+                          className="btn-ghost py-2 px-2.5 text-xs text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5"
+                          title="Imprimir fatura"
+                        >
+                          <Printer className="w-4 h-4" />
+                        </button>
+
+                        <Link
+                          to={`/accounts/${accountId}/invoice?month=${unpaidInv.cycle.monthKey}`}
+                          className="btn-ghost py-2 px-2.5 text-xs text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1"
+                          title="Ver detalhes da fatura"
+                        >
+                          <ArrowUpRight className="w-4 h-4" />
+                        </Link>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
             <div className="card p-4 bg-gradient-to-r from-slate-900 via-indigo-950/30 to-slate-900 border-indigo-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center flex-shrink-0">
@@ -464,6 +559,32 @@ export default function AccountDetailPage() {
             invoiceData={printingInvoice}
             categories={categories}
             onClose={() => setPrintingInvoice(null)}
+          />
+        )}
+
+        {/* Modal de Confirmação de Pagamento de Fatura */}
+        {confirmPaidModalData && (
+          <ConfirmInvoicePaidModal
+            account={account}
+            invoiceData={confirmPaidModalData.invoice}
+            targetStatus={confirmPaidModalData.targetStatus}
+            onConfirm={async () => {
+              if (account.id) {
+                await setPaidStatus(account.id, confirmPaidModalData.invoice.cycle.monthKey, confirmPaidModalData.targetStatus)
+              }
+            }}
+            onClose={() => setConfirmPaidModalData(null)}
+          />
+        )}
+
+        {/* Modal de Pagamento de Fatura Fechada */}
+        {payModalInvoice && (
+          <TransactionForm
+            defaultMode="transfer"
+            defaultTransferAccountId={accountId}
+            defaultAmount={payModalInvoice.totalAmount}
+            defaultPayee={`Pagamento de Fatura ${account.name} (${payModalInvoice.cycle.label})`}
+            onClose={() => setPayModalInvoice(null)}
           />
         )}
       </div>

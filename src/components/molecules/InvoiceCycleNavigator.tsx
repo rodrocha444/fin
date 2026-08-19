@@ -1,5 +1,5 @@
 // src/components/molecules/InvoiceCycleNavigator.tsx — Navegador de ciclo da fatura
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import { formatDate, shiftMonth, formatCurrency } from '@/utils/format'
 import Badge from '@/components/atoms/Badge'
 import type { InvoiceCycle, InvoiceData } from '@/utils/invoices'
@@ -9,6 +9,9 @@ interface InvoiceCycleNavigatorProps {
   activeMonth: string
   onChangeMonth: (month: string) => void
   invoicesList?: InvoiceData[]
+  isPaid?: boolean
+  paidMap?: Record<string, boolean>
+  accountId?: string
 }
 
 export default function InvoiceCycleNavigator({
@@ -16,6 +19,9 @@ export default function InvoiceCycleNavigator({
   activeMonth,
   onChangeMonth,
   invoicesList,
+  isPaid = false,
+  paidMap = {},
+  accountId = '',
 }: InvoiceCycleNavigatorProps) {
   return (
     <div className="space-y-2.5">
@@ -39,9 +45,17 @@ export default function InvoiceCycleNavigator({
                 Aberta
               </Badge>
             ) : cycle.status === 'closed' ? (
-              <Badge variant="warning">
-                Fechada
-              </Badge>
+              isPaid ? (
+                <Badge variant="success">
+                  <span className="flex items-center gap-1">
+                    <Check className="w-3 h-3" /> Paga
+                  </span>
+                </Badge>
+              ) : (
+                <Badge variant="warning">
+                  Fechada (Pendente)
+                </Badge>
+              )
             ) : (
               <Badge variant="violet">
                 Futura
@@ -68,6 +82,7 @@ export default function InvoiceCycleNavigator({
           {invoicesList.map(inv => {
             const isSelected = inv.cycle.monthKey === activeMonth
             const hasCharges = inv.totalAmount > 0
+            const isInvPaid = Boolean(paidMap[`${accountId}_${inv.cycle.monthKey}`])
 
             return (
               <button
@@ -86,6 +101,8 @@ export default function InvoiceCycleNavigator({
                       ? 'bg-emerald-400'
                       : inv.cycle.status === 'future'
                       ? 'bg-violet-400'
+                      : isInvPaid
+                      ? 'bg-emerald-400'
                       : 'bg-amber-400'
                   }`} />
                   <span className={`text-[11px] font-semibold capitalize ${
@@ -93,6 +110,9 @@ export default function InvoiceCycleNavigator({
                   }`}>
                     {inv.cycle.label}
                   </span>
+                  {inv.cycle.status === 'closed' && isInvPaid && (
+                    <span className="text-[9px] text-emerald-400 font-bold">✓</span>
+                  )}
                 </div>
                 <p className={`text-xs font-bold tabular-nums mt-0.5 ${
                   hasCharges

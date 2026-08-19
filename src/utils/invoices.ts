@@ -196,3 +196,36 @@ export function getInvoicesOverview(
     totalFutureCommitted,
   }
 }
+
+/**
+ * Retorna as faturas fechadas que possuem saldo e não foram marcadas como pagas
+ */
+export function getClosedUnpaidInvoices(
+  transactions: Transaction[],
+  closingDay: number,
+  dueDay: number | undefined,
+  accountId: string,
+  paidMap: Record<string, boolean>,
+  pastMonthsCount = 12
+): InvoiceData[] {
+  if (!closingDay || closingDay < 1 || closingDay > 31) return []
+
+  const openMonthKey = getCurrentOpenInvoiceMonth(closingDay)
+  const closedUnpaid: InvoiceData[] = []
+
+  for (let i = 1; i <= pastMonthsCount; i++) {
+    const monthKey = shiftMonthKey(openMonthKey, -i)
+    const cycle = getInvoiceCycle(monthKey, closingDay, dueDay)
+
+    if (cycle.status === 'closed') {
+      const invoice = getInvoiceData(transactions, cycle)
+      const isMarkedPaid = Boolean(paidMap[`${accountId}_${monthKey}`])
+
+      if (invoice.totalAmount > 0 && !isMarkedPaid) {
+        closedUnpaid.push(invoice)
+      }
+    }
+  }
+
+  return closedUnpaid
+}

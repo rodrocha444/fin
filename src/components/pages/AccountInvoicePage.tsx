@@ -11,9 +11,11 @@ import {
   Pencil,
   FileText,
   Printer,
+  CheckCircle2,
 } from 'lucide-react'
 import { useAccount } from '@/hooks/useAccounts'
 import { useAccountTransactions } from '@/hooks/useTransactions'
+import { usePaidInvoices } from '@/hooks/useInvoices'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
 import { formatCurrency, formatDate, shiftMonth } from '@/utils/format'
 import {
@@ -21,10 +23,12 @@ import {
   getInvoiceCycle,
   getInvoiceData,
   getInvoicesOverview,
+  type InvoiceData,
 } from '@/utils/invoices'
 import TransactionForm from '@/components/organisms/TransactionForm'
 import AccountForm from '@/components/organisms/AccountForm'
 import InvoicePrintModal from '@/components/organisms/InvoicePrintModal'
+import ConfirmInvoicePaidModal from '@/components/organisms/ConfirmInvoicePaidModal'
 import InvoiceCycleNavigator from '@/components/molecules/InvoiceCycleNavigator'
 import SearchBar from '@/components/atoms/SearchBar'
 
@@ -46,6 +50,9 @@ export default function AccountInvoicePage() {
   const [showPayForm, setShowPayForm] = useState(false)
   const [showAccForm, setShowAccForm] = useState(false)
   const [showPrintModal, setShowPrintModal] = useState(false)
+  const [confirmPaidModalData, setConfirmPaidModalData] = useState<{ invoice: InvoiceData; targetStatus: boolean } | null>(null)
+
+  const { isPaid, setPaidStatus, paidMap } = usePaidInvoices()
 
   useEffect(() => {
     if (queryMonth) {
@@ -128,6 +135,8 @@ export default function AccountInvoicePage() {
     return tx.payee.toLowerCase().includes(q) || (tx.notes ?? '').toLowerCase().includes(q)
   })
 
+  const isCurrentInvoicePaid = account?.id ? isPaid(account.id, activeMonth) : false
+
   return (
     <div className="fade-in">
       {/* Header com suporte a safe area */}
@@ -205,6 +214,9 @@ export default function AccountInvoicePage() {
               activeMonth={activeMonth}
               onChangeMonth={setSelectedMonth}
               invoicesList={invoicesList}
+              isPaid={isCurrentInvoicePaid}
+              paidMap={paidMap}
+              accountId={account.id}
             />
 
             {/* Atalhos rápidos se não estiver na fatura aberta */}
@@ -269,6 +281,30 @@ export default function AccountInvoicePage() {
 
               {/* Botões de Ação */}
               <div className="flex flex-wrap items-center gap-2.5 pt-4 mt-4 border-t border-slate-800/80">
+                {cycle.status === 'closed' && (
+                  isCurrentInvoicePaid ? (
+                    <button
+                      type="button"
+                      onClick={() => invoiceData && setConfirmPaidModalData({ invoice: invoiceData, targetStatus: false })}
+                      className="btn-secondary py-2.5 px-4 text-xs font-semibold flex items-center gap-2 text-emerald-400 border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-900/50"
+                      title="Fatura marcada como paga. Clique para desmarcar"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <span>Fatura Paga</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => invoiceData && setConfirmPaidModalData({ invoice: invoiceData, targetStatus: true })}
+                      className="btn-primary py-2.5 px-4 text-xs font-semibold flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 border-emerald-500 shadow-lg shadow-emerald-900/30"
+                      title="Marcar esta fatura como paga"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Marcar como Paga</span>
+                    </button>
+                  )
+                )}
+
                 <button
                   onClick={() => setShowPayForm(true)}
                   className="btn-primary py-2.5 px-4 text-xs font-semibold flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 border-emerald-500 shadow-lg shadow-emerald-900/30"
@@ -423,6 +459,21 @@ export default function AccountInvoicePage() {
           invoiceData={invoiceData}
           categories={categories}
           onClose={() => setShowPrintModal(false)}
+        />
+      )}
+
+      {/* Modal de Confirmação de Pagamento de Fatura */}
+      {confirmPaidModalData && (
+        <ConfirmInvoicePaidModal
+          account={account}
+          invoiceData={confirmPaidModalData.invoice}
+          targetStatus={confirmPaidModalData.targetStatus}
+          onConfirm={async () => {
+            if (account.id) {
+              await setPaidStatus(account.id, confirmPaidModalData.invoice.cycle.monthKey, confirmPaidModalData.targetStatus)
+            }
+          }}
+          onClose={() => setConfirmPaidModalData(null)}
         />
       )}
     </div>
