@@ -1,6 +1,6 @@
 // src/App.tsx
 import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from '@/components/templates/Layout'
 import BudgetPage from '@/components/pages/BudgetPage'
 import AccountsPage from '@/components/pages/AccountsPage'
@@ -25,7 +25,7 @@ export default function App() {
   }, [])
 
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Navigate to="/budget" replace />} />
@@ -41,6 +41,6 @@ export default function App() {
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   )
 }
