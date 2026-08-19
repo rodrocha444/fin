@@ -113,8 +113,13 @@ export function getInvoiceData(
     return d >= cycle.startDate && d <= cycle.closingDate
   })
 
-  // Ordenar por data decrescente
-  invoiceTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  // Ordenar por data de criação decrescente (incluindo hora)
+  invoiceTransactions.sort((a, b) => {
+    const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
+    const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
+    if (timeB !== timeA) return timeB - timeA
+    return (b.id ?? '').localeCompare(a.id ?? '')
+  })
 
   let chargesAmount = 0
   let paymentsAmount = 0

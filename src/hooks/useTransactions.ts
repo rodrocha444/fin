@@ -55,7 +55,13 @@ export function useMonthTransactions(month: string) {
       createdAt: p.date,
     }))
 
-    return [...txs, ...projectedTxs]
+    const combined = [...txs, ...projectedTxs]
+    return combined.sort((a, b) => {
+      const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
+      const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
+      if (timeB !== timeA) return timeB - timeA
+      return (b.id ?? '').localeCompare(a.id ?? '')
+    })
   }, [month])
 }
 
@@ -164,8 +170,13 @@ export function useCreditCardPurchases(accountId: string | undefined) {
         }
       }
 
-      // Ordenar por data da compra decrescente
-      purchases.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      // Ordenar por data de criação decrescente (incluindo hora)
+      purchases.sort((a, b) => {
+        const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
+        const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
+        if (timeB !== timeA) return timeB - timeA
+        return (b.id ?? '').localeCompare(a.id ?? '')
+      })
       return purchases
     },
     [accountId]
