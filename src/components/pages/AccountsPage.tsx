@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, CreditCard, PiggyBank, Landmark, Pencil, Trash2 } from 'lucide-react'
+import { Plus, CreditCard, Landmark, Pencil, Trash2 } from 'lucide-react'
 import { useAccounts, useAllBalances } from '@/hooks/useAccounts'
 import { deleteAccount } from '@/db/repositories/accounts'
 import { formatCurrency, accountTypeLabel } from '@/utils/format'
@@ -10,7 +10,6 @@ import type { Account } from '@/types'
 
 function accountIcon(type: string) {
   if (type === 'credit_card') return <CreditCard className="w-5 h-5" />
-  if (type === 'savings') return <PiggyBank className="w-5 h-5" />
   return <Landmark className="w-5 h-5" />
 }
 
@@ -84,7 +83,7 @@ export default function AccountsPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {(['checking', 'savings', 'credit_card'] as const).map(type => {
+          {(['checking', 'credit_card'] as const).map(type => {
             const typed = accounts.filter(a => a.type === type)
             if (typed.length === 0) return null
             return (

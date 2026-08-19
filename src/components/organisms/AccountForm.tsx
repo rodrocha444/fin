@@ -21,7 +21,7 @@ const optionalDay = z.preprocess(
 
 const schema = z.object({
   name: z.string().min(1, 'Nome obrigatório'),
-  type: z.enum(['checking', 'savings', 'credit_card']),
+  type: z.enum(['checking', 'credit_card']),
   initialBalance: z.preprocess(
     v => (v === '' || v === null || v === undefined || (typeof v === 'number' && isNaN(v)) ? 0 : Number(v)),
     z.number().default(0)
@@ -35,7 +35,7 @@ const schema = z.object({
 
 interface FormValues {
   name: string
-  type: 'checking' | 'savings' | 'credit_card'
+  type: 'checking' | 'credit_card'
   initialBalance: number
   creditLimit?: number
   statementClosingDay?: number
@@ -146,9 +146,9 @@ export default function AccountForm({ account, onClose }: Props) {
                 </span>
               )}
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {(['checking', 'savings', 'credit_card'] as const).map(t => {
-                const labels = { checking: 'Corrente', savings: 'Poupança', credit_card: 'Cartão' }
+            <div className="grid grid-cols-2 gap-2">
+              {(['checking', 'credit_card'] as const).map(t => {
+                const labels = { checking: 'Corrente', credit_card: 'Cartão' }
                 const isSelected = type === t
                 return (
                   <button

@@ -7,7 +7,6 @@ import {
   Trash2,
   CreditCard,
   Landmark,
-  PiggyBank,
   Pencil,
   FileText,
   Receipt,
@@ -49,7 +48,6 @@ import type { Transaction } from '@/types'
 
 function accountIcon(type: string) {
   if (type === 'credit_card') return <CreditCard className="w-5 h-5" />
-  if (type === 'savings') return <PiggyBank className="w-5 h-5" />
   return <Landmark className="w-5 h-5" />
 }
 

@@ -66,7 +66,6 @@ export function frequencyLabel(freq: string): string {
 export function accountTypeLabel(type: string): string {
   const map: Record<string, string> = {
     checking: 'Conta Corrente',
-    savings: 'Poupança',
     credit_card: 'Cartão de Crédito',
   }
   return map[type] ?? type
