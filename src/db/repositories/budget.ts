@@ -1,10 +1,11 @@
 // src/db/repositories/budget.ts
 // ─────────────────────────────────────────────────────────────
-// Lógica de orçamento mensal por categoria (zero-sum budgeting)
+// Lógica de orçamento mensal por categoria (zero-sum budgeting) (padrão CUID)
 // Sem rollover: o saldo de categorias não acumula mês a mês.
 // ─────────────────────────────────────────────────────────────
 
 import { db } from '../schema'
+import { createId } from '@/utils/id'
 import type {
   BudgetMonth,
   GroupBudgetRow,
@@ -14,7 +15,7 @@ import type {
   BudgetSummary,
 } from '@/types'
 import { getActivityByCategory, getIncomeByCategory } from './transactions'
-import { getProjectedScheduledForMonth } from './scheduled'
+import { getProjectedScheduledUpToMonth } from './scheduled'
 import { format, subMonths } from 'date-fns'
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -24,30 +25,10 @@ export function toMonthKey(date: Date): string {
   return format(date, 'yyyy-MM')
 }
 
-/** Obtém ou cria um registro de BudgetMonth para category+month */
-async function getOrCreateBudgetMonth(month: string, categoryId: number): Promise<BudgetMonth> {
-  const existing = await db.budgetMonths
-    .where('[month+categoryId]')
-    .equals([month, categoryId])
-    .first()
-
-  if (existing) return existing
-
-  // Criar com budgeted = 0; activity e available são calculados
-  const id = await db.budgetMonths.add({
-    month,
-    categoryId,
-    budgeted: 0,
-    activity: 0,
-    available: 0,
-  })
-  return { id: id as number, month, categoryId, budgeted: 0, activity: 0, available: 0 }
-}
-
 // ── Operações de orçamento ───────────────────────────────────
 
 /** Define quanto o usuário quer orçar em uma categoria naquele mês */
-export async function setBudget(month: string, categoryId: number, budgeted: number): Promise<void> {
+export async function setBudget(month: string, categoryId: string, budgeted: number): Promise<void> {
   const existing = await db.budgetMonths
     .where('[month+categoryId]')
     .equals([month, categoryId])
@@ -56,7 +37,7 @@ export async function setBudget(month: string, categoryId: number, budgeted: num
   if (existing?.id !== undefined) {
     await db.budgetMonths.update(existing.id, { budgeted })
   } else {
-    await db.budgetMonths.add({ month, categoryId, budgeted, activity: 0, available: 0 })
+    await db.budgetMonths.add({ id: createId(), month, categoryId, budgeted, activity: 0, available: 0 })
   }
 }
 
@@ -79,6 +60,7 @@ export async function copyFromPreviousMonth(targetMonth: string): Promise<void> 
         await db.budgetMonths.update(existing.id, { budgeted: prev.budgeted })
       } else {
         await db.budgetMonths.add({
+          id: createId(),
           month: targetMonth,
           categoryId: prev.categoryId,
           budgeted: prev.budgeted,
@@ -197,9 +179,9 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
   ])
 
   // Identificar categorias de despesa (apenas elas deduzem do "A orçar")
-  const incomeGroupIds = new Set(allGroups.filter(g => g.type === 'income').map(g => g.id))
+  const incomeGroupIds = new Set(allGroups.filter(g => g.type === 'income').map(g => g.id!))
   const incomeCategoryIds = new Set(
-    allCategories.filter(c => incomeGroupIds.has(c.groupId)).map(c => c.id)
+    allCategories.filter(c => incomeGroupIds.has(c.groupId)).map(c => c.id!)
   )
 
   // Saldo inicial de contas de dinheiro/corrente/poupança (fundos iniciais disponíveis para orçar)
@@ -272,7 +254,7 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
   }
 
   // 5. Coletar categorias de despesas presentes
-  const expenseCategoryIds = new Set<number>()
+  const expenseCategoryIds = new Set<string>()
   for (const tx of allExpenseTxs) {
     if (tx.categoryId && !incomeCategoryIds.has(tx.categoryId)) expenseCategoryIds.add(tx.categoryId)
   }
@@ -280,11 +262,28 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
     if (b.categoryId && !incomeCategoryIds.has(b.categoryId)) expenseCategoryIds.add(b.categoryId)
   }
 
-  // 6. Integrar projeções de transações agendadas (recorrentes / futuras)
-  const scheduledOccurrences = getProjectedScheduledForMonth(allScheduled, month)
+  // 6. Integrar projeções de transações agendadas (recorrentes / futuras) até o mês selecionado
+  const scheduledOccurrences = getProjectedScheduledUpToMonth(allScheduled, month)
   for (const p of scheduledOccurrences) {
     const pMonth = toMonthKey(p.date)
-    if (pMonth === month) {
+    if (pMonth < month) {
+      if (p.type === 'income') {
+        priorIncome += p.amount
+      } else if (p.type === 'expense') {
+        if (p.categoryId && !incomeCategoryIds.has(p.categoryId)) {
+          const key = `${pMonth}:${p.categoryId}`
+          expensesByMonthCategory.set(key, (expensesByMonthCategory.get(key) || 0) + p.amount)
+          expenseCategoryIds.add(p.categoryId)
+          pastMonths.add(pMonth)
+        } else if (!p.categoryId) {
+          uncategorizedExpensesByMonth.set(
+            pMonth,
+            (uncategorizedExpensesByMonth.get(pMonth) || 0) + p.amount
+          )
+          pastMonths.add(pMonth)
+        }
+      }
+    } else if (pMonth === month) {
       if (p.type === 'income') {
         totalIncome += p.amount
       } else if (p.type === 'expense') {
@@ -342,7 +341,7 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
 }
 
 /** Retorna o budgeted atual de uma categoria em um mês */
-export async function getCategoryBudget(month: string, categoryId: number): Promise<number> {
+export async function getCategoryBudget(month: string, categoryId: string): Promise<number> {
   const rec = await db.budgetMonths
     .where('[month+categoryId]')
     .equals([month, categoryId])

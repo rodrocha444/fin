@@ -6,7 +6,7 @@
 export type AccountType = 'checking' | 'savings' | 'credit_card'
 
 export interface Account {
-  id?: number
+  id?: string
   name: string
   type: AccountType
   /** Saldo inicial (para contas não-cartão) */
@@ -26,7 +26,7 @@ export interface Account {
 // ── Categorias ──────────────────────────────────────────────
 
 export interface CategoryGroup {
-  id?: number
+  id?: string
   name: string
   type?: 'expense' | 'income'
   sortOrder: number
@@ -35,8 +35,8 @@ export interface CategoryGroup {
 }
 
 export interface Category {
-  id?: number
-  groupId: number
+  id?: string
+  groupId: string
   name: string
   sortOrder: number
   isHidden: boolean
@@ -45,10 +45,10 @@ export interface Category {
 // ── Orçamento Mensal ─────────────────────────────────────────
 
 export interface BudgetMonth {
-  id?: number
+  id?: string
   /** Formato: YYYY-MM */
   month: string
-  categoryId: number
+  categoryId: string
   /** Valor orçado pelo usuário naquele mês */
   budgeted: number
   /** Calculado: soma das transações do mês nessa categoria */
@@ -62,35 +62,35 @@ export interface BudgetMonth {
 export type TransactionType = 'income' | 'expense' | 'transfer'
 
 export interface Transaction {
-  id?: number
-  accountId: number
+  id?: string
+  accountId: string
   date: Date
   /** Positivo sempre. O sinal é determinado pelo type */
   amount: number
   payee: string
-  categoryId?: number
+  categoryId?: string
   notes?: string
   /** Reconciliada/compensada no banco */
   cleared: boolean
   type: TransactionType
   /** Para transfers: id da conta destino */
-  transferAccountId?: number
+  transferAccountId?: string
   /** Para identificar a transferência par (payment de cartão) */
-  transferTransactionId?: number
+  transferTransactionId?: string
   /** Se essa transação faz parte de um grupo de parcelamento */
-  installmentGroupId?: number
+  installmentGroupId?: string
   installmentNumber?: number
   installmentTotal?: number
   /** Se essa transação é uma projeção de agendamento futuro */
   isScheduledProjection?: boolean
-  scheduledId?: number
+  scheduledId?: string
   createdAt: Date
 }
 
 // ── Grupo de Parcelamento ────────────────────────────────────
 
 export interface InstallmentGroup {
-  id?: number
+  id?: string
   description: string
   /** Valor total da compra */
   totalAmount: number
@@ -98,8 +98,8 @@ export interface InstallmentGroup {
   /** Valor de cada parcela (pode ser arredondado) */
   installmentAmount: number
   startDate: Date
-  accountId: number
-  categoryId?: number
+  accountId: string
+  categoryId?: string
   createdAt: Date
 }
 
@@ -108,13 +108,13 @@ export interface InstallmentGroup {
 export type ScheduledFrequency = 'once' | 'weekly' | 'biweekly' | 'monthly' | 'yearly'
 
 export interface ScheduledTransaction {
-  id?: number
-  accountId: number
+  id?: string
+  accountId: string
   amount: number
   payee: string
-  categoryId?: number
+  categoryId?: string
   type: TransactionType
-  transferAccountId?: number
+  transferAccountId?: string
   frequency: ScheduledFrequency
   /** Próxima data de disparo */
   nextDate: Date
@@ -127,9 +127,9 @@ export interface ScheduledTransaction {
 // ── Payees ───────────────────────────────────────────────────
 
 export interface Payee {
-  id?: number
+  id?: string
   name: string
-  defaultCategoryId?: number
+  defaultCategoryId?: string
 }
 
 // ── Helpers de cálculo ───────────────────────────────────────
@@ -183,7 +183,7 @@ export interface IncomeGroupBudgetRow {
 export type IssueSeverity = 'warning' | 'error' | 'info'
 
 export interface PendingIssueItem {
-  id: number
+  id: string
   title: string
   subtitle?: string
   amount?: number
@@ -207,7 +207,7 @@ export type DebtType = 'receivable' | 'payable'
 export type DebtStatus = 'pending' | 'settled' | 'cancelled'
 
 export interface DebtAccount {
-  id?: number
+  id?: string
   name: string
   phone?: string
   notes?: string
@@ -217,8 +217,8 @@ export interface DebtAccount {
 }
 
 export interface DebtItem {
-  id?: number
-  debtAccountId: number
+  id?: string
+  debtAccountId: string
   description: string
   type: DebtType
   amount: number
@@ -239,3 +239,4 @@ export interface DebtSummary {
   netBalance: number
   pendingCount: number
 }
+

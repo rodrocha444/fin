@@ -41,7 +41,7 @@ export default function AccountHistoryModal({ account, balance, onClose }: Props
       const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
       const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
       if (timeB !== timeA) return timeB - timeA
-      return (b.id ?? 0) - (a.id ?? 0)
+      return (b.id ?? '').localeCompare(a.id ?? '')
     })
 
   const handleDelete = async (tx: Transaction) => {

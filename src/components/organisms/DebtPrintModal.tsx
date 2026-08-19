@@ -1,5 +1,5 @@
 // src/components/organisms/DebtPrintModal.tsx — Visualização e impressão de extrato em PDF de cobranças/pendências
-import { Printer, X, Download } from 'lucide-react'
+import { Printer, X } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/utils/format'
 import type { DebtAccount, DebtItem } from '@/types'
 
@@ -12,6 +12,67 @@ interface DebtPrintModalProps {
   onClose: () => void
 }
 
+// ── Tipos para agrupamento ───────────────────────────────────
+type InstallmentGroup = {
+  kind: 'group'
+  groupId: string
+  description: string
+  type: DebtItem['type']
+  totalInstallments: number
+  settledCount: number
+  pendingCount: number
+  totalAmount: number
+  perInstallmentAmount: number
+  nextDueDate?: Date
+  items: DebtItem[]
+}
+type SingleEntry = { kind: 'single'; item: DebtItem }
+type PrintEntry = SingleEntry | InstallmentGroup
+
+/** Agrupa itens parcelados (installmentGroupId) em entradas únicas */
+function buildPrintEntries(items: DebtItem[]): PrintEntry[] {
+  const groupMap = new Map<string, DebtItem[]>()
+  const singles: DebtItem[] = []
+
+  for (const item of items) {
+    if (item.installmentGroupId) {
+      const arr = groupMap.get(item.installmentGroupId) ?? []
+      arr.push(item)
+      groupMap.set(item.installmentGroupId, arr)
+    } else {
+      singles.push(item)
+    }
+  }
+
+  const entries: PrintEntry[] = singles.map(item => ({ kind: 'single', item }))
+
+  for (const [groupId, groupItems] of groupMap) {
+    const rep = groupItems[0]
+    const settledCount = groupItems.filter(i => i.status === 'settled').length
+    const pendingCount = groupItems.filter(i => i.status === 'pending').length
+    const nextDue = groupItems
+      .filter(i => i.status === 'pending' && i.dueDate)
+      .map(i => new Date(i.dueDate!))
+      .sort((a, b) => a.getTime() - b.getTime())[0]
+
+    entries.push({
+      kind: 'group',
+      groupId,
+      description: rep.description.replace(/\s*\(\d+\/\d+\)$/, '').trim(),
+      type: rep.type,
+      totalInstallments: rep.installmentTotal ?? groupItems.length,
+      settledCount,
+      pendingCount,
+      totalAmount: groupItems.reduce((s, i) => s + i.amount, 0),
+      perInstallmentAmount: rep.amount,
+      nextDueDate: nextDue,
+      items: [...groupItems].sort((a, b) => (a.installmentNumber ?? 0) - (b.installmentNumber ?? 0)),
+    })
+  }
+
+  return entries
+}
+
 export default function DebtPrintModal({
   account,
   items,
@@ -20,45 +81,54 @@ export default function DebtPrintModal({
   balance,
   onClose,
 }: DebtPrintModalProps) {
-  const pendingItems = items.filter(i => i.status === 'pending')
-  const settledItems = items.filter(i => i.status === 'settled')
+  const allEntries = buildPrintEntries(items)
+  const pendingEntries = allEntries.filter(e =>
+    e.kind === 'single' ? e.item.status === 'pending' : e.pendingCount > 0
+  )
+  const settledEntries = allEntries.filter(e =>
+    e.kind === 'single' ? e.item.status === 'settled' : e.settledCount > 0 && e.pendingCount === 0
+  )
 
-  const handlePrint = () => {
-    window.print()
-  }
+  const handlePrint = () => window.print()
 
   return (
     <div
       className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-2 sm:p-6 overflow-y-auto"
-      onClick={e => {
-        if (e.target === e.currentTarget) onClose()
+      style={{
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)',
+        paddingLeft: 'calc(env(safe-area-inset-left, 0px) + 0.5rem)',
+        paddingRight: 'calc(env(safe-area-inset-right, 0px) + 0.5rem)',
       }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[95vh] overflow-hidden">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl shadow-2xl flex flex-col max-h-full sm:max-h-[95vh] overflow-hidden">
         {/* Header da modal (oculto na impressão) */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 flex-shrink-0 print:hidden">
-          <div>
-            <h2 className="font-semibold text-slate-100 text-base sm:text-lg">Extrato / Relatório em PDF</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Visualize e imprima o extrato de pendências</p>
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-800 flex-shrink-0 print:hidden gap-3">
+          <div className="min-w-0">
+            <h2 className="font-semibold text-slate-100 text-sm sm:text-lg truncate">Extrato / Relatório em PDF</h2>
+            <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">Visualize e imprima o extrato de pendências</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={handlePrint}
-              className="btn-primary py-2 px-3.5 text-xs font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/30"
+              className="btn-primary py-2 px-3 sm:px-3.5 text-xs font-semibold flex items-center gap-1.5 sm:gap-2 shadow-lg shadow-indigo-600/30"
             >
               <Printer className="w-4 h-4" />
-              <span>Imprimir / Salvar PDF</span>
+              <span className="hidden sm:inline">Imprimir / Salvar PDF</span>
+              <span className="sm:hidden">Imprimir</span>
             </button>
             <button
               onClick={onClose}
               className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 active:bg-slate-700 transition-colors"
+              aria-label="Fechar"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Documento Formatado (Folha A4 / Extrato) */}
+        {/* Documento Formatado */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-950 print:bg-white print:p-0 print:m-0 print:text-black print:overflow-visible">
           <div id="printable-debt-container" className="bg-slate-900 print:bg-white text-slate-100 print:text-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-800 print:border-none space-y-6 print:space-y-3.5 print:p-0 print:m-0">
 
@@ -66,9 +136,7 @@ export default function DebtPrintModal({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 print:border-slate-300 pb-6 print:pb-3 print-avoid-break">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <div className="w-6 h-6 rounded-lg bg-indigo-600 print:bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">
-                    F
-                  </div>
+                  <div className="w-6 h-6 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">F</div>
                   <span className="font-bold text-sm text-slate-100 print:text-slate-900 tracking-tight">FinPlan</span>
                 </div>
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-indigo-400 print:text-indigo-900">
@@ -90,24 +158,18 @@ export default function DebtPrintModal({
             <div className="grid grid-cols-3 gap-3 p-4 print:p-2.5 rounded-xl bg-slate-950/80 print:bg-slate-50 border border-slate-800 print:border-slate-300 print-avoid-break">
               <div>
                 <p className="text-[10px] sm:text-xs text-slate-500 print:text-slate-600 font-medium">A Pagar por Você</p>
-                <p className="text-sm sm:text-lg font-bold text-rose-400 print:text-rose-700 tabular-nums">
-                  {formatCurrency(receivable)}
-                </p>
+                <p className="text-sm sm:text-lg font-bold text-rose-400 print:text-rose-700 tabular-nums">{formatCurrency(receivable)}</p>
               </div>
               <div>
                 <p className="text-[10px] sm:text-xs text-slate-500 print:text-slate-600 font-medium">A seu Favor (Créditos)</p>
-                <p className="text-sm sm:text-lg font-bold text-emerald-400 print:text-emerald-700 tabular-nums">
-                  {formatCurrency(payable)}
-                </p>
+                <p className="text-sm sm:text-lg font-bold text-emerald-400 print:text-emerald-700 tabular-nums">{formatCurrency(payable)}</p>
               </div>
               <div>
                 <p className="text-[10px] sm:text-xs text-slate-500 print:text-slate-600 font-medium">Saldo do Acerto</p>
                 <p className={`text-sm sm:text-lg font-bold tabular-nums ${
-                  balance > 0
-                    ? 'text-rose-400 print:text-rose-700'
-                    : balance < 0
-                    ? 'text-emerald-400 print:text-emerald-700'
-                    : 'text-slate-300 print:text-slate-700'
+                  balance > 0 ? 'text-rose-400 print:text-rose-700'
+                  : balance < 0 ? 'text-emerald-400 print:text-emerald-700'
+                  : 'text-slate-300 print:text-slate-700'
                 }`}>
                   {balance > 0
                     ? `${formatCurrency(balance)} (a pagar)`
@@ -118,68 +180,118 @@ export default function DebtPrintModal({
               </div>
             </div>
 
-            {/* Tabela de Pendências Abertas */}
+            {/* Pendências em Aberto */}
             <div className="space-y-3 print:space-y-1.5">
-              <h2 className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-amber-400 print:text-slate-800 flex items-center justify-between print-avoid-break">
-                <span>Pendências e Parcelas em Aberto ({pendingItems.length})</span>
+              <h2 className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-amber-400 print:text-slate-800 print-avoid-break">
+                Pendências em Aberto ({pendingEntries.length})
               </h2>
 
-              {pendingItems.length === 0 ? (
+              {pendingEntries.length === 0 ? (
                 <p className="text-xs text-slate-500 print:text-slate-500 py-3 print:py-1.5 italic">Nenhuma pendência em aberto no momento.</p>
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-slate-800 print:border-slate-300">
                   <table className="w-full text-xs text-left">
                     <thead className="bg-slate-800/80 print:bg-slate-100 text-slate-400 print:text-slate-700 uppercase font-semibold">
                       <tr>
-                        <th className="py-2.5 px-3 print:py-1.5 print:px-2.5">Data</th>
-                        <th className="py-2.5 px-3 print:py-1.5 print:px-2.5">Descrição / Parcela</th>
+                        <th className="py-2.5 px-3 print:py-1.5 print:px-2.5">Descrição</th>
                         <th className="py-2.5 px-3 print:py-1.5 print:px-2.5">Natureza</th>
-                        <th className="py-2.5 px-3 print:py-1.5 print:px-2.5">Vencimento</th>
-                        <th className="py-2.5 px-3 print:py-1.5 print:px-2.5 text-right">Valor</th>
+                        <th className="py-2.5 px-3 print:py-1.5 print:px-2.5">Parcelas</th>
+                        <th className="py-2.5 px-3 print:py-1.5 print:px-2.5">Próx. Venc.</th>
+                        <th className="py-2.5 px-3 print:py-1.5 print:px-2.5 text-right">Valor Pendente</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800 print:divide-slate-200">
-                      {pendingItems.map(item => (
-                        <tr key={item.id} className="hover:bg-slate-800/30 print:hover:bg-transparent print-avoid-break">
-                          <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-slate-400 print:text-slate-600 whitespace-nowrap">{formatDate(item.createdAt)}</td>
-                          <td className="py-2 px-3 print:py-1.5 print:px-2.5 font-medium text-slate-200 print:text-slate-900">
-                            {item.description}
-                            {item.installmentTotal && (
-                              <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-950/80 text-violet-300 print:bg-slate-200 print:text-slate-800">
-                                {item.installmentNumber}/{item.installmentTotal}x
+                      {pendingEntries.map(entry => {
+                        if (entry.kind === 'single') {
+                          const { item } = entry
+                          const hasInstallment = !!(item.installmentTotal && item.installmentTotal > 1)
+                          return (
+                            <tr key={item.id} className="hover:bg-slate-800/30 print:hover:bg-transparent print-avoid-break">
+                              <td className="py-2 px-3 print:py-1.5 print:px-2.5 font-medium text-slate-200 print:text-slate-900">{item.description}</td>
+                              <td className="py-2 px-3 print:py-1.5 print:px-2.5 whitespace-nowrap">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                  item.type === 'receivable'
+                                    ? 'bg-rose-950/80 text-rose-300 print:bg-rose-100 print:text-rose-800'
+                                    : 'bg-emerald-950/80 text-emerald-300 print:bg-emerald-100 print:text-emerald-800'
+                                }`}>
+                                  {item.type === 'receivable' ? 'A Pagar por você' : 'A seu favor'}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-slate-400 print:text-slate-600 whitespace-nowrap">
+                                {hasInstallment ? (
+                                  <div>
+                                    <span>{item.installmentNumber || 1}/{item.installmentTotal}</span>
+                                    <span className="text-[10px] block text-slate-500 print:text-slate-600 font-medium">
+                                      {formatCurrency(item.amount)}/parc.
+                                    </span>
+                                  </div>
+                                ) : '—'}
+                              </td>
+                              <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-slate-400 print:text-slate-600 whitespace-nowrap">
+                                {item.dueDate ? formatDate(item.dueDate) : 'A combinar'}
+                              </td>
+                              <td className={`py-2 px-3 print:py-1.5 print:px-2.5 text-right font-bold tabular-nums whitespace-nowrap ${
+                                item.type === 'receivable' ? 'text-rose-400 print:text-rose-700' : 'text-emerald-400 print:text-emerald-700'
+                              }`}>
+                                {formatCurrency(item.amount)}
+                              </td>
+                            </tr>
+                          )
+                        }
+
+                        // Grupo de parcelas
+                        const pendingAmount = entry.items
+                          .filter(i => i.status === 'pending')
+                          .reduce((s, i) => s + i.amount, 0)
+                        return (
+                          <tr key={entry.groupId} className="hover:bg-slate-800/30 print:hover:bg-transparent print-avoid-break">
+                            <td className="py-2 px-3 print:py-1.5 print:px-2.5 font-medium text-slate-200 print:text-slate-900">
+                              {entry.description}
+                            </td>
+                            <td className="py-2 px-3 print:py-1.5 print:px-2.5 whitespace-nowrap">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                entry.type === 'receivable'
+                                  ? 'bg-rose-950/80 text-rose-300 print:bg-rose-100 print:text-rose-800'
+                                  : 'bg-emerald-950/80 text-emerald-300 print:bg-emerald-100 print:text-emerald-800'
+                              }`}>
+                                {entry.type === 'receivable' ? 'A Pagar por você' : 'A seu favor'}
                               </span>
-                            )}
-                          </td>
-                          <td className="py-2 px-3 print:py-1.5 print:px-2.5 whitespace-nowrap">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                              item.type === 'receivable'
-                                ? 'bg-rose-950/80 text-rose-300 print:bg-rose-100 print:text-rose-800'
-                                : 'bg-emerald-950/80 text-emerald-300 print:bg-emerald-100 print:text-emerald-800'
+                            </td>
+                            <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-slate-400 print:text-slate-600 whitespace-nowrap">
+                              <div>
+                                <span>{entry.settledCount}/{entry.totalInstallments} pagas</span>
+                              </div>
+                              <div className="text-[10px] text-slate-500 print:text-slate-600 font-medium tabular-nums">
+                                {formatCurrency(entry.perInstallmentAmount)}/parcela
+                              </div>
+                            </td>
+                            <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-slate-400 print:text-slate-600 whitespace-nowrap">
+                              {entry.nextDueDate ? formatDate(entry.nextDueDate) : 'A combinar'}
+                            </td>
+                            <td className={`py-2 px-3 print:py-1.5 print:px-2.5 text-right font-bold tabular-nums whitespace-nowrap ${
+                              entry.type === 'receivable' ? 'text-rose-400 print:text-rose-700' : 'text-emerald-400 print:text-emerald-700'
                             }`}>
-                              {item.type === 'receivable' ? 'A Pagar por você' : 'A seu favor'}
-                            </span>
-                          </td>
-                          <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-slate-400 print:text-slate-600 whitespace-nowrap">
-                            {item.dueDate ? formatDate(item.dueDate) : 'A combinar'}
-                          </td>
-                          <td className={`py-2 px-3 print:py-1.5 print:px-2.5 text-right font-bold tabular-nums whitespace-nowrap ${
-                            item.type === 'receivable' ? 'text-rose-400 print:text-rose-700' : 'text-emerald-400 print:text-emerald-700'
-                          }`}>
-                            {formatCurrency(item.amount)}
-                          </td>
-                        </tr>
-                      ))}
+                              <div>{formatCurrency(pendingAmount)}</div>
+                              {entry.totalAmount !== pendingAmount && (
+                                <div className="text-[10px] font-normal text-slate-500 print:text-slate-600">
+                                  Total: {formatCurrency(entry.totalAmount)}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
             </div>
 
-            {/* Histórico de Itens Liquidados / Pagos */}
-            {settledItems.length > 0 && (
+            {/* Histórico de Itens Liquidados */}
+            {settledEntries.length > 0 && (
               <div className="space-y-3 print:space-y-1.5 pt-4 print:pt-2 border-t border-slate-800 print:border-slate-300">
                 <h2 className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-slate-400 print:text-slate-700 print-avoid-break">
-                  Histórico de Itens já Quitados ({settledItems.length})
+                  Histórico de Itens já Quitados ({settledEntries.length})
                 </h2>
 
                 <div className="overflow-x-auto rounded-xl border border-slate-800 print:border-slate-300">
@@ -188,33 +300,64 @@ export default function DebtPrintModal({
                       <tr>
                         <th className="py-2.5 px-3 print:py-1.5 print:px-2.5">Descrição</th>
                         <th className="py-2.5 px-3 print:py-1.5 print:px-2.5">Natureza</th>
-                        <th className="py-2.5 px-3 print:py-1.5 print:px-2.5">Quitado em</th>
-                        <th className="py-2.5 px-3 print:py-1.5 print:px-2.5 text-right">Valor</th>
+                        <th className="py-2.5 px-3 print:py-1.5 print:px-2.5">Parcelas</th>
+                        <th className="py-2.5 px-3 print:py-1.5 print:px-2.5 text-right">Valor Total</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800 print:divide-slate-200">
-                      {settledItems.map(item => (
-                        <tr key={item.id} className="print-avoid-break">
-                          <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-slate-400 print:text-slate-700 line-through">
-                            {item.description}
-                            {item.installmentTotal && ` (${item.installmentNumber}/${item.installmentTotal}x)`}
-                          </td>
-                          <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-slate-400 print:text-slate-600">
-                            {item.type === 'receivable' ? 'Pago por você' : 'Recebido por você'}
-                          </td>
-                          <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-slate-400 print:text-slate-600">{item.settledDate ? formatDate(item.settledDate) : '—'}</td>
-                          <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-right font-medium text-slate-400 print:text-slate-700 tabular-nums">
-                            {formatCurrency(item.amount)}
-                          </td>
-                        </tr>
-                      ))}
+                      {settledEntries.map(entry => {
+                        if (entry.kind === 'single') {
+                          const { item } = entry
+                          const hasInstallment = !!(item.installmentTotal && item.installmentTotal > 1)
+                          return (
+                            <tr key={item.id} className="print-avoid-break">
+                              <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-slate-400 print:text-slate-700 line-through">{item.description}</td>
+                              <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-slate-400 print:text-slate-600">
+                                {item.type === 'receivable' ? 'Pago por você' : 'Recebido por você'}
+                              </td>
+                              <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-slate-400 print:text-slate-600 whitespace-nowrap">
+                                {hasInstallment ? (
+                                  <div>
+                                    <span>{item.installmentNumber || 1}/{item.installmentTotal}</span>
+                                    <span className="text-[10px] block text-slate-500 print:text-slate-600 font-medium">
+                                      {formatCurrency(item.amount)}/parc.
+                                    </span>
+                                  </div>
+                                ) : '—'}
+                              </td>
+                              <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-right font-medium text-slate-400 print:text-slate-700 tabular-nums">
+                                {formatCurrency(item.amount)}
+                              </td>
+                            </tr>
+                          )
+                        }
+
+                        // Grupo totalmente quitado
+                        return (
+                          <tr key={entry.groupId} className="print-avoid-break">
+                            <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-slate-400 print:text-slate-700 line-through">{entry.description}</td>
+                            <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-slate-400 print:text-slate-600">
+                              {entry.type === 'receivable' ? 'Pago por você' : 'Recebido por você'}
+                            </td>
+                            <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-slate-400 print:text-slate-600 whitespace-nowrap">
+                              <div>{entry.totalInstallments}/{entry.totalInstallments} pagas</div>
+                              <div className="text-[10px] text-slate-500 print:text-slate-600 font-medium tabular-nums">
+                                {formatCurrency(entry.perInstallmentAmount)}/parcela
+                              </div>
+                            </td>
+                            <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-right font-medium text-slate-400 print:text-slate-700 tabular-nums">
+                              {formatCurrency(entry.totalAmount)}
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
               </div>
             )}
 
-            {/* Rodapé de Encerramento */}
+            {/* Rodapé */}
             <div className="pt-8 print:pt-3 border-t border-slate-800 print:border-slate-300 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 print:text-slate-600 gap-2 print-avoid-break">
               <p>Demonstrativo para conferência e acerto mútuo.</p>
               <p className="font-medium">FinPlan</p>
@@ -226,3 +369,4 @@ export default function DebtPrintModal({
     </div>
   )
 }
+

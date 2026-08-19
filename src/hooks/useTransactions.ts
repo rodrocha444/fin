@@ -1,13 +1,16 @@
 // src/hooks/useTransactions.ts
+// ─────────────────────────────────────────────────────────────
+// Hooks reativos para transações e compras (padrão CUID)
+// ─────────────────────────────────────────────────────────────
+
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/db/schema'
 import { getTransactionsByAccount, getTransactionsByMonth, getMonthSummary, getTransactionsByCategoryAndMonth } from '@/db/repositories/transactions'
 import { getProjectedScheduledForMonth } from '@/db/repositories/scheduled'
-import { startOfMonth, endOfMonth } from 'date-fns'
 import type { Transaction } from '@/types'
 
 /** Transações de uma conta (todas ordenadas por createdAt desc) */
-export function useAccountTransactions(accountId: number | undefined) {
+export function useAccountTransactions(accountId: string | undefined) {
   return useLiveQuery(
     async () => {
       if (accountId === undefined) return []
@@ -18,7 +21,7 @@ export function useAccountTransactions(accountId: number | undefined) {
 }
 
 /** Transações de uma categoria em um mês específico */
-export function useCategoryMonthTransactions(categoryId: number | undefined, month: string) {
+export function useCategoryMonthTransactions(categoryId: string | undefined, month: string) {
   return useLiveQuery(
     async () => {
       if (categoryId === undefined) return []
@@ -62,7 +65,7 @@ export function useMonthSummary(month: string) {
 }
 
 /** Parcelamentos de um grupo */
-export function useInstallmentGroup(groupId: number | undefined) {
+export function useInstallmentGroup(groupId: string | undefined) {
   return useLiveQuery(
     async () => {
       if (groupId === undefined) return undefined
@@ -78,22 +81,22 @@ export function useInstallmentGroup(groupId: number | undefined) {
 
 export interface CreditCardPurchase {
   id: string
-  groupId?: number
-  transactionId?: number
+  groupId?: string
+  transactionId?: string
   payee: string
   date: Date
   createdAt?: Date
   amount: number
   installmentCount?: number
   installmentAmount?: number
-  categoryId?: number
+  categoryId?: string
   notes?: string
   type: 'expense' | 'income' | 'transfer'
   isInstallment: boolean
 }
 
 /** Histórico consolidado de compras para conta do tipo Cartão de Crédito */
-export function useCreditCardPurchases(accountId: number | undefined) {
+export function useCreditCardPurchases(accountId: string | undefined) {
   return useLiveQuery(
     async () => {
       if (accountId === undefined) return []
@@ -111,7 +114,7 @@ export function useCreditCardPurchases(accountId: number | undefined) {
       ])
 
       const groupMap = new Map(allGroups.map(g => [g.id!, g]))
-      const seenGroupIds = new Set<number>()
+      const seenGroupIds = new Set<string>()
       const purchases: CreditCardPurchase[] = []
 
       for (const tx of allTxs) {
@@ -168,4 +171,3 @@ export function useCreditCardPurchases(accountId: number | undefined) {
     [accountId]
   )
 }
-

@@ -19,7 +19,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 interface DebtItemFormProps {
-  debtAccountId: number
+  debtAccountId: string
   accountName: string
   item?: DebtItem
   defaultType?: DebtType
@@ -57,7 +57,7 @@ export default function DebtItemForm({
       : {
           description: '',
           amount: 0,
-          dueDate: format(new Date(), 'yyyy-MM-dd'),
+          dueDate: '',
           notes: '',
         },
   })
@@ -65,7 +65,7 @@ export default function DebtItemForm({
   const currentAmount = watch('amount') || 0
 
   const onSubmit = async (data: FormData) => {
-    const dueDateParsed = data.dueDate ? new Date(data.dueDate + 'T12:00:00') : new Date()
+    const dueDateParsed = data.dueDate ? new Date(data.dueDate + 'T12:00:00') : undefined
 
     if (isEdit && item.id) {
       await updateDebtItem(item.id, {
@@ -82,7 +82,7 @@ export default function DebtItemForm({
         type,
         totalAmount: data.amount,
         installmentCount,
-        startDate: dueDateParsed,
+        startDate: dueDateParsed || new Date(),
         notes: data.notes?.trim() || undefined,
       })
     } else {
@@ -238,7 +238,7 @@ export default function DebtItemForm({
           {/* Prazo / Data de Vencimento */}
           <div>
             <label className="label">
-              {!isEdit && installmentCount > 1 ? 'Vencimento da 1ª Parcela' : 'Data limite / Prazo de acerto'}
+              {!isEdit && installmentCount > 1 ? 'Vencimento da 1ª Parcela (opcional)' : 'Data limite / Prazo de acerto (opcional)'}
             </label>
             <input
               {...register('dueDate')}

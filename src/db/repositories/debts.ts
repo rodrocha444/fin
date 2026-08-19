@@ -1,16 +1,17 @@
 // src/db/repositories/debts.ts
 // ─────────────────────────────────────────────────────────────
-// CRUD e cálculos para Contas a Receber / Pagar e Pendências
+// CRUD e cálculos para Contas a Receber / Pagar e Pendências (padrão CUID)
 // ─────────────────────────────────────────────────────────────
 
 import { db } from '../schema'
+import { createId } from '@/utils/id'
 import type { DebtAccount, DebtItem, DebtSummary, DebtStatus, DebtType } from '@/types'
 import { addMonths } from 'date-fns'
 
 // ── Tipos de Parcelamento de Dívida ──────────────────────────
 
 export interface CreateDebtInstallmentsInput {
-  debtAccountId: number
+  debtAccountId: string
   description: string
   type: DebtType
   totalAmount: number
@@ -23,7 +24,7 @@ export interface CreateDebtInstallmentsInput {
 
 export async function createDebtAccount(
   data: Omit<DebtAccount, 'id' | 'createdAt'>
-): Promise<number> {
+): Promise<string> {
   const normalizedName = data.name.trim().toLowerCase()
   const existing = await db.debtAccounts
     .filter(a => a.isActive !== false && a.name.trim().toLowerCase() === normalizedName)
@@ -33,17 +34,20 @@ export async function createDebtAccount(
     throw new Error(`Já existe uma conta/contato cadastrado com o nome "${data.name.trim()}".`)
   }
 
-  return db.debtAccounts.add({
+  const id = createId()
+  await db.debtAccounts.add({
     ...data,
+    id,
     name: data.name.trim(),
     color: data.color || '#6366f1',
     isActive: data.isActive ?? true,
     createdAt: new Date(),
-  }) as Promise<number>
+  })
+  return id
 }
 
 export async function updateDebtAccount(
-  id: number,
+  id: string,
   data: Partial<Omit<DebtAccount, 'id' | 'createdAt'>>
 ): Promise<void> {
   if (data.name) {
@@ -65,14 +69,14 @@ export async function updateDebtAccount(
   await db.debtAccounts.update(id, payload)
 }
 
-export async function deleteDebtAccount(id: number): Promise<void> {
+export async function deleteDebtAccount(id: string): Promise<void> {
   await db.transaction('rw', db.debtAccounts, db.debtItems, async () => {
     await db.debtItems.where('debtAccountId').equals(id).delete()
     await db.debtAccounts.delete(id)
   })
 }
 
-export async function getDebtAccount(id: number): Promise<DebtAccount | undefined> {
+export async function getDebtAccount(id: string): Promise<DebtAccount | undefined> {
   return db.debtAccounts.get(id)
 }
 
@@ -87,13 +91,16 @@ export async function getAllDebtAccounts(): Promise<DebtAccount[]> {
 
 export async function createDebtItem(
   data: Omit<DebtItem, 'id' | 'createdAt'>
-): Promise<number> {
-  return db.debtItems.add({
+): Promise<string> {
+  const id = createId()
+  await db.debtItems.add({
     ...data,
+    id,
     description: data.description.trim(),
     status: data.status || 'pending',
     createdAt: new Date(),
-  }) as Promise<number>
+  })
+  return id
 }
 
 export async function createDebtInstallments(input: CreateDebtInstallmentsInput): Promise<void> {
@@ -125,8 +132,10 @@ export async function createDebtInstallments(input: CreateDebtInstallmentsInput)
       accumulated += amount
 
       const dueDate = addMonths(input.startDate, i - 1)
+      const itemId = createId()
 
       await db.debtItems.add({
+        id: itemId,
         debtAccountId: input.debtAccountId,
         description: input.description.trim(),
         type: input.type,
@@ -145,7 +154,7 @@ export async function createDebtInstallments(input: CreateDebtInstallmentsInput)
 }
 
 export async function updateDebtItem(
-  id: number,
+  id: string,
   data: Partial<Omit<DebtItem, 'id' | 'createdAt'>>
 ): Promise<void> {
   const payload = {
@@ -155,18 +164,18 @@ export async function updateDebtItem(
   await db.debtItems.update(id, payload)
 }
 
-export async function deleteDebtItem(id: number): Promise<void> {
+export async function deleteDebtItem(id: string): Promise<void> {
   await db.debtItems.delete(id)
 }
 
-export async function setDebtItemStatus(id: number, status: DebtStatus): Promise<void> {
+export async function setDebtItemStatus(id: string, status: DebtStatus): Promise<void> {
   await db.debtItems.update(id, {
     status,
     settledDate: status === 'settled' ? new Date() : undefined,
   })
 }
 
-export async function getDebtItemsByAccount(debtAccountId: number): Promise<DebtItem[]> {
+export async function getDebtItemsByAccount(debtAccountId: string): Promise<DebtItem[]> {
   const items = await db.debtItems
     .where('debtAccountId')
     .equals(debtAccountId)
@@ -180,7 +189,7 @@ export async function getDebtItemsByAccount(debtAccountId: number): Promise<Debt
   })
 }
 
-export async function calculateDebtAccountBalance(debtAccountId: number): Promise<{
+export async function calculateDebtAccountBalance(debtAccountId: string): Promise<{
   receivable: number
   payable: number
   balance: number

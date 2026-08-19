@@ -1,4 +1,8 @@
 // src/hooks/useAccounts.ts
+// ─────────────────────────────────────────────────────────────
+// Hooks reativos para contas e saldos (padrão CUID)
+// ─────────────────────────────────────────────────────────────
+
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/db/schema'
 import { calculateAccountBalance } from '@/db/repositories/accounts'
@@ -9,7 +13,7 @@ export function useAccounts() {
 }
 
 /** Uma conta específica pelo ID */
-export function useAccount(accountId: number | undefined) {
+export function useAccount(accountId: string | undefined) {
   return useLiveQuery(
     async () => {
       if (accountId === undefined) return undefined
@@ -20,7 +24,7 @@ export function useAccount(accountId: number | undefined) {
 }
 
 /** Saldo de uma conta específica, calculado dinamicamente */
-export function useAccountBalance(accountId: number | undefined) {
+export function useAccountBalance(accountId: string | undefined) {
   return useLiveQuery(
     async () => {
       if (accountId === undefined) return undefined
@@ -37,7 +41,7 @@ export function useAllBalances() {
     const entries = await Promise.all(
       accounts
         .filter(a => a.id !== undefined)
-        .map(async a => [a.id!, await calculateAccountBalance(a.id!)] as [number, number])
+        .map(async a => [a.id!, await calculateAccountBalance(a.id!)] as [string, number])
     )
     return new Map(entries)
   }, [])

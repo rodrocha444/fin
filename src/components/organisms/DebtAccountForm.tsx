@@ -19,7 +19,7 @@ type FormData = z.infer<typeof schema>
 interface DebtAccountFormProps {
   account?: DebtAccount
   onClose: () => void
-  onSuccess?: (id: number) => void
+  onSuccess?: (id: string) => void
 }
 
 export default function DebtAccountForm({

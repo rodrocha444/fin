@@ -1,4 +1,4 @@
-// src/components/organisms/ScheduledForm.tsx — Formulário de Transações Agendadas
+// src/components/organisms/ScheduledForm.tsx — Formulário de Transações Agendadas (padrão CUID)
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -6,17 +6,17 @@ import { X } from 'lucide-react'
 import { format } from 'date-fns'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
-import { createScheduled, updateScheduled } from '@/db/repositories/scheduled'
+import { createScheduled, updateScheduled, processScheduledTransactions } from '@/db/repositories/scheduled'
 import PriceInput from '@/components/atoms/PriceInput'
 import type { ScheduledTransaction } from '@/types'
 
 const schema = z.object({
-  accountId: z.coerce.number().min(1, 'Conta obrigatória'),
+  accountId: z.string().min(1, 'Conta obrigatória'),
   payee: z.string().optional(),
   amount: z.coerce.number().positive('Valor deve ser positivo'),
   type: z.enum(['income', 'expense', 'transfer']),
-  categoryId: z.coerce.number().optional(),
-  transferAccountId: z.coerce.number().optional(),
+  categoryId: z.string().optional(),
+  transferAccountId: z.string().optional(),
   frequency: z.enum(['once', 'weekly', 'biweekly', 'monthly', 'yearly']),
   nextDate: z.string().min(1, 'Data obrigatória'),
   endDate: z.string().optional(),
@@ -43,14 +43,14 @@ export default function ScheduledForm({
           payee: scheduled.payee,
           amount: scheduled.amount,
           type: scheduled.type,
-          categoryId: scheduled.categoryId,
-          transferAccountId: scheduled.transferAccountId,
+          categoryId: scheduled.categoryId ?? '',
+          transferAccountId: scheduled.transferAccountId ?? '',
           frequency: scheduled.frequency,
           nextDate: format(new Date(scheduled.nextDate), 'yyyy-MM-dd'),
           endDate: scheduled.endDate ? format(new Date(scheduled.endDate), 'yyyy-MM-dd') : undefined,
           notes: scheduled.notes,
         }
-      : { type: 'expense', frequency: 'monthly', nextDate: format(new Date(), 'yyyy-MM-dd') },
+      : { type: 'expense', frequency: 'monthly', nextDate: format(new Date(), 'yyyy-MM-dd'), accountId: '' },
   })
 
   const type = watch('type')
@@ -63,19 +63,20 @@ export default function ScheduledForm({
   })).filter(g => g.cats.length > 0) ?? []
 
   const onSubmit = async (data: FormData) => {
-    const selectedCat = categories?.find(c => c.id === Number(data.categoryId))
+    const selectedCat = categories?.find(c => c.id === data.categoryId)
     const finalPayee =
       data.payee?.trim() ||
       selectedCat?.name ||
       (data.type === 'transfer' ? 'Transferência' : data.type === 'income' ? 'Renda' : 'Despesa')
+    const catId = data.categoryId && data.categoryId.trim() !== '' ? data.categoryId : undefined
 
     const payload: Omit<ScheduledTransaction, 'id' | 'createdAt'> = {
       accountId: data.accountId,
       payee: finalPayee,
       amount: data.amount,
       type: data.type,
-      categoryId: data.categoryId,
-      transferAccountId: data.type === 'transfer' ? data.transferAccountId : undefined,
+      categoryId: catId,
+      transferAccountId: data.type === 'transfer' ? (data.transferAccountId || undefined) : undefined,
       frequency: data.frequency,
       nextDate: new Date(data.nextDate + 'T12:00:00'),
       endDate: data.endDate ? new Date(data.endDate + 'T12:00:00') : undefined,
@@ -84,6 +85,7 @@ export default function ScheduledForm({
     }
     if (isEdit && scheduled.id) await updateScheduled(scheduled.id, payload)
     else await createScheduled(payload)
+    await processScheduledTransactions().catch(console.error)
     onClose()
   }
 
@@ -174,7 +176,7 @@ export default function ScheduledForm({
                 render={({ field }) => (
                   <select
                     value={field.value ?? ''}
-                    onChange={e => field.onChange(Number(e.target.value))}
+                    onChange={e => field.onChange(e.target.value)}
                     onBlur={field.onBlur}
                     className="input-base"
                   >
@@ -195,7 +197,7 @@ export default function ScheduledForm({
                 render={({ field }) => (
                   <select
                     value={field.value ?? ''}
-                    onChange={e => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                    onChange={e => field.onChange(e.target.value || undefined)}
                     onBlur={field.onBlur}
                     className="input-base"
                   >
@@ -216,7 +218,7 @@ export default function ScheduledForm({
                 render={({ field }) => (
                   <select
                     value={field.value ?? ''}
-                    onChange={e => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                    onChange={e => field.onChange(e.target.value || undefined)}
                     onBlur={field.onBlur}
                     style={{ colorScheme: 'dark' }}
                     className="input-base"

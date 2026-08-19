@@ -29,7 +29,7 @@ import SearchBar from '@/components/atoms/SearchBar'
 export default function AccountInvoicePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const accountId = id ? parseInt(id, 10) : undefined
+  const accountId = id
 
   const account = useAccount(accountId)
   const transactions = useAccountTransactions(accountId)

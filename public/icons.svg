@@ -21,7 +21,7 @@
   </defs>
 
   <!-- Base Card com borda gradiente -->
-  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#bgGrad)" stroke="url(#borderGrad)" stroke-width="2.5" />
+  <rect x="0" y="0" width="64" height="64" fill="url(#bgGrad)" />
 
   <!-- Barras do gráfico -->
   <rect x="12" y="36" width="9" height="16" rx="4" fill="url(#barGrad2)" opacity="0.8" />

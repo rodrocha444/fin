@@ -40,7 +40,7 @@ function accountIcon(type: string) {
 export default function AccountDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const accountId = id ? parseInt(id, 10) : undefined
+  const accountId = id
 
   const account = useAccount(accountId)
   const balance = useAccountBalance(accountId) ?? 0
@@ -104,7 +104,7 @@ export default function AccountDetailPage() {
       const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
       const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
       if (timeB !== timeA) return timeB - timeA
-      return (b.id ?? 0) - (a.id ?? 0)
+      return (b.id ?? '').localeCompare(a.id ?? '')
     })
 
   const filteredPurchases = (ccPurchases ?? []).filter(p => {

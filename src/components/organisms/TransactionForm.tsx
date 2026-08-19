@@ -1,9 +1,9 @@
-// src/components/organisms/TransactionForm.tsx — Formulário de Transação
+// src/components/organisms/TransactionForm.tsx — Formulário de Transação (padrão CUID)
 import { useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { X, SplitSquareVertical, ArrowLeftRight } from 'lucide-react'
+import { X } from 'lucide-react'
 import { format } from 'date-fns'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
@@ -19,10 +19,10 @@ const schema = z.object({
   date: z.string().min(1, 'Data obrigatória'),
   payee: z.string().optional(),
   amount: z.coerce.number().positive('Valor deve ser positivo'),
-  accountId: z.coerce.number().min(1, 'Conta obrigatória'),
-  categoryId: z.coerce.number().optional(),
+  accountId: z.string().min(1, 'Conta obrigatória'),
+  categoryId: z.string().optional(),
   notes: z.string().optional(),
-  transferAccountId: z.coerce.number().optional(),
+  transferAccountId: z.string().optional(),
   installmentCount: z.coerce.number().min(2).max(72).optional(),
 })
 
@@ -37,9 +37,9 @@ const MODE_CONFIG: Record<TxMode, { label: string; color: string; activeBg: stri
 interface TransactionFormProps {
   onClose: () => void
   transaction?: Transaction
-  defaultAccountId?: number
-  defaultTransferAccountId?: number
-  defaultCategoryId?: number
+  defaultAccountId?: string
+  defaultTransferAccountId?: string
+  defaultCategoryId?: string
   defaultMode?: TxMode | 'installment'
   defaultAmount?: number
   defaultPayee?: string
@@ -81,19 +81,15 @@ export default function TransactionForm({
     resolver: zodResolver(schema),
     defaultValues: {
       date: transaction ? format(new Date(transaction.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-      accountId: initialAccountId,
-      transferAccountId: transaction?.transferAccountId ?? defaultTransferAccountId,
+      accountId: initialAccountId ?? '',
+      transferAccountId: transaction?.transferAccountId ?? defaultTransferAccountId ?? '',
       amount: transaction?.amount ?? defaultAmount,
       payee: transaction?.payee ?? defaultPayee,
-      categoryId: transaction?.categoryId ?? defaultCategoryId,
+      categoryId: transaction?.categoryId ?? defaultCategoryId ?? '',
       notes: transaction?.notes,
       installmentCount: 2,
     },
   })
-
-  const selectedAccountId = watch('accountId')
-  const selectedAccount = accounts.find(a => a.id === Number(selectedAccountId))
-  const isCreditCard = selectedAccount?.type === 'credit_card'
 
   const groupedCategories = groups?.map(g => ({
     group: g,
@@ -104,22 +100,23 @@ export default function TransactionForm({
 
   const onSubmit = async (data: FormData) => {
     const txDate = new Date(data.date + 'T12:00:00')
-    const selectedCat = categories?.find(c => c.id === Number(data.categoryId))
+    const selectedCat = categories?.find(c => c.id === data.categoryId)
     const finalPayee = data.payee?.trim() || selectedCat?.name || (mode === 'transfer' ? 'Transferência' : 'Despesa')
+    const catId = data.categoryId && data.categoryId.trim() !== '' ? data.categoryId : undefined
 
     if (isEdit && transaction?.id) {
       if (mode !== 'transfer') {
-        await getOrCreatePayee(finalPayee, data.categoryId)
+        await getOrCreatePayee(finalPayee, catId)
       }
       await updateTransaction(transaction.id, {
         accountId: data.accountId,
         date: txDate,
         amount: data.amount,
         payee: finalPayee,
-        categoryId: data.categoryId,
+        categoryId: catId,
         notes: data.notes,
         type: mode === 'income' ? 'income' : mode === 'transfer' ? 'transfer' : 'expense',
-        transferAccountId: mode === 'transfer' ? data.transferAccountId : undefined,
+        transferAccountId: mode === 'transfer' ? (data.transferAccountId || undefined) : undefined,
       })
     } else if (mode === 'transfer') {
       if (!data.transferAccountId) return
@@ -135,7 +132,7 @@ export default function TransactionForm({
       if (!data.installmentCount) return
       await createInstallmentPurchase({
         accountId: data.accountId,
-        categoryId: data.categoryId,
+        categoryId: catId,
         description: finalPayee,
         totalAmount: data.amount,
         installmentCount: data.installmentCount,
@@ -144,13 +141,13 @@ export default function TransactionForm({
         notes: data.notes,
       })
     } else {
-      await getOrCreatePayee(finalPayee, data.categoryId)
+      await getOrCreatePayee(finalPayee, catId)
       await createTransaction({
         accountId: data.accountId,
         date: txDate,
         amount: data.amount,
         payee: finalPayee,
-        categoryId: data.categoryId,
+        categoryId: catId,
         notes: data.notes,
         cleared: false,
         type: mode === 'income' ? 'income' : 'expense',
@@ -281,7 +278,7 @@ export default function TransactionForm({
               render={({ field }) => (
                 <select
                   value={field.value ?? ''}
-                  onChange={e => field.onChange(e.target.value ? Number(e.target.value) : '')}
+                  onChange={e => field.onChange(e.target.value)}
                   onBlur={field.onBlur}
                   className="input-base"
                 >
@@ -303,7 +300,7 @@ export default function TransactionForm({
                 render={({ field }) => (
                   <select
                     value={field.value ?? ''}
-                    onChange={e => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                    onChange={e => field.onChange(e.target.value || undefined)}
                     onBlur={field.onBlur}
                     className="input-base"
                   >
@@ -348,7 +345,7 @@ export default function TransactionForm({
                 render={({ field }) => (
                   <select
                     value={field.value ?? ''}
-                    onChange={e => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                    onChange={e => field.onChange(e.target.value || undefined)}
                     onBlur={field.onBlur}
                     style={{ colorScheme: 'dark' }}
                     className="input-base"

@@ -11,6 +11,7 @@ import { deleteTransaction } from '@/db/repositories/transactions'
 import { formatCurrency, currentMonth } from '@/utils/format'
 import MonthNavigator from '@/components/atoms/MonthNavigator'
 import SearchBar from '@/components/atoms/SearchBar'
+import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
 import TransactionItem from '@/components/molecules/TransactionItem'
 import TransactionForm from '@/components/organisms/TransactionForm'
 import PendingIssuesCard from '@/components/organisms/PendingIssuesCard'
@@ -24,7 +25,7 @@ export default function TransactionsPage() {
   const [search, setSearch] = useState('')
   const [showSearch, setShowSearch] = useState(false)
 
-  const selectedAccountId = searchParams.get('account') ? Number(searchParams.get('account')) : undefined
+  const selectedAccountId = searchParams.get('account') || undefined
 
   const accounts = useAccounts()
   const transactions = useMonthTransactions(month)
@@ -48,7 +49,7 @@ export default function TransactionsPage() {
       const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
       const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
       if (timeB !== timeA) return timeB - timeA
-      return (b.id ?? 0) - (a.id ?? 0)
+      return (b.id ?? '').localeCompare(a.id ?? '')
     })
 
   const handleDelete = async (tx: Transaction) => {
@@ -88,6 +89,11 @@ export default function TransactionsPage() {
           </select>
 
           <div className="flex-1" />
+
+          {/* Status de sync no mobile */}
+          <div className="lg:hidden">
+            <SyncStatusBadge compact={true} />
+          </div>
 
           {/* Busca toggle */}
           <button

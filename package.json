@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.7.1",
+    "@paralleldrive/cuid2": "^3.3.0",
+    "@supabase/supabase-js": "^2.112.3",
     "date-fns": "^4.4.0",
     "dexie": "^4.4.4",
     "dexie-react-hooks": "^4.4.0",

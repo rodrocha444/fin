@@ -1,5 +1,9 @@
 import { useState, useRef } from 'react'
-import { Plus, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronRight, Download, Upload, Database, CheckCircle2 } from 'lucide-react'
+import {
+  Plus, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronRight,
+  Download, Upload, Database, CheckCircle2, Cloud, RefreshCw,
+  Copy, Check, ExternalLink, KeyRound, Server, AlertCircle
+} from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/db/schema'
 import {
@@ -7,6 +11,13 @@ import {
   createCategory, updateCategory, deleteCategory, toggleCategoryVisibility,
 } from '@/db/repositories/categories'
 import { downloadDatabaseBackup, importDatabase, type DatabaseBackup } from '@/db/repositories/backup'
+import {
+  getSupabaseConfig, saveSupabaseConfig, clearSupabaseConfig,
+  testSupabaseConnection
+} from '@/services/supabase'
+import { SUPABASE_SCHEMA_SQL } from '@/services/supabaseSchema'
+import { useSync } from '@/hooks/useSync'
+import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
 import ResetDatabaseModal from '@/components/organisms/ResetDatabaseModal'
 import Logo from '@/components/atoms/Logo'
 
@@ -14,20 +25,66 @@ export default function SettingsPage() {
   const groups = useLiveQuery(() => db.categoryGroups.orderBy('sortOrder').toArray(), [])
   const categories = useLiveQuery(() => db.categories.orderBy('sortOrder').toArray(), [])
 
+  // Sincronização Supabase
+  const { status: syncStatus, isSyncing, lastSyncAt, lastError, syncNow } = useSync()
+  const [supabaseUrl, setSupabaseUrl] = useState(() => getSupabaseConfig()?.url || '')
+  const [supabaseKey, setSupabaseKey] = useState(() => getSupabaseConfig()?.anonKey || '')
+  const [testResult, setTestResult] = useState<{ success?: boolean; message: string } | null>(null)
+  const [isTestingConnection, setIsTestingConnection] = useState(false)
+  const [showSqlGuide, setShowSqlGuide] = useState(false)
+  const [copiedSql, setCopiedSql] = useState(false)
+
   const [groupTypeTab, setGroupTypeTab] = useState<'expense' | 'income'>('expense')
-  const [editingGroupId, setEditingGroupId] = useState<number | null>(null)
-  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null)
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
   const [newGroupName, setNewGroupName] = useState('')
   const [newCatName, setNewCatName] = useState('')
-  const [newCatGroupId, setNewCatGroupId] = useState<number | null>(null)
-  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set())
+  const [newCatGroupId, setNewCatGroupId] = useState<string | null>(null)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
   const [backupStatus, setBackupStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [showResetModal, setShowResetModal] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const toggleGroup = (id: number) =>
+  const handleSaveSupabase = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    if (!supabaseUrl.trim() || !supabaseKey.trim()) {
+      setTestResult({ success: false, message: 'Preencha a URL e a Chave Anon.' })
+      return
+    }
+
+    setIsTestingConnection(true)
+    setTestResult(null)
+
+    const cleanUrl = supabaseUrl.trim()
+    const cleanKey = supabaseKey.trim()
+
+    const result = await testSupabaseConnection({ url: cleanUrl, anonKey: cleanKey })
+    setIsTestingConnection(false)
+    setTestResult(result)
+
+    if (result.success) {
+      saveSupabaseConfig({ url: cleanUrl, anonKey: cleanKey })
+      syncNow(true)
+    }
+  }
+
+  const handleDisconnectSupabase = () => {
+    if (!confirm('Deseja desconectar o Supabase? Os dados locais permanecerão salvos no navegador.')) return
+    clearSupabaseConfig()
+    setSupabaseUrl('')
+    setSupabaseKey('')
+    setTestResult(null)
+  }
+
+  const handleCopySql = () => {
+    navigator.clipboard.writeText(SUPABASE_SCHEMA_SQL)
+    setCopiedSql(true)
+    setTimeout(() => setCopiedSql(false), 2500)
+  }
+
+  const toggleGroup = (id: string) =>
     setExpandedGroups(s => {
       const next = new Set(s)
       next.has(id) ? next.delete(id) : next.add(id)
@@ -51,7 +108,7 @@ export default function SettingsPage() {
     }
   }
 
-  const handleAddCategory = async (groupId: number) => {
+  const handleAddCategory = async (groupId: string) => {
     if (!newCatName.trim()) return
     try {
       const count = categories?.filter(c => c.groupId === groupId).length ?? 0
@@ -63,7 +120,7 @@ export default function SettingsPage() {
     }
   }
 
-  const handleDeleteGroup = async (id: number) => {
+  const handleDeleteGroup = async (id: string) => {
     try {
       if (!confirm('Excluir grupo?')) return
       await deleteGroup(id)
@@ -72,7 +129,7 @@ export default function SettingsPage() {
     }
   }
 
-  const handleDeleteCategory = async (id: number) => {
+  const handleDeleteCategory = async (id: string) => {
     try {
       if (!confirm('Excluir categoria?')) return
       await deleteCategory(id)
@@ -357,6 +414,155 @@ export default function SettingsPage() {
               </div>
             )
           })}
+        </div>
+
+        {/* ── Card Sincronização em Nuvem (Supabase) ─────────── */}
+        <div className="card p-5 space-y-4 bg-slate-900 border border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                <Cloud className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-200">Sincronização em Nuvem (Supabase)</h2>
+                <p className="text-xs text-slate-500">Backup automático e sincronização em tempo real entre dispositivos</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <SyncStatusBadge compact={false} showTime={true} />
+              {syncStatus !== 'unconfigured' && (
+                <button
+                  onClick={() => syncNow(true)}
+                  disabled={isSyncing}
+                  className="btn-secondary py-1.5 px-2.5 text-xs flex items-center gap-1.5 hover:text-sky-300"
+                  title="Forçar sincronização completa agora"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-sky-400' : ''}`} />
+                  <span>{isSyncing ? 'Sincronizando…' : 'Sincronizar'}</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Feedback de Teste / Erro */}
+          {testResult && (
+            <div className={`p-3 rounded-xl text-xs flex items-start gap-2 ${
+              testResult.success
+                ? 'bg-emerald-950/40 border border-emerald-800/60 text-emerald-300'
+                : 'bg-rose-950/40 border border-rose-800/60 text-rose-300'
+            }`}>
+              {testResult.success ? <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />}
+              <span>{testResult.message}</span>
+            </div>
+          )}
+
+          {/* Formulário de Configuração */}
+          <form onSubmit={handleSaveSupabase} className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="label flex items-center gap-1.5">
+                  <Server className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Project URL</span>
+                </label>
+                <input
+                  type="url"
+                  className="input-base text-xs font-mono"
+                  placeholder="https://xyzcompany.supabase.co"
+                  value={supabaseUrl}
+                  onChange={e => setSupabaseUrl(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+
+              <div>
+                <label className="label flex items-center gap-1.5">
+                  <KeyRound className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Anon Public Key</span>
+                </label>
+                <input
+                  type="password"
+                  className="input-base text-xs font-mono"
+                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+                  value={supabaseKey}
+                  onChange={e => setSupabaseKey(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <div className="flex items-center gap-2">
+                <button
+                  type="submit"
+                  disabled={isTestingConnection}
+                  className="btn-primary py-2 px-3.5 text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-600/20"
+                >
+                  {isTestingConnection ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  <span>{isTestingConnection ? 'Conectando…' : 'Salvar e Conectar'}</span>
+                </button>
+
+                {getSupabaseConfig() && (
+                  <button
+                    type="button"
+                    onClick={handleDisconnectSupabase}
+                    className="btn-ghost py-2 px-3 text-xs text-slate-400 hover:text-rose-400"
+                  >
+                    Desconectar
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowSqlGuide(!showSqlGuide)}
+                className="text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 py-1"
+              >
+                <span>{showSqlGuide ? 'Ocultar Script SQL' : 'Ver Script SQL de Criação das Tabelas'}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showSqlGuide ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+          </form>
+
+          {/* Guia e Script SQL */}
+          {showSqlGuide && (
+            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3 text-xs text-slate-300">
+              <div className="flex items-center justify-between">
+                <div className="font-semibold text-slate-200 flex items-center gap-1.5">
+                  <span>Passo a Passo para Configurar o Supabase</span>
+                  <a
+                    href="https://supabase.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-indigo-400 hover:underline inline-flex items-center gap-0.5 text-[11px]"
+                  >
+                    supabase.com <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+                <button
+                  onClick={handleCopySql}
+                  className="btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5 text-indigo-300 hover:text-white"
+                >
+                  {copiedSql ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedSql ? 'Copiado!' : 'Copiar Script SQL'}</span>
+                </button>
+              </div>
+
+              <ol className="list-decimal list-inside space-y-1 text-slate-400 text-[11px] leading-relaxed">
+                <li>Acesse o <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">painel do Supabase</a> e crie um novo projeto gratuito.</li>
+                <li>No menu lateral esquerdo, clique em <strong>SQL Editor</strong>.</li>
+                <li>Clique em <strong>New Query</strong>, cole o script copiado acima e clique no botão verde <strong>Run</strong>.</li>
+                <li>Vá em <strong>Project Settings (ícone de engrenagem) &gt; API</strong>.</li>
+                <li>Copie a <strong>Project URL</strong> e a <strong>anon public key</strong> e cole nos campos acima.</li>
+              </ol>
+
+              <div className="relative">
+                <pre className="p-3 bg-slate-900 rounded-lg text-[11px] font-mono text-slate-300 max-h-48 overflow-y-auto border border-slate-800 select-all">
+                  {SUPABASE_SCHEMA_SQL}
+                </pre>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Card Gerenciamento de Dados */}

@@ -140,8 +140,8 @@ function getProjectedScheduledTransactions(
   scheduledList: ScheduledTransaction[],
   afterDateExclusive: Date,
   upToDateInclusive: Date
-): Array<{ accountId: number; transferAccountId?: number; type: TransactionType; amount: number; date: Date }> {
-  const projected: Array<{ accountId: number; transferAccountId?: number; type: TransactionType; amount: number; date: Date }> = []
+): Array<{ accountId: string; transferAccountId?: string; type: TransactionType; amount: number; date: Date }> {
+  const projected: Array<{ accountId: string; transferAccountId?: string; type: TransactionType; amount: number; date: Date }> = []
 
   for (const s of scheduledList) {
     let next = new Date(s.nextDate)

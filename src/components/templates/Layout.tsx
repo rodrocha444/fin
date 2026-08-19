@@ -10,6 +10,7 @@ import {
   Settings,
 } from 'lucide-react'
 import Logo from '@/components/atoms/Logo'
+import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
 
 const NAV = [
   { to: '/budget', label: 'Orçamento', icon: LayoutGrid },
@@ -46,8 +47,11 @@ export default function Layout() {
           ))}
         </nav>
 
-        <div className="px-4 py-3 border-t border-slate-800">
-          <p className="text-xs text-slate-600">FinPlan v1.0</p>
+        <div className="p-3 border-t border-slate-800 space-y-2">
+          <SyncStatusBadge className="w-full justify-between" />
+          <div className="flex items-center justify-between px-1 text-[11px] text-slate-600">
+            <span>FinPlan v1.0</span>
+          </div>
         </div>
       </aside>
 

@@ -6,6 +6,7 @@ import { setBudget, copyFromPreviousMonth, clearMonthBudgets } from '@/db/reposi
 import { formatCurrency, currentMonth } from '@/utils/format'
 import PriceInput from '@/components/atoms/PriceInput'
 import MonthNavigator from '@/components/atoms/MonthNavigator'
+import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
 import PendingIssuesCard from '@/components/organisms/PendingIssuesCard'
 import CategoryTransactionsModal from '@/components/organisms/CategoryTransactionsModal'
 import type {
@@ -314,29 +315,34 @@ export default function BudgetPage() {
           </div>
         )}
 
-        {/* Menu de ações */}
-        <div className="relative flex-shrink-0">
-          <button
-            onClick={() => setShowMenu(s => !s)}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 active:bg-slate-700 transition-colors"
-          >
-            <MoreHorizontal className="w-5 h-5" />
-          </button>
-          {showMenu && (
-            <>
-              <div className="fixed inset-0 z-20" onClick={() => setShowMenu(false)} />
-              <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-30 overflow-hidden min-w-[180px] fade-in">
-                <button onClick={handleCopy} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-200 hover:bg-slate-700 active:bg-slate-600 transition-colors">
-                  <Copy className="w-4 h-4 text-slate-400" />
-                  Copiar mês anterior
-                </button>
-                <button onClick={handleClear} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-rose-400 hover:bg-slate-700 active:bg-slate-600 transition-colors border-t border-slate-700">
-                  <Trash2 className="w-4 h-4" />
-                  Zerar orçamento
-                </button>
-              </div>
-            </>
-          )}
+        {/* Menu de ações e status de sync */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="lg:hidden">
+            <SyncStatusBadge compact={true} />
+          </div>
+          <div className="relative">
+            <button
+              onClick={() => setShowMenu(s => !s)}
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 active:bg-slate-700 transition-colors"
+            >
+              <MoreHorizontal className="w-5 h-5" />
+            </button>
+            {showMenu && (
+              <>
+                <div className="fixed inset-0 z-20" onClick={() => setShowMenu(false)} />
+                <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-30 overflow-hidden min-w-[180px] fade-in">
+                  <button onClick={handleCopy} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-200 hover:bg-slate-700 active:bg-slate-600 transition-colors">
+                    <Copy className="w-4 h-4 text-slate-400" />
+                    Copiar mês anterior
+                  </button>
+                  <button onClick={handleClear} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-rose-400 hover:bg-slate-700 active:bg-slate-600 transition-colors border-t border-slate-700">
+                    <Trash2 className="w-4 h-4" />
+                    Zerar orçamento
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 

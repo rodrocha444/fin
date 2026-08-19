@@ -20,7 +20,7 @@ export default function PendingIssuesCard() {
     ? issues.find(i => i.id === selectedIssueId) ?? issues[0]
     : issues[0]
 
-  const handleAssignCategory = async (txId: number, categoryId: number) => {
+  const handleAssignCategory = async (txId: string, categoryId: string) => {
     if (!categoryId) return
     await updateTransaction(txId, { categoryId })
   }
@@ -121,7 +121,7 @@ export default function PendingIssuesCard() {
                         </span>
                       ) : (
                         <select
-                          onChange={e => handleAssignCategory(item.id, Number(e.target.value))}
+                          onChange={e => handleAssignCategory(item.id, e.target.value)}
                           defaultValue=""
                           style={{ colorScheme: 'dark' }}
                           className="w-full sm:w-52 px-3 py-1.5 text-xs font-medium text-slate-100 bg-slate-800 hover:bg-slate-700/80 border border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 cursor-pointer shadow-sm"

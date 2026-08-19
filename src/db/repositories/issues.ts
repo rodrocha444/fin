@@ -1,6 +1,6 @@
 // src/db/repositories/issues.ts
 // ─────────────────────────────────────────────────────────────
-// Motor modular de regras e detecção de pendências/inconsistências
+// Motor modular de regras e detecção de pendências/inconsistências (padrão CUID)
 // Suporta regras extensíveis para transações sem categoria, estouro de envelopes, etc.
 // ─────────────────────────────────────────────────────────────
 
@@ -48,9 +48,9 @@ export async function checkOverspentCategories(): Promise<PendingIssue | null> {
   ])
 
   const budgetByCategory = new Map(budgetRecords.map(b => [b.categoryId, b.budgeted]))
-  const categoryMap = new Map(categories.map(c => [c.id, c]))
+  const categoryMap = new Map(categories.map(c => [c.id!, c]))
 
-  const overspent: Array<{ id: number; title: string; subtitle: string; amount: number }> = []
+  const overspent: Array<{ id: string; title: string; subtitle: string; amount: number }> = []
 
   for (const [catId, spent] of activityMap.entries()) {
     const budgeted = budgetByCategory.get(catId) ?? 0

@@ -1,14 +1,15 @@
 // src/db/repositories/accounts.ts
 // ─────────────────────────────────────────────────────────────
-// CRUD e cálculos de saldo para contas
+// CRUD e cálculos de saldo para contas (padrão CUID)
 // ─────────────────────────────────────────────────────────────
 
 import { db } from '../schema'
+import { createId } from '@/utils/id'
 import type { Account } from '@/types'
 
 // ── CRUD ─────────────────────────────────────────────────────
 
-export async function createAccount(data: Omit<Account, 'id' | 'createdAt'>) {
+export async function createAccount(data: Omit<Account, 'id' | 'createdAt'>): Promise<string> {
   const normalizedName = data.name.trim().toLowerCase()
   const existing = await db.accounts
     .filter(a => a.isActive !== false && a.name.trim().toLowerCase() === normalizedName)
@@ -18,10 +19,17 @@ export async function createAccount(data: Omit<Account, 'id' | 'createdAt'>) {
     throw new Error(`Já existe uma conta cadastrada com o nome "${data.name.trim()}".`)
   }
 
-  return db.accounts.add({ ...data, name: data.name.trim(), createdAt: new Date() })
+  const id = createId()
+  await db.accounts.add({
+    ...data,
+    id,
+    name: data.name.trim(),
+    createdAt: new Date(),
+  })
+  return id
 }
 
-export async function updateAccount(id: number, data: Partial<Omit<Account, 'id' | 'createdAt'>>) {
+export async function updateAccount(id: string, data: Partial<Omit<Account, 'id' | 'createdAt'>>): Promise<number> {
   if (data.name) {
     const normalizedName = data.name.trim().toLowerCase()
     const existing = await db.accounts
@@ -41,35 +49,24 @@ export async function updateAccount(id: number, data: Partial<Omit<Account, 'id'
   return db.accounts.update(id, payload)
 }
 
-export async function deleteAccount(id: number) {
+export async function deleteAccount(id: string): Promise<void> {
   // Verificar se tem transações antes de deletar
   const txCount = await db.transactions.where('accountId').equals(id).count()
   if (txCount > 0) throw new Error('Não é possível excluir uma conta que possui transações.')
-  return db.accounts.delete(id)
+  await db.accounts.delete(id)
 }
 
-export async function getAccount(id: number) {
+export async function getAccount(id: string): Promise<Account | undefined> {
   return db.accounts.get(id)
 }
 
-export async function getAllAccounts() {
+export async function getAllAccounts(): Promise<Account[]> {
   return db.accounts.orderBy('name').filter(a => a.isActive !== false).toArray()
 }
 
 // ── Cálculo de Saldo ─────────────────────────────────────────
-//
-// O saldo de uma conta é calculado dinamicamente a partir das transações.
-// Isso garante consistência e evita drift entre saldo armazenado e real.
-//
-// Para conta corrente/poupança:
-//   saldo = initialBalance + soma(income) - soma(expense) + transferências recebidas - transferências enviadas
-//
-// Para cartão de crédito:
-//   saldo = 0 - soma(expenses) + soma(payments/transfers recebidos)
-//   (Opção A: parcelamento total aparece desde o dia 1, pois todas as
-//    N transações são criadas com datas futuras mas o group já existe)
 
-export async function calculateAccountBalance(accountId: number): Promise<number> {
+export async function calculateAccountBalance(accountId: string): Promise<number> {
   const account = await db.accounts.get(accountId)
   if (!account) throw new Error(`Conta ${accountId} não encontrada`)
 
@@ -108,9 +105,9 @@ export async function calculateAccountBalance(accountId: number): Promise<number
 }
 
 // Retorna saldo de todas as contas ativas
-export async function getAllAccountBalances(): Promise<Map<number, number>> {
+export async function getAllAccountBalances(): Promise<Map<string, number>> {
   const accounts = await db.accounts.filter(a => a.isActive !== false).toArray()
-  const map = new Map<number, number>()
+  const map = new Map<string, number>()
   await Promise.all(
     accounts.map(async (acc) => {
       if (acc.id !== undefined) {

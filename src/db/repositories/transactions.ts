@@ -1,11 +1,12 @@
 // src/db/repositories/transactions.ts
 // ─────────────────────────────────────────────────────────────
-// CRUD de transações, parcelamento e pagamento de fatura
+// CRUD de transações, parcelamento e pagamento de fatura (padrão CUID)
 // ─────────────────────────────────────────────────────────────
 
 import { db } from '../schema'
+import { createId } from '@/utils/id'
 import type { Transaction, InstallmentGroup } from '@/types'
-import { addMonths, startOfMonth, endOfMonth, format } from 'date-fns'
+import { addMonths, startOfMonth, endOfMonth } from 'date-fns'
 import { getProjectedScheduledForMonth } from './scheduled'
 
 // ── Tipos de entrada ─────────────────────────────────────────
@@ -13,8 +14,8 @@ import { getProjectedScheduledForMonth } from './scheduled'
 export type CreateTransactionInput = Omit<Transaction, 'id' | 'createdAt'>
 
 export interface CreateInstallmentInput {
-  accountId: number
-  categoryId?: number
+  accountId: string
+  categoryId?: string
   description: string
   totalAmount: number
   installmentCount: number
@@ -24,8 +25,8 @@ export interface CreateInstallmentInput {
 }
 
 export interface CreateTransferInput {
-  fromAccountId: number
-  toAccountId: number
+  fromAccountId: string
+  toAccountId: string
   amount: number
   date: Date
   notes?: string
@@ -34,21 +35,21 @@ export interface CreateTransferInput {
 
 // ── CRUD básico ──────────────────────────────────────────────
 
-export async function createTransaction(data: CreateTransactionInput): Promise<number> {
-  const id = await db.transactions.add({ ...data, createdAt: new Date() })
-  return id as number
+export async function createTransaction(data: CreateTransactionInput): Promise<string> {
+  const id = createId()
+  await db.transactions.add({ ...data, id, createdAt: new Date() })
+  return id
 }
 
-export async function updateTransaction(id: number, data: Partial<CreateTransactionInput>): Promise<void> {
+export async function updateTransaction(id: string, data: Partial<CreateTransactionInput>): Promise<void> {
   await db.transactions.update(id, data)
 }
 
-export async function deleteTransaction(id: number): Promise<void> {
+export async function deleteTransaction(id: string): Promise<void> {
   const tx = await db.transactions.get(id)
   if (!tx) return
 
-  // Se fizer parte de um parcelamento, excluir apenas essa ou perguntar?
-  // Por ora, excluímos apenas a transação individualmente.
+  // Se fizer parte de um parcelamento, remove apenas essa parcela
   if (tx.installmentGroupId) {
     await db.transactions.delete(id)
     // Se era a última parcela, remove o grupo
@@ -70,12 +71,12 @@ export async function deleteTransaction(id: number): Promise<void> {
   await db.transactions.delete(id)
 }
 
-export async function deleteInstallmentGroup(installmentGroupId: number): Promise<void> {
+export async function deleteInstallmentGroup(installmentGroupId: string): Promise<void> {
   await db.transactions.where('installmentGroupId').equals(installmentGroupId).delete()
   await db.installmentGroups.delete(installmentGroupId)
 }
 
-export async function getTransactionsByAccount(accountId: number): Promise<Transaction[]> {
+export async function getTransactionsByAccount(accountId: string): Promise<Transaction[]> {
   const txs = await db.transactions
     .where('accountId')
     .equals(accountId)
@@ -85,7 +86,7 @@ export async function getTransactionsByAccount(accountId: number): Promise<Trans
     const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
     const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
     if (timeB !== timeA) return timeB - timeA
-    return (b.id ?? 0) - (a.id ?? 0)
+    return (b.id ?? '').localeCompare(a.id ?? '')
   })
 }
 
@@ -104,28 +105,13 @@ export async function getTransactionsByMonth(month: string): Promise<Transaction
     const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
     const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
     if (timeB !== timeA) return timeB - timeA
-    return (b.id ?? 0) - (a.id ?? 0)
+    return (b.id ?? '').localeCompare(a.id ?? '')
   })
 }
 
 // ── Parcelamento ─────────────────────────────────────────────
-//
-// Opção A (escolhida pelo usuário):
-//   Saldo do cartão mostra o compromisso total desde o início.
-//   Para isso, criamos N transações com datas em meses futuros.
-//   O saldo do cartão = soma de todas as transações (incluindo futuras).
-//   O ORÇAMENTO mensal só vê as transações do mês corrente.
-//
-// Exemplo: 3x R$100 em 12/ago:
-//   - Transação 1: 12/ago - R$100 (parcela 1/3)
-//   - Transação 2: 12/set - R$100 (parcela 2/3)
-//   - Transação 3: 12/out - R$100 (parcela 3/3)
-//   → Saldo do cartão: -R$300 imediatamente
-//   → Orçamento agosto: -R$100 na categoria
-//   → Orçamento setembro: -R$100 na categoria
-//   → Orçamento outubro: -R$100 na categoria
 
-export async function createInstallmentPurchase(input: CreateInstallmentInput): Promise<number> {
+export async function createInstallmentPurchase(input: CreateInstallmentInput): Promise<string> {
   const installmentAmount = parseFloat((input.totalAmount / input.installmentCount).toFixed(2))
 
   // Ajuste de arredondamento na última parcela
@@ -134,8 +120,11 @@ export async function createInstallmentPurchase(input: CreateInstallmentInput): 
   )
 
   return db.transaction('rw', db.installmentGroups, db.transactions, async () => {
+    const groupId = createId()
+
     // 1. Criar o grupo de parcelamento
-    const groupId = await db.installmentGroups.add({
+    await db.installmentGroups.add({
+      id: groupId,
       description: input.description,
       totalAmount: input.totalAmount,
       installmentCount: input.installmentCount,
@@ -150,8 +139,10 @@ export async function createInstallmentPurchase(input: CreateInstallmentInput): 
     for (let i = 0; i < input.installmentCount; i++) {
       const installmentDate = addMonths(input.startDate, i)
       const amount = i === input.installmentCount - 1 ? lastInstallmentAmount : installmentAmount
+      const txId = createId()
 
       await db.transactions.add({
+        id: txId,
         accountId: input.accountId,
         date: installmentDate,
         amount,
@@ -162,30 +153,28 @@ export async function createInstallmentPurchase(input: CreateInstallmentInput): 
           : `${input.description} (${i + 1}/${input.installmentCount})`,
         cleared: false,
         type: 'expense',
-        installmentGroupId: groupId as number,
+        installmentGroupId: groupId,
         installmentNumber: i + 1,
         installmentTotal: input.installmentCount,
         createdAt: new Date(),
       })
     }
 
-    return groupId as number
+    return groupId
   })
 }
 
 // ── Transferência / Pagamento de Fatura ──────────────────────
-//
-// Pagamento de fatura = transferência da conta corrente → cartão.
-// Não cria categoria, não impacta orçamento.
-// Cria dois registros de transação espelhados (um em cada conta).
 
 export async function createTransfer(input: CreateTransferInput): Promise<void> {
   await db.transaction('rw', db.transactions, async () => {
     const payee = input.payee ?? 'Transferência'
     const now = new Date()
+    const outId = createId()
+    const inId = createId()
 
-    // Placeholder IDs; vamos criar e depois atualizar o par
-    const outId = await db.transactions.add({
+    await db.transactions.add({
+      id: outId,
       accountId: input.fromAccountId,
       date: input.date,
       amount: input.amount,
@@ -195,10 +184,12 @@ export async function createTransfer(input: CreateTransferInput): Promise<void> 
       cleared: false,
       type: 'transfer',
       transferAccountId: input.toAccountId,
+      transferTransactionId: inId,
       createdAt: now,
     })
 
-    const inId = await db.transactions.add({
+    await db.transactions.add({
+      id: inId,
       accountId: input.toAccountId,
       date: input.date,
       amount: input.amount,
@@ -208,30 +199,27 @@ export async function createTransfer(input: CreateTransferInput): Promise<void> 
       cleared: false,
       type: 'transfer',
       transferAccountId: input.fromAccountId,
-      transferTransactionId: outId as number,
+      transferTransactionId: outId,
       createdAt: now,
     })
-
-    // Atualizar o registro de saída com o ID do par
-    await db.transactions.update(outId, { transferTransactionId: inId as number })
   })
 }
 
 // ── Consultas especiais ──────────────────────────────────────
 
-export async function getInstallmentsByGroup(groupId: number): Promise<Transaction[]> {
+export async function getInstallmentsByGroup(groupId: string): Promise<Transaction[]> {
   return db.transactions
     .where('installmentGroupId')
     .equals(groupId)
     .sortBy('date')
 }
 
-export async function clearTransaction(id: number): Promise<void> {
+export async function clearTransaction(id: string): Promise<void> {
   await db.transactions.update(id, { cleared: true })
 }
 
 export async function getTransactionsByAccountAndMonth(
-  accountId: number,
+  accountId: string,
   month: string
 ): Promise<Transaction[]> {
   const [year, mon] = month.split('-').map(Number)
@@ -245,7 +233,7 @@ export async function getTransactionsByAccountAndMonth(
 }
 
 export async function getTransactionsByCategoryAndMonth(
-  categoryId: number,
+  categoryId: string,
   month: string
 ): Promise<Transaction[]> {
   const [year, mon] = month.split('-').map(Number)
@@ -283,7 +271,8 @@ export async function getTransactionsByCategoryAndMonth(
   combined.sort((a, b) => {
     const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
     const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
-    return timeB - timeA
+    if (timeB !== timeA) return timeB - timeA
+    return (b.id ?? '').localeCompare(a.id ?? '')
   })
 
   return combined
@@ -315,14 +304,14 @@ export async function getMonthSummary(month: string) {
 }
 
 // Agrupa activity por categoryId para um mês (incluindo transações reais e agendamentos futuros)
-export async function getActivityByCategory(month: string): Promise<Map<number, number>> {
+export async function getActivityByCategory(month: string): Promise<Map<string, number>> {
   const [txs, scheduled] = await Promise.all([
     getTransactionsByMonth(month),
     db.scheduledTransactions.filter(s => s.isActive !== false).toArray(),
   ])
 
   const projected = getProjectedScheduledForMonth(scheduled, month)
-  const map = new Map<number, number>()
+  const map = new Map<string, number>()
 
   for (const tx of txs) {
     if (tx.type !== 'expense' || !tx.categoryId) continue
@@ -340,14 +329,14 @@ export async function getActivityByCategory(month: string): Promise<Map<number, 
 }
 
 // Agrupa income por categoryId para um mês (incluindo receitas reais e agendamentos futuros)
-export async function getIncomeByCategory(month: string): Promise<Map<number, number>> {
+export async function getIncomeByCategory(month: string): Promise<Map<string, number>> {
   const [txs, scheduled] = await Promise.all([
     getTransactionsByMonth(month),
     db.scheduledTransactions.filter(s => s.isActive !== false).toArray(),
   ])
 
   const projected = getProjectedScheduledForMonth(scheduled, month)
-  const map = new Map<number, number>()
+  const map = new Map<string, number>()
 
   for (const tx of txs) {
     if (tx.type !== 'income' || !tx.categoryId) continue

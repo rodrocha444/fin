@@ -1,6 +1,6 @@
 // src/hooks/useDebts.ts
 // ─────────────────────────────────────────────────────────────
-// Hooks reativos para Contas a Receber / Pagar e Cobranças
+// Hooks reativos para Contas a Receber / Pagar e Cobranças (padrão CUID)
 // ─────────────────────────────────────────────────────────────
 
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -24,7 +24,7 @@ export function useDebtAccounts() {
       db.debtItems.toArray(),
     ])
 
-    const itemsByAccount = new Map<number, DebtItem[]>()
+    const itemsByAccount = new Map<string, DebtItem[]>()
     for (const item of items) {
       const list = itemsByAccount.get(item.debtAccountId) || []
       list.push(item)
@@ -60,7 +60,7 @@ export function useDebtAccounts() {
 }
 
 /** Retorna os detalhes de uma conta de cobrança específica e todos os seus itens */
-export function useDebtAccountWithItems(accountId: number | undefined) {
+export function useDebtAccountWithItems(accountId: string | undefined) {
   return useLiveQuery(
     async () => {
       if (accountId === undefined) return null

@@ -1,14 +1,15 @@
 // src/db/repositories/categories.ts
 // ─────────────────────────────────────────────────────────────
-// CRUD de grupos e categorias
+// CRUD de grupos e categorias (padrão CUID)
 // ─────────────────────────────────────────────────────────────
 
 import { db } from '../schema'
+import { createId } from '@/utils/id'
 import type { CategoryGroup, Category } from '@/types'
 
 // ── Grupos ───────────────────────────────────────────────────
 
-export async function createGroup(data: Omit<CategoryGroup, 'id'>): Promise<number> {
+export async function createGroup(data: Omit<CategoryGroup, 'id'>): Promise<string> {
   const normalizedName = data.name.trim().toLowerCase()
   const existing = await db.categoryGroups
     .filter(g => g.name.trim().toLowerCase() === normalizedName)
@@ -18,10 +19,12 @@ export async function createGroup(data: Omit<CategoryGroup, 'id'>): Promise<numb
     throw new Error(`Já existe um grupo cadastrado com o nome "${data.name.trim()}".`)
   }
 
-  return db.categoryGroups.add({ ...data, name: data.name.trim() }) as Promise<number>
+  const id = createId()
+  await db.categoryGroups.add({ ...data, id, name: data.name.trim() })
+  return id
 }
 
-export async function updateGroup(id: number, data: Partial<Omit<CategoryGroup, 'id'>>): Promise<void> {
+export async function updateGroup(id: string, data: Partial<Omit<CategoryGroup, 'id'>>): Promise<void> {
   if (data.name) {
     const normalizedName = data.name.trim().toLowerCase()
     const existing = await db.categoryGroups
@@ -41,13 +44,13 @@ export async function updateGroup(id: number, data: Partial<Omit<CategoryGroup, 
   await db.categoryGroups.update(id, payload)
 }
 
-export async function deleteGroup(id: number): Promise<void> {
+export async function deleteGroup(id: string): Promise<void> {
   const catCount = await db.categories.where('groupId').equals(id).count()
   if (catCount > 0) throw new Error('Não é possível excluir um grupo que possui categorias.')
   await db.categoryGroups.delete(id)
 }
 
-export async function toggleGroupVisibility(id: number): Promise<void> {
+export async function toggleGroupVisibility(id: string): Promise<void> {
   const group = await db.categoryGroups.get(id)
   if (group) await db.categoryGroups.update(id, { isHidden: !group.isHidden })
 }
@@ -89,7 +92,7 @@ export async function clearDefaultIncomeCategories(): Promise<void> {
 
 // ── Categorias ───────────────────────────────────────────────
 
-export async function createCategory(data: Omit<Category, 'id'>): Promise<number> {
+export async function createCategory(data: Omit<Category, 'id'>): Promise<string> {
   const normalizedName = data.name.trim().toLowerCase()
   const existing = await db.categories
     .filter(c => c.name.trim().toLowerCase() === normalizedName)
@@ -99,10 +102,12 @@ export async function createCategory(data: Omit<Category, 'id'>): Promise<number
     throw new Error(`Já existe uma categoria cadastrada com o nome "${data.name.trim()}".`)
   }
 
-  return db.categories.add({ ...data, name: data.name.trim() }) as Promise<number>
+  const id = createId()
+  await db.categories.add({ ...data, id, name: data.name.trim() })
+  return id
 }
 
-export async function updateCategory(id: number, data: Partial<Omit<Category, 'id'>>): Promise<void> {
+export async function updateCategory(id: string, data: Partial<Omit<Category, 'id'>>): Promise<void> {
   if (data.name) {
     const normalizedName = data.name.trim().toLowerCase()
     const existing = await db.categories
@@ -122,7 +127,7 @@ export async function updateCategory(id: number, data: Partial<Omit<Category, 'i
   await db.categories.update(id, payload)
 }
 
-export async function deleteCategory(id: number): Promise<void> {
+export async function deleteCategory(id: string): Promise<void> {
   // Checar se tem transações associadas
   const txCount = await db.transactions.where('categoryId').equals(id).count()
   if (txCount > 0) throw new Error('Categoria possui transações. Mova-as antes de excluir.')
@@ -137,12 +142,12 @@ export async function deleteCategory(id: number): Promise<void> {
   await db.categories.delete(id)
 }
 
-export async function toggleCategoryVisibility(id: number): Promise<void> {
+export async function toggleCategoryVisibility(id: string): Promise<void> {
   const cat = await db.categories.get(id)
   if (cat) await db.categories.update(id, { isHidden: !cat.isHidden })
 }
 
-export async function getCategoriesByGroup(groupId: number): Promise<Category[]> {
+export async function getCategoriesByGroup(groupId: string): Promise<Category[]> {
   return db.categories.where('groupId').equals(groupId).sortBy('sortOrder')
 }
 
@@ -150,12 +155,12 @@ export async function getAllCategories(): Promise<Category[]> {
   return db.categories.orderBy('sortOrder').toArray()
 }
 
-export async function getCategoryById(id: number): Promise<Category | undefined> {
+export async function getCategoryById(id: string): Promise<Category | undefined> {
   return db.categories.get(id)
 }
 
 // Reordenar categorias dentro de um grupo
-export async function reorderCategories(categoryIds: number[]): Promise<void> {
+export async function reorderCategories(categoryIds: string[]): Promise<void> {
   await db.transaction('rw', db.categories, async () => {
     for (let i = 0; i < categoryIds.length; i++) {
       await db.categories.update(categoryIds[i], { sortOrder: i })

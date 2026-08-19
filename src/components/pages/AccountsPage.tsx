@@ -5,6 +5,7 @@ import { useAccounts, useAllBalances } from '@/hooks/useAccounts'
 import { deleteAccount } from '@/db/repositories/accounts'
 import { formatCurrency, accountTypeLabel } from '@/utils/format'
 import AccountForm from '@/components/organisms/AccountForm'
+import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
 import type { Account } from '@/types'
 
 function accountIcon(type: string) {
@@ -25,9 +26,15 @@ export default function AccountsPage() {
     if (!confirm(`Excluir a conta "${acc.name}"?`)) return
     try {
       await deleteAccount(acc.id)
-    } catch (e: any) {
-      alert(e.message)
+    } catch (err: any) {
+      alert(err.message || 'Erro ao excluir conta.')
     }
+  }
+
+  const handleEdit = (e: React.MouseEvent, acc: Account) => {
+    e.stopPropagation()
+    setEditingAccount(acc)
+    setShowForm(true)
   }
 
   const closeForm = () => { setShowForm(false); setEditingAccount(undefined) }
@@ -52,14 +59,19 @@ export default function AccountsPage() {
             </span>
           </p>
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="btn-primary flex items-center gap-1.5"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Nova conta</span>
-          <span className="sm:hidden">Nova</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="lg:hidden">
+            <SyncStatusBadge compact={true} />
+          </div>
+          <button
+            onClick={() => setShowForm(true)}
+            className="btn-primary flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Nova conta</span>
+            <span className="sm:hidden">Nova</span>
+          </button>
+        </div>
       </div>
 
       <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
