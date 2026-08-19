@@ -90,11 +90,15 @@ export async function importDatabase(
       if (Array.isArray(records)) {
         await table.clear()
         if (records.length > 0) {
-          // Converter strings ISO para Date em campos conhecidos e garantir ID string
+          // Converter strings ISO para Date em campos conhecidos, garantir ID string e converter números
           const parsedRecords = records.map(item => {
             const parsed = parseDates(item)
             if (!parsed.id) parsed.id = createId()
             else parsed.id = String(parsed.id)
+            if (table.name === 'accounts' && parsed.initialBalance !== undefined) {
+              parsed.initialBalance = Number(parsed.initialBalance ?? 0)
+            }
+            parsed.updatedAt = new Date()
             return parsed
           })
           await table.bulkAdd(parsedRecords)
@@ -102,6 +106,12 @@ export async function importDatabase(
         totalRecords += records.length
         importedTables.push(table.name)
       }
+    }
+    // Reseta o timestamp de última sincronização para que o motor na nuvem envie a base importada
+    try {
+      await db.syncMeta.delete('lastSyncAt')
+    } catch {
+      // ignora se a tabela não existir
     }
   })
 
@@ -141,6 +151,7 @@ function normalizeLegacyBackup(data: Record<string, any[]>): Record<string, any[
       const newId = createId()
       accountIdMap.set(oldId, newId)
       acc.id = newId
+      acc.initialBalance = Number(acc.initialBalance ?? 0)
     }
   }
 
@@ -277,6 +288,7 @@ function parseDates(obj: any): any {
   const dateFields = [
     'date',
     'createdAt',
+    'updatedAt',
     'nextDate',
     'startDate',
     'endDate',

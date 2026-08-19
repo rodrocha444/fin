@@ -614,11 +614,14 @@ export async function initSyncEngine(): Promise<void> {
   SYNC_TABLES.forEach(def => {
     const table = (db as any)[def.dexieName]
     if (table) {
-      table.hook('creating', () => {
+      table.hook('creating', function (_primKey: any, obj: any) {
+        if (!obj.createdAt) obj.createdAt = new Date()
+        if (!obj.updatedAt) obj.updatedAt = new Date()
         if (!isApplyingRemoteSync && !syncState.isPaused) scheduleSync(1500)
       })
-      table.hook('updating', () => {
+      table.hook('updating', function (modifications: any) {
         if (!isApplyingRemoteSync && !syncState.isPaused) scheduleSync(1500)
+        return { ...modifications, updatedAt: new Date() }
       })
       table.hook('deleting', (primKey: any) => {
         if (!isApplyingRemoteSync && primKey) {
