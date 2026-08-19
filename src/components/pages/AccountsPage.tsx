@@ -1,18 +1,12 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { Plus, CreditCard, PiggyBank, Landmark, Pencil, Trash2, ArrowRight, ArrowLeftRight } from 'lucide-react'
-import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '@/db/schema'
+import { useNavigate } from 'react-router-dom'
+import { Plus, CreditCard, PiggyBank, Landmark, Pencil, Trash2 } from 'lucide-react'
 import { useAccounts, useAllBalances } from '@/hooks/useAccounts'
-import { useCategoriesWithGroups } from '@/hooks/useBudget'
 import { deleteAccount } from '@/db/repositories/accounts'
-import { deleteTransaction } from '@/db/repositories/transactions'
 import { formatCurrency, accountTypeLabel } from '@/utils/format'
 import AccountForm from '@/components/organisms/AccountForm'
-import TransactionForm from '@/components/organisms/TransactionForm'
-import TransactionItem from '@/components/molecules/TransactionItem'
 import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
-import type { Account, Transaction } from '@/types'
+import type { Account } from '@/types'
 
 function accountIcon(type: string) {
   if (type === 'credit_card') return <CreditCard className="w-5 h-5" />
@@ -26,27 +20,6 @@ export default function AccountsPage() {
   const balances = useAllBalances()
   const [showForm, setShowForm] = useState(false)
   const [editingAccount, setEditingAccount] = useState<Account | undefined>()
-  const [editingTx, setEditingTx] = useState<Transaction | null>(null)
-
-  const installmentGroups = useLiveQuery(() => db.installmentGroups.toArray(), [])
-  const { categories } = useCategoriesWithGroups() ?? {}
-
-  const recentTxs = useLiveQuery(
-    async () => {
-      const txs = await db.transactions.toArray()
-      return txs.sort((a, b) => {
-        const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
-        const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
-        if (timeB !== timeA) return timeB - timeA
-        return (b.id ?? '').localeCompare(a.id ?? '')
-      }).slice(0, 15)
-    },
-    []
-  )
-
-  const accountMap = new Map(accounts?.map(a => [a.id!, a]) ?? [])
-  const categoryMap = new Map(categories?.map(c => [c.id!, c]) ?? [])
-  const groupMap = new Map(installmentGroups?.map(g => [g.id!, g]) ?? [])
 
   const handleDelete = async (acc: Account) => {
     if (!acc.id) return
@@ -56,18 +29,6 @@ export default function AccountsPage() {
     } catch (err: any) {
       alert(err.message || 'Erro ao excluir conta.')
     }
-  }
-
-  const handleDeleteTx = async (tx: Transaction) => {
-    if (!tx.id) return
-    if (!confirm(tx.installmentGroupId ? 'Excluir esta parcela?' : 'Excluir esta transação?')) return
-    await deleteTransaction(tx.id)
-  }
-
-  const handleEdit = (e: React.MouseEvent, acc: Account) => {
-    e.stopPropagation()
-    setEditingAccount(acc)
-    setShowForm(true)
   }
 
   const closeForm = () => { setShowForm(false); setEditingAccount(undefined) }
@@ -208,46 +169,8 @@ export default function AccountsPage() {
         </div>
       )}
 
-      {/* Seção de Lançamentos Recentes com Edição Direta */}
-      {recentTxs && recentTxs.length > 0 && (
-        <div className="card p-0 overflow-hidden space-y-0">
-          <div className="p-3 sm:p-4 bg-slate-900/80 border-b border-slate-800 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <ArrowLeftRight className="w-4 h-4 text-indigo-400" />
-              <h2 className="text-xs sm:text-sm font-semibold text-slate-200 uppercase tracking-wider">
-                Lançamentos Recentes
-              </h2>
-            </div>
-            <Link
-              to="/transactions"
-              className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium transition-colors"
-            >
-              <span>Ver extrato geral</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="divide-y divide-slate-800/40">
-            {recentTxs.map(tx => (
-              <TransactionItem
-                key={tx.id}
-                tx={tx}
-                accountName={accountMap.get(tx.accountId)?.name ?? '—'}
-                categoryName={tx.categoryId ? categoryMap.get(tx.categoryId)?.name : undefined}
-                installmentGroup={tx.installmentGroupId ? groupMap.get(tx.installmentGroupId) : undefined}
-                onEdit={() => setEditingTx(tx)}
-                onDelete={() => handleDeleteTx(tx)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Modal de formulário de conta */}
       {showForm && <AccountForm account={editingAccount} onClose={closeForm} />}
-
-      {/* Modal de edição de transação */}
-      {editingTx && <TransactionForm transaction={editingTx} onClose={() => setEditingTx(null)} />}
       </div>
     </div>
   )
