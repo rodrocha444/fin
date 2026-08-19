@@ -30,7 +30,12 @@ export default function TransactionItem({
   const timeStr = tx.createdAt ? formatTime(tx.createdAt) : formatTime(tx.date)
 
   return (
-    <div className="flex items-center gap-3 px-3 sm:px-4 py-3 border-b border-slate-800/30 hover:bg-slate-800/20 active:bg-slate-800/40 transition-colors">
+    <div
+      onClick={onEdit}
+      className={`flex items-center gap-3 px-3 sm:px-4 py-3 border-b border-slate-800/30 hover:bg-slate-800/20 active:bg-slate-800/40 transition-colors ${
+        onEdit ? 'cursor-pointer' : ''
+      }`}
+    >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-sm text-slate-200 truncate font-medium">{tx.payee}</p>
@@ -67,7 +72,7 @@ export default function TransactionItem({
         {tx.notes && <p className="text-[10px] text-slate-600 truncate mt-0.5">{tx.notes}</p>}
       </div>
 
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
         <div className="text-right">
           <span className={`text-sm font-semibold tabular-nums ${amtColor}`}>
             {prefix}
