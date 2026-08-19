@@ -341,21 +341,7 @@ export default function BudgetPage() {
         {/* To Be Budgeted */}
         {summary && (
           <div className="text-center flex-1 min-w-0">
-            <div className="flex items-center justify-center gap-1.5">
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">A orçar</p>
-              {summary.previousMonthSurplus !== 0 && (
-                <span
-                  className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
-                    summary.previousMonthSurplus > 0
-                      ? 'text-emerald-400 bg-emerald-950/70 border border-emerald-800/60'
-                      : 'text-rose-400 bg-rose-950/70 border border-rose-800/60'
-                  }`}
-                  title="Sobra/Falta acumulada de meses anteriores"
-                >
-                  {summary.previousMonthSurplus > 0 ? '+' : ''}{formatCurrency(summary.previousMonthSurplus)} ant.
-                </span>
-              )}
-            </div>
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">A orçar</p>
             <p className={`text-base sm:text-lg font-bold tabular-nums truncate ${tbbColor}`}>
               {formatCurrency(Math.abs(summary.toBeBudgeted))}
             </p>
