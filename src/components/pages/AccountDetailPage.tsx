@@ -18,6 +18,7 @@ import {
   AlertCircle,
   ArrowDownLeft,
 } from 'lucide-react'
+import { format } from 'date-fns'
 import { useAccount, useAccountBalance } from '@/hooks/useAccounts'
 import {
   useAccountTransactions,
@@ -28,7 +29,7 @@ import { usePaidInvoices, useClosedUnpaidInvoices } from '@/hooks/useInvoices'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
 import { deleteTransaction, deleteInstallmentGroup } from '@/db/repositories/transactions'
 import { deleteAccount } from '@/db/repositories/accounts'
-import { formatCurrency, formatDate, accountTypeLabel } from '@/utils/format'
+import { formatCurrency, formatDate, formatMonthLabel, currentMonth, accountTypeLabel } from '@/utils/format'
 import {
   getCurrentOpenInvoiceMonth,
   getInvoiceCycle,
@@ -41,6 +42,7 @@ import AccountForm from '@/components/organisms/AccountForm'
 import InvoicePrintModal from '@/components/organisms/InvoicePrintModal'
 import ConfirmInvoicePaidModal from '@/components/organisms/ConfirmInvoicePaidModal'
 import SearchBar from '@/components/atoms/SearchBar'
+import MonthNavigator from '@/components/atoms/MonthNavigator'
 import CreditCardPurchaseItem from '@/components/molecules/CreditCardPurchaseItem'
 import TransactionItem from '@/components/molecules/TransactionItem'
 import type { Transaction } from '@/types'
@@ -65,6 +67,7 @@ export default function AccountDetailPage() {
   const { categories } = useCategoriesWithGroups() ?? {}
   const categoryMap = new Map(categories?.map(c => [c.id!, c]) ?? [])
 
+  const [month, setMonth] = useState(currentMonth)
   const [search, setSearch] = useState('')
   const [showTxForm, setShowTxForm] = useState(false)
   const [showAccForm, setShowAccForm] = useState(false)
@@ -119,9 +122,11 @@ export default function AccountDetailPage() {
     return getInvoicesOverview(transactions, account.statementClosingDay, account.paymentDueDay, 12)
   })()
 
-  // Filtragem de lista
+  // Filtragem de lista paginada por mês selecionado
   const filteredTxs = [...(transactions ?? [])]
     .filter(tx => {
+      const txMonth = format(new Date(tx.date), 'yyyy-MM')
+      if (txMonth !== month) return false
       if (!search) return true
       const q = search.toLowerCase()
       return tx.payee.toLowerCase().includes(q) || (tx.notes ?? '').toLowerCase().includes(q)
@@ -134,6 +139,8 @@ export default function AccountDetailPage() {
     })
 
   const filteredPurchases = (ccPurchases ?? []).filter(p => {
+    const pMonth = format(new Date(p.date), 'yyyy-MM')
+    if (pMonth !== month) return false
     if (!search) return true
     const q = search.toLowerCase()
     return p.payee.toLowerCase().includes(q) || (p.notes ?? '').toLowerCase().includes(q)
@@ -469,35 +476,41 @@ export default function AccountDetailPage() {
           </div>
         )}
 
-        {/* Seção de histórico (Compras para Cartão, Transações para demais contas) */}
+        {/* Seção de histórico paginado por mês (Compras para Cartão, Transações para demais contas) */}
         <div className="card p-0 overflow-hidden">
-          {/* Barra de busca e título */}
-          <div className="p-3 sm:p-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between gap-3">
+          {/* Barra de navegação por mês e busca */}
+          <div className="p-3 sm:p-4 bg-slate-900/60 border-b border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="flex items-center justify-between sm:justify-start gap-3">
+              <MonthNavigator month={month} onChangeMonth={setMonth} />
+              <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                <span className="font-medium hidden sm:inline">
+                  {isCreditCard ? 'Compras:' : 'Lançamentos:'}
+                </span>
+                <span className="text-slate-300 font-semibold tabular-nums">
+                  {isCreditCard ? filteredPurchases.length : filteredTxs.length} {((isCreditCard ? filteredPurchases.length : filteredTxs.length) === 1 ? 'item' : 'itens')}
+                </span>
+              </div>
+            </div>
+
             <SearchBar
               value={search}
               onChange={setSearch}
-              placeholder={isCreditCard ? 'Buscar compra no cartão…' : 'Buscar favorecido ou nota nesta conta…'}
-              className="max-w-md"
+              placeholder={isCreditCard ? 'Buscar compra neste mês…' : 'Buscar favorecido ou nota…'}
+              className="max-w-md w-full sm:w-auto"
             />
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400 font-medium hidden sm:inline">
-                {isCreditCard ? 'Histórico de Compras' : 'Transações'}:
-              </span>
-              <span className="text-xs text-slate-500 font-medium">
-                {isCreditCard ? filteredPurchases.length : filteredTxs.length} {((isCreditCard ? filteredPurchases.length : filteredTxs.length) === 1 ? 'item' : 'itens')}
-              </span>
-            </div>
           </div>
 
           {/* Lista de Compras (Cartão de Crédito) ou Transações (Contas) */}
           <div className="divide-y divide-slate-800/60">
             {isCreditCard ? (
-              // Modo Cartão de Crédito: Histórico consolidado de compras
+              // Modo Cartão de Crédito: Histórico consolidado de compras do mês
               filteredPurchases.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-500 text-xs px-4 text-center">
                   <CreditCard className="w-10 h-10 text-slate-700" />
                   <p className="text-sm font-medium text-slate-400">
-                    {search ? 'Nenhuma compra encontrada' : 'Nenhuma compra registrada neste cartão'}
+                    {search
+                      ? 'Nenhuma compra encontrada para a busca'
+                      : `Nenhuma compra registrada em ${formatMonthLabel(month)}`}
                   </p>
                   <button
                     onClick={() => setShowTxForm(true)}
@@ -519,12 +532,14 @@ export default function AccountDetailPage() {
                 ))
               )
             ) : (
-              // Modo Padrão: Transações normais de conta corrente/poupança
+              // Modo Padrão: Transações normais de conta corrente/poupança do mês
               filteredTxs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-500 text-xs px-4 text-center">
-                  <CreditCard className="w-10 h-10 text-slate-700" />
+                  <Landmark className="w-10 h-10 text-slate-700" />
                   <p className="text-sm font-medium text-slate-400">
-                    {search ? 'Nenhuma transação encontrada' : 'Nenhuma transação registrada nesta conta'}
+                    {search
+                      ? 'Nenhuma transação encontrada para a busca'
+                      : `Nenhuma transação registrada em ${formatMonthLabel(month)}`}
                   </p>
                   <button
                     onClick={() => setShowTxForm(true)}
