@@ -347,23 +347,25 @@ export default function AccountDetailPage() {
                           title="Registrar pagamento desta fatura"
                         >
                           <ArrowDownLeft className="w-4 h-4 text-emerald-400" />
-                          <span className="hidden sm:inline">Pagar</span>
+                          <span>Pagar</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => setPrintingInvoice(unpaidInv)}
-                          className="btn-ghost py-2 px-2.5 text-xs text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5"
-                          title="Imprimir fatura"
+                          className="btn-secondary py-2 px-3 text-xs font-semibold flex items-center justify-center gap-1.5 flex-1 sm:flex-initial"
+                          title="Imprimir fatura fechada"
                         >
-                          <Printer className="w-4 h-4" />
+                          <Printer className="w-4 h-4 text-indigo-400" />
+                          <span>Imprimir</span>
                         </button>
 
                         <Link
                           to={`/accounts/${accountId}/invoice?month=${unpaidInv.cycle.monthKey}`}
-                          className="btn-ghost py-2 px-2.5 text-xs text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1"
-                          title="Ver detalhes da fatura"
+                          className="btn-secondary py-2 px-3.5 text-xs font-semibold flex items-center justify-center gap-1.5 flex-1 sm:flex-initial hover:border-amber-500 hover:text-amber-300 transition-colors"
+                          title="Acessar detalhes da fatura"
                         >
+                          <span>Acessar Fatura</span>
                           <ArrowUpRight className="w-4 h-4" />
                         </Link>
                       </div>
