@@ -10,6 +10,7 @@ import {
   ArrowDownLeft,
   Pencil,
   FileText,
+  Printer,
 } from 'lucide-react'
 import { useAccount } from '@/hooks/useAccounts'
 import { useAccountTransactions } from '@/hooks/useTransactions'
@@ -23,6 +24,7 @@ import {
 } from '@/utils/invoices'
 import TransactionForm from '@/components/organisms/TransactionForm'
 import AccountForm from '@/components/organisms/AccountForm'
+import InvoicePrintModal from '@/components/organisms/InvoicePrintModal'
 import InvoiceCycleNavigator from '@/components/molecules/InvoiceCycleNavigator'
 import SearchBar from '@/components/atoms/SearchBar'
 
@@ -43,6 +45,7 @@ export default function AccountInvoicePage() {
   const [showTxForm, setShowTxForm] = useState(false)
   const [showPayForm, setShowPayForm] = useState(false)
   const [showAccForm, setShowAccForm] = useState(false)
+  const [showPrintModal, setShowPrintModal] = useState(false)
 
   useEffect(() => {
     if (queryMonth) {
@@ -149,6 +152,15 @@ export default function AccountInvoicePage() {
             />
             <span className="text-xs font-semibold text-slate-200 hidden sm:inline">{account.name}</span>
           </div>
+
+          <button
+            onClick={() => setShowPrintModal(true)}
+            className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5"
+            title="Imprimir fatura em PDF"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Imprimir Fatura</span>
+          </button>
 
           <button
             onClick={() => setShowAccForm(true)}
@@ -273,6 +285,15 @@ export default function AccountInvoicePage() {
                   <span>Lançar nesta fatura</span>
                 </button>
 
+                <button
+                  onClick={() => setShowPrintModal(true)}
+                  className="btn-secondary py-2.5 px-4 text-xs font-semibold flex items-center gap-2"
+                  title="Imprimir ou salvar fatura em PDF"
+                >
+                  <Printer className="w-4 h-4 text-indigo-400" />
+                  <span>Imprimir Fatura</span>
+                </button>
+
                 <Link
                   to={`/accounts/${accountId}`}
                   className="btn-ghost py-2.5 px-3 text-xs text-slate-400 hover:text-slate-200 ml-auto"
@@ -392,6 +413,16 @@ export default function AccountInvoicePage() {
         <AccountForm
           account={account}
           onClose={() => setShowAccForm(false)}
+        />
+      )}
+
+      {/* Modal de Impressão de Fatura */}
+      {showPrintModal && invoiceData && (
+        <InvoicePrintModal
+          account={account}
+          invoiceData={invoiceData}
+          categories={categories}
+          onClose={() => setShowPrintModal(false)}
         />
       )}
     </div>

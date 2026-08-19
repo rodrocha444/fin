@@ -13,6 +13,7 @@ import {
   Receipt,
   ArrowUpRight,
   Calendar,
+  Printer,
 } from 'lucide-react'
 import { useAccount, useAccountBalance } from '@/hooks/useAccounts'
 import {
@@ -29,9 +30,11 @@ import {
   getInvoiceCycle,
   getInvoiceData,
   getInvoicesOverview,
+  type InvoiceData,
 } from '@/utils/invoices'
 import TransactionForm from '@/components/organisms/TransactionForm'
 import AccountForm from '@/components/organisms/AccountForm'
+import InvoicePrintModal from '@/components/organisms/InvoicePrintModal'
 import SearchBar from '@/components/atoms/SearchBar'
 import CreditCardPurchaseItem from '@/components/molecules/CreditCardPurchaseItem'
 import TransactionItem from '@/components/molecules/TransactionItem'
@@ -61,6 +64,7 @@ export default function AccountDetailPage() {
   const [showTxForm, setShowTxForm] = useState(false)
   const [showAccForm, setShowAccForm] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
+  const [printingInvoice, setPrintingInvoice] = useState<InvoiceData | null>(null)
 
   if (accountId === undefined || (account === undefined && transactions === undefined)) {
     return (
@@ -288,13 +292,26 @@ export default function AccountDetailPage() {
                 </div>
               </div>
 
-              <Link
-                to={`/accounts/${accountId}/invoice`}
-                className="btn-secondary py-2 px-3.5 text-xs font-semibold flex items-center justify-center gap-1.5 self-stretch sm:self-auto hover:border-indigo-500 hover:text-indigo-300 transition-colors"
-              >
-                <span>Acessar Fatura</span>
-                <ArrowUpRight className="w-4 h-4" />
-              </Link>
+              <div className="flex items-center gap-2 self-stretch sm:self-auto">
+                {openInvoiceData && (
+                  <button
+                    onClick={() => setPrintingInvoice(openInvoiceData)}
+                    className="btn-secondary py-2 px-3 text-xs font-semibold flex items-center justify-center gap-1.5 flex-1 sm:flex-initial"
+                    title="Imprimir fatura aberta"
+                  >
+                    <Printer className="w-4 h-4 text-indigo-400" />
+                    <span>Imprimir</span>
+                  </button>
+                )}
+
+                <Link
+                  to={`/accounts/${accountId}/invoice`}
+                  className="btn-secondary py-2 px-3.5 text-xs font-semibold flex items-center justify-center gap-1.5 flex-1 sm:flex-initial hover:border-indigo-500 hover:text-indigo-300 transition-colors"
+                >
+                  <span>Acessar Fatura</span>
+                  <ArrowUpRight className="w-4 h-4" />
+                </Link>
+              </div>
             </div>
 
             {/* Projeção de Faturas Futuras (Parcelamentos) */}
@@ -439,6 +456,16 @@ export default function AccountDetailPage() {
 
         {/* Form de edição de conta */}
         {showAccForm && <AccountForm account={account} onClose={() => setShowAccForm(false)} />}
+
+        {/* Modal de Impressão de Fatura */}
+        {printingInvoice && (
+          <InvoicePrintModal
+            account={account}
+            invoiceData={printingInvoice}
+            categories={categories}
+            onClose={() => setPrintingInvoice(null)}
+          />
+        )}
       </div>
     </div>
   )

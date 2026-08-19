@@ -256,7 +256,8 @@
     display: block !important;
   }
 
-  #printable-debt-container {
+  #printable-debt-container,
+  #printable-invoice-container {
     position: static !important;
     width: 100% !important;
     max-width: 100% !important;
