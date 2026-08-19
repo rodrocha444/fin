@@ -226,15 +226,18 @@ export async function computeIncomeBudgetRows(month: string): Promise<IncomeGrou
 // ── Resumo de "A Orçar" (Zero-Sum Budgeting) ──────────────────
 
 export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
-  const [allIncomeTxs, allExpenseTxs, allBudgets, allAccounts, allGroups, allCategories, allScheduled] = await Promise.all([
-    db.transactions.filter(t => t.type === 'income').toArray(),
-    db.transactions.filter(t => t.type === 'expense').toArray(),
+  const [allTransactions, allBudgets, allAccounts, allGroups, allCategories, allScheduled] = await Promise.all([
+    db.transactions.toArray(),
     db.budgetMonths.toArray(),
     db.accounts.toArray(),
     db.categoryGroups.toArray(),
     db.categories.toArray(),
     db.scheduledTransactions.filter(s => s.isActive !== false).toArray(),
   ])
+
+  const allIncomeTxs = allTransactions.filter(t => t.type === 'income')
+  const allExpenseTxs = allTransactions.filter(t => t.type === 'expense')
+  const ccAccounts = allAccounts.filter(a => a.type === 'credit_card')
 
   const groupMap = new Map(allGroups.map(g => [g.id!, g]))
 
@@ -314,12 +317,7 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
 
   // 4. Coletar todos os meses anteriores que tiveram transações ou orçamento
   const pastMonths = new Set<string>()
-  for (const tx of allIncomeTxs) {
-    const m = toMonthKey(new Date(tx.date))
-    if (m < month) pastMonths.add(m)
-  }
-  for (const tx of allExpenseTxs) {
-    if (tx.categoryId && ignoredCategoryIds.has(tx.categoryId)) continue
+  for (const tx of allTransactions) {
     const m = toMonthKey(new Date(tx.date))
     if (m < month) pastMonths.add(m)
   }
@@ -375,7 +373,7 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
     }
   }
 
-  // 6. Calcular compromissos efetivos dos meses anteriores: Math.max(orçado, despesas/parcelas)
+  // 7. Calcular compromissos efetivos dos meses anteriores: Math.max(orçado, despesas/parcelas) + faturas de cartão
   let priorCommitments = 0
   for (const m of pastMonths) {
     for (const catId of expenseCategoryIds) {
@@ -385,9 +383,15 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
       priorCommitments += Math.max(budgeted, spent)
     }
     priorCommitments += uncategorizedExpensesByMonth.get(m) || 0
+
+    // Faturas de cartão de crédito vencidas nos meses anteriores
+    for (const acc of ccAccounts) {
+      const accTxs = allTransactions.filter(t => t.accountId === acc.id)
+      priorCommitments += getInvoiceForBudgetMonth(accTxs, acc, m)
+    }
   }
 
-  // 7. Calcular compromissos efetivos do mês selecionado
+  // 8. Calcular compromissos efetivos do mês selecionado: envelopes + faturas atuais a pagar no mês
   let currentMonthCommitments = 0
   for (const catId of expenseCategoryIds) {
     const key = `${month}:${catId}`
@@ -396,6 +400,12 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
     currentMonthCommitments += Math.max(budgeted, spent)
   }
   currentMonthCommitments += uncategorizedExpensesByMonth.get(month) || 0
+
+  // Faturas de cartão de crédito atuais que vencem no mês (deduzem diretamente do "A orçar")
+  for (const acc of ccAccounts) {
+    const accTxs = allTransactions.filter(t => t.accountId === acc.id)
+    currentMonthCommitments += getInvoiceForBudgetMonth(accTxs, acc, month)
+  }
 
   // Sobra/Falta acumulada dos meses anteriores
   const previousMonthSurplus = initialFunds + priorIncome - priorCommitments
