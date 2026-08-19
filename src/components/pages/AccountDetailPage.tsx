@@ -166,6 +166,20 @@ export default function AccountDetailPage() {
     }
   }
 
+  const handleEditPurchase = (p: CreditCardPurchase) => {
+    if (p.isInstallment && p.groupId) {
+      const firstTx = (transactions ?? []).find(t => t.installmentGroupId === p.groupId)
+      if (firstTx) {
+        setEditingTx(firstTx)
+      }
+    } else if (p.transactionId) {
+      const tx = (transactions ?? []).find(t => t.id === p.transactionId)
+      if (tx) {
+        setEditingTx(tx)
+      }
+    }
+  }
+
   return (
     <div className="fade-in">
       {/* Header com suporte à statusbar / safe-area */}
@@ -497,6 +511,7 @@ export default function AccountDetailPage() {
                     key={p.id}
                     purchase={p}
                     categoryName={p.categoryId ? categoryMap.get(p.categoryId)?.name : undefined}
+                    onEdit={() => handleEditPurchase(p)}
                     onDelete={() => handleDeletePurchase(p)}
                   />
                 ))

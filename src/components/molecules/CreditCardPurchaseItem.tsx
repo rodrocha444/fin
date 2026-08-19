@@ -1,5 +1,5 @@
 // src/components/molecules/CreditCardPurchaseItem.tsx — Item de linha de compra no cartão de crédito
-import { Trash2 } from 'lucide-react'
+import { Trash2, Pencil } from 'lucide-react'
 import { formatCurrency, formatDate, formatTime } from '@/utils/format'
 import Badge from '@/components/atoms/Badge'
 import type { CreditCardPurchase } from '@/hooks/useTransactions'
@@ -7,12 +7,14 @@ import type { CreditCardPurchase } from '@/hooks/useTransactions'
 interface CreditCardPurchaseItemProps {
   purchase: CreditCardPurchase
   categoryName?: string
+  onEdit?: () => void
   onDelete: () => void
 }
 
 export default function CreditCardPurchaseItem({
   purchase,
   categoryName,
+  onEdit,
   onDelete,
 }: CreditCardPurchaseItemProps) {
   const isExpense = purchase.type === 'expense'
@@ -20,7 +22,12 @@ export default function CreditCardPurchaseItem({
   const timeStr = purchase.createdAt ? formatTime(purchase.createdAt) : formatTime(purchase.date)
 
   return (
-    <div className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-800/40 transition-colors">
+    <div
+      onClick={onEdit}
+      className={`flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-800/40 transition-colors ${
+        onEdit ? 'cursor-pointer' : ''
+      }`}
+    >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-sm font-medium text-slate-200 truncate">{purchase.payee}</p>
@@ -44,11 +51,22 @@ export default function CreditCardPurchaseItem({
         {purchase.notes && <p className="text-xs text-slate-600 truncate mt-0.5">{purchase.notes}</p>}
       </div>
 
-      <div className="flex items-center gap-3 flex-shrink-0">
+      <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
         <span className={`text-sm sm:text-base font-semibold tabular-nums ${amtColor}`}>
           {isExpense ? '-' : '+'}
           {formatCurrency(purchase.amount)}
         </span>
+
+        {onEdit && (
+          <button
+            onClick={onEdit}
+            className="p-2 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 active:bg-slate-700 transition-colors"
+            title="Editar compra"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
+        )}
+
         <button
           onClick={onDelete}
           className="p-2 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-900/20 active:bg-rose-900/30 transition-colors"

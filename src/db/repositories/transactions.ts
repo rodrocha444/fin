@@ -6,7 +6,7 @@
 import { db } from '../schema'
 import { createId } from '@/utils/id'
 import type { Transaction, InstallmentGroup } from '@/types'
-import { addMonths, startOfMonth, endOfMonth } from 'date-fns'
+import { addMonths, subMonths, startOfMonth, endOfMonth } from 'date-fns'
 import { getProjectedScheduledForMonth } from './scheduled'
 
 // ── Tipos de entrada ─────────────────────────────────────────
@@ -42,6 +42,82 @@ export async function createTransaction(data: CreateTransactionInput): Promise<s
 }
 
 export async function updateTransaction(id: string, data: Partial<CreateTransactionInput>): Promise<void> {
+  const tx = await db.transactions.get(id)
+  if (!tx) return
+
+  // Se a transação pertencer a um parcelamento, sincroniza todas as parcelas do grupo
+  if (tx.installmentGroupId) {
+    const groupId = tx.installmentGroupId
+    const groupTxs = await db.transactions.where('installmentGroupId').equals(groupId).toArray()
+
+    // Se a data foi alterada, recalcula a data base do parcelamento e desloca todas as parcelas proporcionalmente
+    let newBaseDate: Date | undefined
+    if (data.date) {
+      const currentParcelNum = tx.installmentNumber || 1
+      const inputDate = new Date(data.date)
+      inputDate.setHours(12, 0, 0, 0)
+      newBaseDate = subMonths(inputDate, currentParcelNum - 1)
+      newBaseDate.setHours(12, 0, 0, 0)
+    }
+
+    await db.transaction('rw', db.transactions, db.installmentGroups, async () => {
+      for (const parcelTx of groupTxs) {
+        const parcelNum = parcelTx.installmentNumber || 1
+        const updates: Partial<Transaction> = {}
+
+        if (data.accountId !== undefined) updates.accountId = data.accountId
+        if (data.categoryId !== undefined) updates.categoryId = data.categoryId
+        if (data.payee !== undefined) updates.payee = data.payee
+
+        if (data.notes !== undefined) {
+          const cleanNotes = data.notes.replace(/\s*\(\d+\/\d+\)$/, '').trim()
+          updates.notes = cleanNotes
+            ? `${cleanNotes} (${parcelNum}/${parcelTx.installmentTotal || groupTxs.length})`
+            : `${data.payee || tx.payee} (${parcelNum}/${parcelTx.installmentTotal || groupTxs.length})`
+        }
+
+        if (newBaseDate) {
+          const newParcelDate = addMonths(newBaseDate, parcelNum - 1)
+          newParcelDate.setHours(12, 0, 0, 0)
+          updates.date = newParcelDate
+        }
+
+        if (parcelTx.id === id && data.amount !== undefined) {
+          updates.amount = data.amount
+        }
+
+        await db.transactions.update(parcelTx.id, updates)
+      }
+
+      // Atualiza o registro do grupo
+      const groupUpdates: Partial<InstallmentGroup> = {}
+      if (newBaseDate) groupUpdates.startDate = newBaseDate
+      if (data.payee !== undefined) groupUpdates.description = data.payee
+      if (data.categoryId !== undefined) groupUpdates.categoryId = data.categoryId
+      if (data.accountId !== undefined) groupUpdates.accountId = data.accountId
+
+      if (Object.keys(groupUpdates).length > 0) {
+        await db.installmentGroups.update(groupId, groupUpdates)
+      }
+    })
+    return
+  }
+
+  // Para transferências, sincroniza a contraparte se houver
+  if (tx.type === 'transfer' && tx.transferTransactionId) {
+    await db.transaction('rw', db.transactions, async () => {
+      await db.transactions.update(id, data)
+      const counterpartUpdates: Partial<Transaction> = {}
+      if (data.date) counterpartUpdates.date = data.date
+      if (data.amount !== undefined) counterpartUpdates.amount = data.amount
+      if (data.notes !== undefined) counterpartUpdates.notes = data.notes
+      if (data.payee !== undefined) counterpartUpdates.payee = data.payee
+      if (data.transferAccountId !== undefined) counterpartUpdates.accountId = data.transferAccountId
+      await db.transactions.update(tx.transferTransactionId!, counterpartUpdates)
+    })
+    return
+  }
+
   await db.transactions.update(id, data)
 }
 

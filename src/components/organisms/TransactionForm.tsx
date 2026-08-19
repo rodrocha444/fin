@@ -284,6 +284,11 @@ export default function TransactionForm({
                 }
               }}
             />
+            {transaction?.installmentGroupId && (
+              <p className="text-[11px] text-violet-400 mt-1 flex items-center gap-1">
+                <span>✦ Parcela {transaction.installmentNumber} de {transaction.installmentTotal} (ajustará as datas de todas as parcelas)</span>
+              </p>
+            )}
             {errors.date && <p className="text-rose-400 text-xs mt-1">{errors.date.message}</p>}
           </div>
 

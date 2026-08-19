@@ -31,6 +31,7 @@ import InvoicePrintModal from '@/components/organisms/InvoicePrintModal'
 import ConfirmInvoicePaidModal from '@/components/organisms/ConfirmInvoicePaidModal'
 import InvoiceCycleNavigator from '@/components/molecules/InvoiceCycleNavigator'
 import SearchBar from '@/components/atoms/SearchBar'
+import type { Transaction } from '@/types'
 
 export default function AccountInvoicePage() {
   const { id } = useParams<{ id: string }>()
@@ -47,6 +48,7 @@ export default function AccountInvoicePage() {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(queryMonth)
   const [search, setSearch] = useState('')
   const [showTxForm, setShowTxForm] = useState(false)
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [showPayForm, setShowPayForm] = useState(false)
   const [showAccForm, setShowAccForm] = useState(false)
   const [showPrintModal, setShowPrintModal] = useState(false)
@@ -378,7 +380,8 @@ export default function AccountInvoicePage() {
                     return (
                       <div
                         key={tx.id}
-                        className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-800/40 transition-colors"
+                        onClick={() => setEditingTx(tx)}
+                        className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-800/40 transition-colors cursor-pointer"
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
@@ -406,7 +409,7 @@ export default function AccountInvoicePage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3 flex-shrink-0">
+                        <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
                           <span
                             className={`text-sm sm:text-base font-semibold tabular-nums ${
                               isExpense ? 'text-rose-400' : 'text-emerald-400'
@@ -414,6 +417,14 @@ export default function AccountInvoicePage() {
                           >
                             {isExpense ? '+' : '-'}{formatCurrency(tx.amount)}
                           </span>
+
+                          <button
+                            onClick={() => setEditingTx(tx)}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                            title="Editar lançamento"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
                     )
@@ -430,6 +441,14 @@ export default function AccountInvoicePage() {
         <TransactionForm
           defaultAccountId={accountId}
           onClose={() => setShowTxForm(false)}
+        />
+      )}
+
+      {/* Modal de Edição de Transação */}
+      {editingTx && (
+        <TransactionForm
+          transaction={editingTx}
+          onClose={() => setEditingTx(null)}
         />
       )}
 
