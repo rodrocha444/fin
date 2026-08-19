@@ -60,8 +60,13 @@ export function getInvoiceCycle(
   const prevYear = prevMonthDate.getFullYear()
   const prevMonthIdx = prevMonthDate.getMonth()
   const maxDayPrevMonth = getDaysInMonth(new Date(prevYear, prevMonthIdx, 1))
-  const safeStartDay = Math.min(closingDay + 1, maxDayPrevMonth)
-  const startDate = new Date(prevYear, prevMonthIdx, safeStartDay, 0, 0, 0, 0)
+  
+  let startDate: Date
+  if (closingDay >= maxDayPrevMonth) {
+    startDate = new Date(year, monthIdx, 1, 0, 0, 0, 0)
+  } else {
+    startDate = new Date(prevYear, prevMonthIdx, closingDay + 1, 0, 0, 0, 0)
+  }
 
   // Vencimento
   let dueDate: Date
@@ -140,5 +145,54 @@ export function getInvoiceData(
     totalAmount,
     chargesAmount,
     paymentsAmount,
+  }
+}
+
+export interface InvoicesOverview {
+  openInvoice: InvoiceData
+  futureInvoices: InvoiceData[]
+  allInvoices: InvoiceData[]
+  totalFutureCommitted: number
+}
+
+function shiftMonthKey(monthKey: string, delta: number): string {
+  const [year, mon] = monthKey.split('-').map(Number)
+  const d = addMonths(new Date(year, mon - 1, 1), delta)
+  return format(d, 'yyyy-MM')
+}
+
+/**
+ * Retorna visão consolidada de faturas (aberta atual + próximas faturas com parcelas / gastos futuros)
+ */
+export function getInvoicesOverview(
+  transactions: Transaction[],
+  closingDay: number,
+  dueDay?: number,
+  futureMonthsCount = 12
+): InvoicesOverview | null {
+  if (!closingDay || closingDay < 1 || closingDay > 31) return null
+
+  const openMonthKey = getCurrentOpenInvoiceMonth(closingDay)
+  const openCycle = getInvoiceCycle(openMonthKey, closingDay, dueDay)
+  const openInvoice = getInvoiceData(transactions, openCycle)
+
+  const futureInvoices: InvoiceData[] = []
+  let totalFutureCommitted = 0
+
+  for (let i = 1; i <= futureMonthsCount; i++) {
+    const monthKey = shiftMonthKey(openMonthKey, i)
+    const cycle = getInvoiceCycle(monthKey, closingDay, dueDay)
+    const invoice = getInvoiceData(transactions, cycle)
+    if (invoice.totalAmount > 0 || invoice.transactions.length > 0) {
+      futureInvoices.push(invoice)
+      totalFutureCommitted += invoice.totalAmount
+    }
+  }
+
+  return {
+    openInvoice,
+    futureInvoices,
+    allInvoices: [openInvoice, ...futureInvoices],
+    totalFutureCommitted,
   }
 }

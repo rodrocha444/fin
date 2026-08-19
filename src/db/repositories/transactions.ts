@@ -135,9 +135,13 @@ export async function createInstallmentPurchase(input: CreateInstallmentInput): 
       createdAt: new Date(),
     } as InstallmentGroup)
 
-    // 2. Criar uma transação por parcela
+    // 2. Criar uma transação por parcela com horário normalizado para evitar desvio de fuso horário
+    const baseDate = new Date(input.startDate)
+    baseDate.setHours(12, 0, 0, 0)
+
     for (let i = 0; i < input.installmentCount; i++) {
-      const installmentDate = addMonths(input.startDate, i)
+      const installmentDate = addMonths(baseDate, i)
+      installmentDate.setHours(12, 0, 0, 0)
       const amount = i === input.installmentCount - 1 ? lastInstallmentAmount : installmentAmount
       const txId = createId()
 

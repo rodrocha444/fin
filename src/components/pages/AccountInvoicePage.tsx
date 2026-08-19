@@ -1,6 +1,5 @@
-// src/pages/AccountInvoicePage.tsx — Página dedicada à Fatura Aberta e Faturas do Cartão
-import { useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import {
   ArrowLeft,
   CreditCard,
@@ -15,11 +14,12 @@ import {
 import { useAccount } from '@/hooks/useAccounts'
 import { useAccountTransactions } from '@/hooks/useTransactions'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
-import { formatCurrency, formatDate } from '@/utils/format'
+import { formatCurrency, formatDate, shiftMonth } from '@/utils/format'
 import {
   getCurrentOpenInvoiceMonth,
   getInvoiceCycle,
   getInvoiceData,
+  getInvoicesOverview,
 } from '@/utils/invoices'
 import TransactionForm from '@/components/organisms/TransactionForm'
 import AccountForm from '@/components/organisms/AccountForm'
@@ -28,6 +28,7 @@ import SearchBar from '@/components/atoms/SearchBar'
 
 export default function AccountInvoicePage() {
   const { id } = useParams<{ id: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const accountId = id
 
@@ -36,13 +37,20 @@ export default function AccountInvoicePage() {
   const { categories } = useCategoriesWithGroups() ?? {}
   const categoryMap = new Map(categories?.map(c => [c.id!, c]) ?? [])
 
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
+  const queryMonth = searchParams.get('month')
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(queryMonth)
   const [search, setSearch] = useState('')
   const [showTxForm, setShowTxForm] = useState(false)
   const [showPayForm, setShowPayForm] = useState(false)
   const [showAccForm, setShowAccForm] = useState(false)
 
-  if (accountId === undefined || (!account && !transactions)) {
+  useEffect(() => {
+    if (queryMonth) {
+      setSelectedMonth(queryMonth)
+    }
+  }, [queryMonth])
+
+  if (accountId === undefined || (account === undefined && transactions === undefined)) {
     return (
       <div
         className="p-6 text-slate-500 text-sm flex items-center justify-center h-48"
@@ -74,16 +82,40 @@ export default function AccountInvoicePage() {
   const hasClosingDay = typeof closingDay === 'number' && closingDay >= 1 && closingDay <= 31
 
   // Determinar o mês da fatura aberta
-  const openInvoiceMonth = hasClosingDay ? getCurrentOpenInvoiceMonth(closingDay) : '2026-08'
+  const openInvoiceMonth = hasClosingDay && closingDay ? getCurrentOpenInvoiceMonth(closingDay) : '2026-08'
   const activeMonth = selectedMonth ?? openInvoiceMonth
 
-  const cycle = hasClosingDay
+  const cycle = hasClosingDay && closingDay
     ? getInvoiceCycle(activeMonth, closingDay, dueDay)
     : null
 
   const invoiceData = (cycle && transactions)
     ? getInvoiceData(transactions, cycle)
     : null
+
+  const invoicesList = (() => {
+    if (!hasClosingDay || !closingDay || !transactions) return []
+    const overview = getInvoicesOverview(transactions, closingDay, dueDay, 12)
+    if (!overview) return []
+
+    // Incluir também a fatura anterior fechada se tiver histórico
+    const prevMonthKey = shiftMonth(openInvoiceMonth, -1)
+    const prevCycle = getInvoiceCycle(prevMonthKey, closingDay, dueDay)
+    const prevInvoice = getInvoiceData(transactions, prevCycle)
+
+    const baseList = prevInvoice.totalAmount > 0 || prevInvoice.transactions.length > 0
+      ? [prevInvoice, ...overview.allInvoices]
+      : overview.allInvoices
+
+    // Garantir que a activeMonth atual sempre apareça na lista de abas mesmo se tiver 0 compras
+    const hasActive = baseList.some(inv => inv.cycle.monthKey === activeMonth)
+    if (!hasActive && cycle) {
+      const activeInvoice = getInvoiceData(transactions, cycle)
+      return [...baseList, activeInvoice].sort((a, b) => a.cycle.monthKey.localeCompare(b.cycle.monthKey))
+    }
+
+    return baseList
+  })()
 
   const isOpenCurrent = activeMonth === openInvoiceMonth
 
@@ -160,6 +192,7 @@ export default function AccountInvoicePage() {
               cycle={cycle}
               activeMonth={activeMonth}
               onChangeMonth={setSelectedMonth}
+              invoicesList={invoicesList}
             />
 
             {/* Atalhos rápidos se não estiver na fatura aberta */}

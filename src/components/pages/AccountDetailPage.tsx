@@ -12,6 +12,7 @@ import {
   FileText,
   Receipt,
   ArrowUpRight,
+  Calendar,
 } from 'lucide-react'
 import { useAccount, useAccountBalance } from '@/hooks/useAccounts'
 import {
@@ -23,7 +24,12 @@ import { useCategoriesWithGroups } from '@/hooks/useBudget'
 import { deleteTransaction, deleteInstallmentGroup } from '@/db/repositories/transactions'
 import { deleteAccount } from '@/db/repositories/accounts'
 import { formatCurrency, formatDate, accountTypeLabel } from '@/utils/format'
-import { getCurrentOpenInvoiceMonth, getInvoiceCycle, getInvoiceData } from '@/utils/invoices'
+import {
+  getCurrentOpenInvoiceMonth,
+  getInvoiceCycle,
+  getInvoiceData,
+  getInvoicesOverview,
+} from '@/utils/invoices'
 import TransactionForm from '@/components/organisms/TransactionForm'
 import AccountForm from '@/components/organisms/AccountForm'
 import SearchBar from '@/components/atoms/SearchBar'
@@ -91,6 +97,12 @@ export default function AccountDetailPage() {
     const openMonth = getCurrentOpenInvoiceMonth(account.statementClosingDay)
     const cycle = getInvoiceCycle(openMonth, account.statementClosingDay, account.paymentDueDay)
     return getInvoiceData(transactions, cycle)
+  })()
+
+  // Visão geral das faturas futuras (parcelamentos)
+  const invoicesOverview = (() => {
+    if (!isCreditCard || !account.statementClosingDay || !transactions) return null
+    return getInvoicesOverview(transactions, account.statementClosingDay, account.paymentDueDay, 12)
   })()
 
   // Filtragem de lista
@@ -247,41 +259,85 @@ export default function AccountDetailPage() {
 
         {/* Card de Acesso Rápido à Fatura Aberta (para Cartão de Crédito) */}
         {isCreditCard && (
-          <div className="card p-4 bg-gradient-to-r from-slate-900 via-indigo-950/30 to-slate-900 border-indigo-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center flex-shrink-0">
-                <Receipt className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-slate-200">Fatura Aberta do Cartão</p>
-                  <span className="badge bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 text-[10px]">
-                    Aberta
-                  </span>
+          <div className="space-y-3">
+            <div className="card p-4 bg-gradient-to-r from-slate-900 via-indigo-950/30 to-slate-900 border-indigo-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center flex-shrink-0">
+                  <Receipt className="w-5 h-5" />
                 </div>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {openInvoiceData ? (
-                    <>
-                      Valor atual:{' '}
-                      <span className="font-bold text-slate-200">{formatCurrency(openInvoiceData.totalAmount)}</span>
-                      {account.statementClosingDay && ` · Fecha em ${formatDate(openInvoiceData.cycle.closingDate)}`}
-                    </>
-                  ) : (
-                    account.statementClosingDay
-                      ? `Fechamento dia ${account.statementClosingDay}`
-                      : 'Configure o dia de fechamento para cálculo automático'
-                  )}
-                </p>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-slate-200">Fatura Aberta do Cartão</p>
+                    <span className="badge bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 text-[10px]">
+                      Aberta
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {openInvoiceData ? (
+                      <>
+                        Valor atual:{' '}
+                        <span className="font-bold text-slate-200">{formatCurrency(openInvoiceData.totalAmount)}</span>
+                        {account.statementClosingDay && ` · Fecha em ${formatDate(openInvoiceData.cycle.closingDate)}`}
+                      </>
+                    ) : (
+                      account.statementClosingDay
+                        ? `Fechamento dia ${account.statementClosingDay}`
+                        : 'Configure o dia de fechamento para cálculo automático'
+                    )}
+                  </p>
+                </div>
               </div>
+
+              <Link
+                to={`/accounts/${accountId}/invoice`}
+                className="btn-secondary py-2 px-3.5 text-xs font-semibold flex items-center justify-center gap-1.5 self-stretch sm:self-auto hover:border-indigo-500 hover:text-indigo-300 transition-colors"
+              >
+                <span>Acessar Fatura</span>
+                <ArrowUpRight className="w-4 h-4" />
+              </Link>
             </div>
 
-            <Link
-              to={`/accounts/${accountId}/invoice`}
-              className="btn-secondary py-2 px-3.5 text-xs font-semibold flex items-center justify-center gap-1.5 self-stretch sm:self-auto hover:border-indigo-500 hover:text-indigo-300 transition-colors"
-            >
-              <span>Acessar Fatura</span>
-              <ArrowUpRight className="w-4 h-4" />
-            </Link>
+            {/* Projeção de Faturas Futuras (Parcelamentos) */}
+            {invoicesOverview && invoicesOverview.futureInvoices.length > 0 && (
+              <div className="card p-4 bg-slate-900 border-slate-800 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-violet-400" />
+                    <p className="text-xs font-semibold text-slate-200 uppercase tracking-wider">
+                      Próximas Faturas (Parcelamentos)
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold text-violet-300 tabular-nums">
+                    Total futuro comprometido: {formatCurrency(invoicesOverview.totalFutureCommitted)}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                  {invoicesOverview.futureInvoices.map(fut => (
+                    <Link
+                      key={fut.cycle.monthKey}
+                      to={`/accounts/${accountId}/invoice?month=${fut.cycle.monthKey}`}
+                      className="p-3 bg-slate-950/70 border border-slate-800 hover:border-violet-500/50 rounded-xl transition-all group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-slate-300 capitalize group-hover:text-violet-300 transition-colors">
+                          {fut.cycle.label}
+                        </span>
+                        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-violet-950 text-violet-300 border border-violet-800/40">
+                          {fut.transactions.length}x
+                        </span>
+                      </div>
+                      <p className="text-sm font-bold text-slate-100 tabular-nums mt-1 group-hover:text-violet-200">
+                        {formatCurrency(fut.totalAmount)}
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        Vence {formatDate(fut.cycle.dueDate)}
+                      </p>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
