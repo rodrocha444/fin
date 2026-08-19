@@ -551,19 +551,6 @@ export default function BudgetPage() {
               <col className="w-[21.5%] sm:w-[21%]" />
             </colgroup>
             <tbody>
-              {/* ── Seção de Faturas de Cartão (Grupo especial com 1 coluna como Receitas) ── */}
-              {invoiceRows && invoiceRows.length > 0 && (
-                <>
-                  <tr className="bg-slate-950/90 text-[10px] sm:text-xs font-semibold text-rose-400/90 uppercase tracking-wider border-t border-b border-rose-900/40 select-none">
-                    <th className="py-2 pl-3 sm:pl-6 pr-1 text-left">Faturas de Cartão</th>
-                    <th colSpan={3} className="py-2 pl-2 pr-3 sm:pr-6 text-right">Fatura a Vencer</th>
-                  </tr>
-                  {invoiceRows.map(row => (
-                    <InvoiceGroupRow key={row.group.id} row={row} onSelectCategory={setSelectedCategoryModal} />
-                  ))}
-                </>
-              )}
-
               {/* ── Seção de Despesas (com 3 colunas) ── */}
               {rows && rows.length > 0 && (
                 <>
@@ -588,6 +575,19 @@ export default function BudgetPage() {
                   </tr>
                   {incomeRows.map(row => (
                     <IncomeGroupRow key={row.group.id} row={row} onSelectCategory={setSelectedCategoryModal} />
+                  ))}
+                </>
+              )}
+
+              {/* ── Seção de Faturas de Cartão (Grupo especial com 1 coluna como Receitas) ── */}
+              {invoiceRows && invoiceRows.length > 0 && (
+                <>
+                  <tr className="bg-slate-950/90 text-[10px] sm:text-xs font-semibold text-rose-400/90 uppercase tracking-wider border-t border-b border-rose-900/40 select-none">
+                    <th className="py-2 pl-3 sm:pl-6 pr-1 text-left">Faturas de Cartão</th>
+                    <th colSpan={3} className="py-2 pl-2 pr-3 sm:pr-6 text-right">Fatura a Vencer</th>
+                  </tr>
+                  {invoiceRows.map(row => (
+                    <InvoiceGroupRow key={row.group.id} row={row} onSelectCategory={setSelectedCategoryModal} />
                   ))}
                 </>
               )}
