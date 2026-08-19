@@ -1,13 +1,15 @@
 // src/components/organisms/TransactionForm.tsx — Formulário de Transação (padrão CUID)
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { X } from 'lucide-react'
 import { format } from 'date-fns'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '@/db/schema'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
-import { createTransaction, createInstallmentPurchase, createTransfer, updateTransaction } from '@/db/repositories/transactions'
+import { createTransaction, createInstallmentPurchase, updateInstallmentPurchase, createTransfer, updateTransaction } from '@/db/repositories/transactions'
 import { getOrCreatePayee } from '@/db/repositories/payees'
 import PriceInput from '@/components/atoms/PriceInput'
 import { formatCurrency } from '@/utils/format'
@@ -83,6 +85,12 @@ export default function TransactionForm({
   const isEdit = !!transaction
   const isExistingInstallment = !!transaction?.installmentGroupId
 
+  // Busca os dados consolidados do grupo quando estiver editando uma compra parcelada
+  const group = useLiveQuery(
+    () => (transaction?.installmentGroupId ? db.installmentGroups.get(transaction.installmentGroupId) : undefined),
+    [transaction?.installmentGroupId]
+  )
+
   const initialMode: TxMode = transaction
     ? (transaction.type === 'transfer' ? 'transfer' : transaction.type === 'income' ? 'income' : 'expense')
     : (defaultMode === 'installment' ? 'expense' : defaultMode)
@@ -118,10 +126,25 @@ export default function TransactionForm({
       amount: transaction?.amount ?? defaultAmount,
       payee: transaction?.payee ?? defaultPayee,
       categoryId: transaction?.categoryId ?? defaultCategoryId ?? '',
-      notes: transaction?.notes,
+      notes: transaction?.notes ? transaction.notes.replace(/\s*\(\d+\/\d+\)$/, '').trim() : undefined,
       installmentCount: transaction?.installmentTotal ?? 2,
     },
   })
+
+  // Popula os dados consolidados da compra parcelada completa (valor total, contagem, data de início)
+  useEffect(() => {
+    if (group) {
+      setValue('amount', group.totalAmount, { shouldValidate: true })
+      setValue('installmentCount', group.installmentCount, { shouldValidate: true })
+      setValue('date', format(new Date(group.startDate), 'yyyy-MM-dd'), { shouldValidate: true })
+      if (group.description) setValue('payee', group.description)
+      if (group.categoryId) setValue('categoryId', group.categoryId)
+      if (group.accountId) setValue('accountId', group.accountId)
+      if (transaction?.notes) {
+        setValue('notes', transaction.notes.replace(/\s*\(\d+\/\d+\)$/, '').trim())
+      }
+    }
+  }, [group, transaction, setValue])
 
   const selectedDate = watch('date')
   const watchAmount = watch('amount')
@@ -155,7 +178,25 @@ export default function TransactionForm({
     const finalPayee = data.payee?.trim() || selectedCat?.name || (mode === 'transfer' ? 'Transferência' : 'Despesa')
     const catId = data.categoryId && data.categoryId.trim() !== '' ? data.categoryId : undefined
 
-    if (isEdit && transaction?.id) {
+    if (isExistingInstallment && transaction?.installmentGroupId) {
+      if (mode !== 'transfer') {
+        await getOrCreatePayee(finalPayee, catId)
+      }
+      const finalTotalAmount = installmentAmountType === 'parcel'
+        ? parseFloat((data.amount * (data.installmentCount || 2)).toFixed(2))
+        : data.amount
+
+      await updateInstallmentPurchase(transaction.installmentGroupId, {
+        accountId: data.accountId,
+        categoryId: catId,
+        description: finalPayee,
+        totalAmount: finalTotalAmount,
+        installmentCount: data.installmentCount || 2,
+        startDate: txDate,
+        payee: finalPayee,
+        notes: data.notes,
+      })
+    } else if (isEdit && transaction?.id) {
       if (mode !== 'transfer') {
         await getOrCreatePayee(finalPayee, catId)
       }
@@ -298,7 +339,9 @@ export default function TransactionForm({
           {/* Data */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="label mb-0">Data</label>
+              <label className="label mb-0">
+                {isInstallment ? 'Data da compra (1ª parcela)' : 'Data'}
+              </label>
               {selectedDate !== todayStr && (
                 <button
                   type="button"
@@ -323,11 +366,6 @@ export default function TransactionForm({
                 }
               }}
             />
-            {transaction?.installmentGroupId && (
-              <p className="text-[11px] text-violet-400 mt-1 flex items-center gap-1">
-                <span>✦ Parcela {transaction.installmentNumber} de {transaction.installmentTotal} (ajustará as datas de todas as parcelas)</span>
-              </p>
-            )}
             {errors.date && <p className="text-rose-400 text-xs mt-1">{errors.date.message}</p>}
           </div>
 
@@ -337,13 +375,11 @@ export default function TransactionForm({
               <label className="label !mb-0">
                 {isInstallment
                   ? (installmentAmountType === 'total' ? 'Valor total da compra' : 'Valor por parcela')
-                  : transaction?.installmentGroupId
-                    ? 'Valor por parcela'
-                    : 'Valor'}
+                  : 'Valor'}
               </label>
 
-              {/* Seletor de Tipo de Valor para Parcelamento (Apenas na criação) */}
-              {isInstallment && !isEdit && (
+              {/* Seletor de Tipo de Valor para Parcelamento */}
+              {isInstallment && (
                 <div className="flex bg-slate-800 p-0.5 rounded-lg border border-slate-700/60 text-[11px]">
                   <button
                     type="button"
@@ -398,11 +434,6 @@ export default function TransactionForm({
               </div>
             )}
 
-            {transaction?.installmentGroupId && (
-              <p className="text-[11px] text-violet-400 mt-1">
-                ✦ O novo valor será sincronizado em todas as {transaction.installmentTotal} parcelas deste parcelamento.
-              </p>
-            )}
             {errors.amount && <p className="text-rose-400 text-xs mt-1">{errors.amount.message}</p>}
           </div>
 
@@ -410,12 +441,26 @@ export default function TransactionForm({
           {(mode === 'transfer' || isInstallment) && (
             <div>
               <label className="label">
-                {mode === 'transfer' ? 'Descrição' : 'Descrição da compra (opcional)'}
+                {isInstallment ? 'Descrição da compra' : 'Descrição da transferência'}
               </label>
               <input
                 {...register('payee')}
                 className="input-base"
                 placeholder={mode === 'transfer' ? 'Pagamento fatura…' : 'Ex: Notebook, Smartphone…'}
+                autoComplete="off"
+              />
+              {errors.payee && <p className="text-rose-400 text-xs mt-1">{errors.payee.message}</p>}
+            </div>
+          )}
+
+          {/* Favorecido em despesa/renda à vista */}
+          {mode !== 'transfer' && !isInstallment && (
+            <div>
+              <label className="label">Favorecido / Estabelecimento</label>
+              <input
+                {...register('payee')}
+                className="input-base"
+                placeholder="Ex: Padaria, Supermercado…"
                 autoComplete="off"
               />
               {errors.payee && <p className="text-rose-400 text-xs mt-1">{errors.payee.message}</p>}
@@ -465,8 +510,8 @@ export default function TransactionForm({
             </div>
           )}
 
-          {/* Parcelas (apenas ao criar um novo parcelamento) */}
-          {isInstallment && !isExistingInstallment && (
+          {/* Parcelas */}
+          {isInstallment && (
             <div>
               <label className="label">Quantidade de parcelas</label>
               <input
@@ -500,8 +545,8 @@ export default function TransactionForm({
                     className="input-base"
                   >
                     <option value="" className="text-slate-400 bg-slate-900">Sem categoria</option>
-                    {groupedCategories.map(({ group, cats }) => (
-                      <optgroup key={group.id} label={group.name} className="bg-slate-950 text-indigo-300 font-semibold">
+                    {groupedCategories.map(({ group: g, cats }) => (
+                      <optgroup key={g.id} label={g.name} className="bg-slate-950 text-indigo-300 font-semibold">
                         {cats.map(c => (
                           <option key={c.id} value={c.id} className="bg-slate-900 text-slate-100 py-1">
                             {c.name}
@@ -525,7 +570,13 @@ export default function TransactionForm({
           <div className="flex gap-2 pt-2">
             <button type="button" onClick={onClose} className="btn-secondary flex-1 py-3">Cancelar</button>
             <button type="submit" disabled={isSubmitting} className="btn-primary flex-1 py-3">
-              {isSubmitting ? 'Salvando…' : isEdit ? 'Salvar alterações' : 'Salvar'}
+              {isSubmitting
+                ? 'Salvando…'
+                : isExistingInstallment
+                  ? 'Salvar compra parcelada'
+                  : isEdit
+                    ? 'Salvar alterações'
+                    : 'Salvar'}
             </button>
           </div>
         </form>

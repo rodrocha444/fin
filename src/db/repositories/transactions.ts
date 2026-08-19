@@ -250,6 +250,85 @@ export async function createInstallmentPurchase(input: CreateInstallmentInput): 
   })
 }
 
+export async function updateInstallmentPurchase(groupId: string, input: CreateInstallmentInput): Promise<void> {
+  const installmentAmount = parseFloat((input.totalAmount / input.installmentCount).toFixed(2))
+  const lastInstallmentAmount = parseFloat(
+    (input.totalAmount - installmentAmount * (input.installmentCount - 1)).toFixed(2)
+  )
+
+  await db.transaction('rw', db.installmentGroups, db.transactions, async () => {
+    // 1. Atualiza o registro do grupo
+    await db.installmentGroups.update(groupId, {
+      description: input.description,
+      totalAmount: input.totalAmount,
+      installmentCount: input.installmentCount,
+      installmentAmount,
+      startDate: input.startDate,
+      accountId: input.accountId,
+      categoryId: input.categoryId,
+    })
+
+    // 2. Busca parcelas existentes do grupo ordenadas por número da parcela
+    const existingTxs = await db.transactions
+      .where('installmentGroupId')
+      .equals(groupId)
+      .sortBy('installmentNumber')
+
+    const baseDate = new Date(input.startDate)
+    baseDate.setHours(12, 0, 0, 0)
+
+    const cleanNotes = input.notes ? input.notes.replace(/\s*\(\d+\/\d+\)$/, '').trim() : ''
+
+    // 3. Atualiza ou cria as parcelas para corresponder a input.installmentCount
+    for (let i = 0; i < input.installmentCount; i++) {
+      const installmentDate = addMonths(baseDate, i)
+      installmentDate.setHours(12, 0, 0, 0)
+      const amount = i === input.installmentCount - 1 ? lastInstallmentAmount : installmentAmount
+      const notes = cleanNotes
+        ? `${cleanNotes} (${i + 1}/${input.installmentCount})`
+        : `${input.description || input.payee} (${i + 1}/${input.installmentCount})`
+
+      if (i < existingTxs.length) {
+        await db.transactions.update(existingTxs[i].id, {
+          accountId: input.accountId,
+          date: installmentDate,
+          amount,
+          payee: input.payee,
+          categoryId: input.categoryId,
+          notes,
+          type: 'expense',
+          installmentNumber: i + 1,
+          installmentTotal: input.installmentCount,
+        })
+      } else {
+        await db.transactions.add({
+          id: createId(),
+          accountId: input.accountId,
+          date: installmentDate,
+          amount,
+          payee: input.payee,
+          categoryId: input.categoryId,
+          notes,
+          cleared: false,
+          type: 'expense',
+          installmentGroupId: groupId,
+          installmentNumber: i + 1,
+          installmentTotal: input.installmentCount,
+          createdAt: new Date(),
+        })
+      }
+    }
+
+    // 4. Se a nova quantidade for menor que a anterior, deleta as parcelas excedentes
+    if (existingTxs.length > input.installmentCount) {
+      const extraTxs = existingTxs.slice(input.installmentCount)
+      for (const extra of extraTxs) {
+        await db.transactions.delete(extra.id)
+      }
+    }
+  })
+}
+
 // ── Transferência / Pagamento de Fatura ──────────────────────
 
 export async function createTransfer(input: CreateTransferInput): Promise<void> {
