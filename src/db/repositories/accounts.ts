@@ -29,7 +29,16 @@ export async function createAccount(data: Omit<Account, 'id' | 'createdAt'>): Pr
   return id
 }
 
+export async function getAccountTransactionCount(accountId: string): Promise<number> {
+  const countDirect = await db.transactions.where('accountId').equals(accountId).count()
+  const countTransfer = await db.transactions.where('transferAccountId').equals(accountId).count()
+  return countDirect + countTransfer
+}
+
 export async function updateAccount(id: string, data: Partial<Omit<Account, 'id' | 'createdAt'>>): Promise<number> {
+  const current = await db.accounts.get(id)
+  if (!current) throw new Error(`Conta ${id} não encontrada.`)
+
   if (data.name) {
     const normalizedName = data.name.trim().toLowerCase()
     const existing = await db.accounts
@@ -38,6 +47,14 @@ export async function updateAccount(id: string, data: Partial<Omit<Account, 'id'
 
     if (existing) {
       throw new Error(`Já existe uma conta cadastrada com o nome "${data.name.trim()}".`)
+    }
+  }
+
+  // Não permitir alterar saldo inicial se a conta já possuir transações vinculadas
+  if (data.initialBalance !== undefined && data.initialBalance !== current.initialBalance) {
+    const txCount = await getAccountTransactionCount(id)
+    if (txCount > 0) {
+      throw new Error('Não é possível alterar o saldo inicial de uma conta que já possui transações vinculadas.')
     }
   }
 
@@ -51,7 +68,7 @@ export async function updateAccount(id: string, data: Partial<Omit<Account, 'id'
 
 export async function deleteAccount(id: string): Promise<void> {
   // Verificar se tem transações antes de deletar
-  const txCount = await db.transactions.where('accountId').equals(id).count()
+  const txCount = await getAccountTransactionCount(id)
   if (txCount > 0) throw new Error('Não é possível excluir uma conta que possui transações.')
   await db.accounts.delete(id)
 }

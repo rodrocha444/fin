@@ -99,6 +99,7 @@
     @apply w-full bg-slate-900/80 border border-slate-700 rounded-xl px-3.5 py-3
            text-slate-100 placeholder-slate-500 text-sm sm:text-sm
            focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500
+           disabled:bg-slate-800/40 disabled:text-slate-500 disabled:border-slate-800/80 disabled:cursor-not-allowed
            transition-all duration-200 min-h-[44px];
   }
 

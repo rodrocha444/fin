@@ -34,6 +34,21 @@ export function useAccountBalance(accountId: string | undefined) {
   )
 }
 
+/** Verifica se uma conta possui transações vinculadas (reativo) */
+export function useHasAccountTransactions(accountId: string | undefined) {
+  return useLiveQuery(
+    async () => {
+      if (!accountId) return false
+      const countDirect = await db.transactions.where('accountId').equals(accountId).count()
+      if (countDirect > 0) return true
+      const countTransfer = await db.transactions.where('transferAccountId').equals(accountId).count()
+      return countTransfer > 0
+    },
+    [accountId],
+    false
+  )
+}
+
 /** Saldo de todas as contas: Map<accountId, balance> */
 export function useAllBalances() {
   return useLiveQuery(async () => {

@@ -2,8 +2,9 @@
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { X } from 'lucide-react'
+import { X, Lock } from 'lucide-react'
 import { createAccount, updateAccount } from '@/db/repositories/accounts'
+import { useHasAccountTransactions } from '@/hooks/useAccounts'
 import PriceInput from '@/components/atoms/PriceInput'
 import ColorPicker from '@/components/atoms/ColorPicker'
 import type { Account } from '@/types'
@@ -50,6 +51,7 @@ interface Props {
 
 export default function AccountForm({ account, onClose }: Props) {
   const isEdit = !!account
+  const hasTransactions = useHasAccountTransactions(account?.id) ?? false
 
   const { register, handleSubmit, watch, setValue, setError, control, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema) as any,
@@ -78,7 +80,7 @@ export default function AccountForm({ account, onClose }: Props) {
     const payload = {
       name: data.name,
       type: data.type,
-      initialBalance: data.initialBalance ?? 0,
+      initialBalance: isEdit && hasTransactions ? (account.initialBalance ?? 0) : (data.initialBalance ?? 0),
       creditLimit: data.type === 'credit_card' && data.creditLimit ? data.creditLimit : undefined,
       statementClosingDay: data.type === 'credit_card' && data.statementClosingDay ? data.statementClosingDay : undefined,
       paymentDueDay: data.type === 'credit_card' && data.paymentDueDay ? data.paymentDueDay : undefined,
@@ -136,19 +138,30 @@ export default function AccountForm({ account, onClose }: Props) {
 
           {/* Tipo */}
           <div>
-            <label className="label">Tipo</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="label mb-0">Tipo</label>
+              {hasTransactions && (
+                <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                  <Lock className="w-3 h-3 text-slate-500" /> Tipo fixo
+                </span>
+              )}
+            </div>
             <div className="grid grid-cols-3 gap-2">
               {(['checking', 'savings', 'credit_card'] as const).map(t => {
                 const labels = { checking: 'Corrente', savings: 'Poupança', credit_card: 'Cartão' }
+                const isSelected = type === t
                 return (
                   <button
                     key={t}
                     type="button"
-                    onClick={() => setValue('type', t)}
-                    className={`py-2.5 px-2 rounded-xl border text-xs font-medium transition-all active:scale-95 ${
-                      type === t
+                    disabled={hasTransactions && !isSelected}
+                    onClick={() => !hasTransactions && setValue('type', t)}
+                    className={`py-2.5 px-2 rounded-xl border text-xs font-medium transition-all ${
+                      isSelected
                         ? 'border-indigo-500 bg-indigo-600/20 text-indigo-300'
-                        : 'border-slate-700 text-slate-400 hover:border-slate-500'
+                        : hasTransactions
+                        ? 'border-slate-800 bg-slate-900/40 text-slate-600 cursor-not-allowed opacity-50'
+                        : 'border-slate-700 text-slate-400 hover:border-slate-500 active:scale-95'
                     }`}
                   >
                     {labels[t]}
@@ -168,7 +181,14 @@ export default function AccountForm({ account, onClose }: Props) {
           {/* Saldo inicial */}
           {type !== 'credit_card' && (
             <div>
-              <label className="label">Saldo inicial</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="label mb-0">Saldo inicial</label>
+                {hasTransactions && (
+                  <span className="text-[11px] text-amber-400/90 flex items-center gap-1 font-medium">
+                    <Lock className="w-3 h-3 text-amber-400" /> Bloqueado para edição
+                  </span>
+                )}
+              </div>
               <Controller
                 name="initialBalance"
                 control={control}
@@ -178,9 +198,15 @@ export default function AccountForm({ account, onClose }: Props) {
                     onChange={field.onChange}
                     onBlur={field.onBlur}
                     ref={field.ref}
+                    disabled={hasTransactions}
                   />
                 )}
               />
+              {hasTransactions && (
+                <p className="text-[11px] text-slate-400 mt-2 flex items-start gap-1.5 bg-slate-800/50 p-2.5 rounded-xl border border-slate-700/60 leading-relaxed">
+                  <span>Não é possível alterar o saldo inicial porque esta conta já possui transações cadastradas. Para corrigir o saldo atual, lance uma transação de ajuste.</span>
+                </p>
+              )}
             </div>
           )}
 
