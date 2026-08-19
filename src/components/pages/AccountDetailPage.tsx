@@ -295,13 +295,15 @@ export default function AccountDetailPage() {
                   {formatCurrency(balance)}
                 </p>
 
-                {/* Saldo Futuro projetado com agendamentos */}
-                <div className="mt-0.5 flex items-center justify-start sm:justify-end gap-1.5 text-xs text-slate-400">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider">Saldo Futuro:</span>
-                  <span className={`font-semibold tabular-nums ${futureBalance < 0 ? 'text-rose-400' : 'text-slate-200'}`}>
-                    {formatCurrency(futureBalance)}
-                  </span>
-                </div>
+                {/* Saldo Futuro projetado com agendamentos (apenas para contas não-cartão) */}
+                {!isCreditCard && (
+                  <div className="mt-0.5 flex items-center justify-start sm:justify-end gap-1.5 text-xs text-slate-400">
+                    <span className="text-[10px] text-slate-500 uppercase tracking-wider">Saldo Futuro:</span>
+                    <span className={`font-semibold tabular-nums ${futureBalance < 0 ? 'text-rose-400' : 'text-slate-200'}`}>
+                      {formatCurrency(futureBalance)}
+                    </span>
+                  </div>
+                )}
 
                 {account.type === 'credit_card' && account.creditLimit && (
                   <p className="text-xs text-slate-400 mt-0.5">
