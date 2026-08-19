@@ -82,7 +82,8 @@ export async function updateTransaction(id: string, data: Partial<CreateTransact
           updates.date = newParcelDate
         }
 
-        if (parcelTx.id === id && data.amount !== undefined) {
+        // Sincroniza o novo valor da parcela em TODAS as parcelas do grupo
+        if (data.amount !== undefined) {
           updates.amount = data.amount
         }
 
@@ -95,6 +96,11 @@ export async function updateTransaction(id: string, data: Partial<CreateTransact
       if (data.payee !== undefined) groupUpdates.description = data.payee
       if (data.categoryId !== undefined) groupUpdates.categoryId = data.categoryId
       if (data.accountId !== undefined) groupUpdates.accountId = data.accountId
+
+      if (data.amount !== undefined) {
+        groupUpdates.installmentAmount = data.amount
+        groupUpdates.totalAmount = data.amount * (tx.installmentTotal || groupTxs.length)
+      }
 
       if (Object.keys(groupUpdates).length > 0) {
         await db.installmentGroups.update(groupId, groupUpdates)

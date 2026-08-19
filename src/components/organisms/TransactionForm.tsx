@@ -295,7 +295,7 @@ export default function TransactionForm({
           {/* Valor */}
           <div>
             <label className="label">
-              {isInstallment ? 'Total da compra' : 'Valor'}
+              {isInstallment ? 'Total da compra' : transaction?.installmentGroupId ? 'Valor por parcela' : 'Valor'}
             </label>
             <Controller
               name="amount"
@@ -309,6 +309,11 @@ export default function TransactionForm({
                 />
               )}
             />
+            {transaction?.installmentGroupId && (
+              <p className="text-[11px] text-violet-400 mt-1">
+                ✦ O novo valor será sincronizado em todas as {transaction.installmentTotal} parcelas deste parcelamento.
+              </p>
+            )}
             {errors.amount && <p className="text-rose-400 text-xs mt-1">{errors.amount.message}</p>}
           </div>
 
