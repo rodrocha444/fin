@@ -451,14 +451,7 @@ export default function TransactionForm({
           {/* Parcelas */}
           {isInstallment && (
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="label !mb-0">Quantidade de parcelas</label>
-                {watchAmount > 0 && watchInstallmentCount && watchInstallmentCount >= 2 && (
-                  <span className="text-xs text-violet-400 font-semibold tabular-nums">
-                    {watchInstallmentCount}x de {formatCurrency(watchAmount / watchInstallmentCount)}
-                  </span>
-                )}
-              </div>
+              <label className="label">Quantidade de parcelas</label>
               <input
                 {...register('installmentCount')}
                 type="number"
