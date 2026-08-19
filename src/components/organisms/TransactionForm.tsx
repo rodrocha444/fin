@@ -89,6 +89,7 @@ export default function TransactionForm({
   const [expensePaymentType, setExpensePaymentType] = useState<ExpensePaymentType>(
     defaultMode === 'installment' ? 'installment' : 'single'
   )
+  const [installmentAmountType, setInstallmentAmountType] = useState<'total' | 'parcel'>('total')
   const accounts = useAccounts() ?? []
   const categoryType = mode === 'income' ? 'income' : 'expense'
   const { categories, groups } = useCategoriesWithGroups(categoryType) ?? { categories: [], groups: [] }
@@ -121,6 +122,20 @@ export default function TransactionForm({
   const selectedDate = watch('date')
   const watchAmount = watch('amount')
   const watchInstallmentCount = watch('installmentCount')
+
+  const handleToggleInstallmentAmountType = (type: 'total' | 'parcel') => {
+    if (type === installmentAmountType) return
+    const currentVal = watchAmount || 0
+    const count = watchInstallmentCount || 2
+    if (currentVal > 0 && count > 0) {
+      if (type === 'parcel') {
+        setValue('amount', parseFloat((currentVal / count).toFixed(2)), { shouldValidate: true })
+      } else {
+        setValue('amount', parseFloat((currentVal * count).toFixed(2)), { shouldValidate: true })
+      }
+    }
+    setInstallmentAmountType(type)
+  }
 
   const groupedCategories = groups?.map(g => ({
     group: g,
@@ -162,11 +177,15 @@ export default function TransactionForm({
       })
     } else if (isInstallment) {
       if (!data.installmentCount) return
+      const finalTotalAmount = installmentAmountType === 'parcel'
+        ? parseFloat((data.amount * data.installmentCount).toFixed(2))
+        : data.amount
+
       await createInstallmentPurchase({
         accountId: data.accountId,
         categoryId: catId,
         description: finalPayee,
-        totalAmount: data.amount,
+        totalAmount: finalTotalAmount,
         installmentCount: data.installmentCount,
         startDate: txDate,
         payee: finalPayee,
@@ -297,9 +316,44 @@ export default function TransactionForm({
 
           {/* Valor */}
           <div>
-            <label className="label">
-              {isInstallment ? 'Total da compra' : transaction?.installmentGroupId ? 'Valor por parcela' : 'Valor'}
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="label !mb-0">
+                {isInstallment
+                  ? (installmentAmountType === 'total' ? 'Valor total da compra' : 'Valor por parcela')
+                  : transaction?.installmentGroupId
+                    ? 'Valor por parcela'
+                    : 'Valor'}
+              </label>
+
+              {/* Seletor de Tipo de Valor para Parcelamento (Apenas na criação) */}
+              {isInstallment && !isEdit && (
+                <div className="flex bg-slate-800 p-0.5 rounded-lg border border-slate-700/60 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleInstallmentAmountType('total')}
+                    className={`px-2 py-0.5 rounded-md font-medium transition-all ${
+                      installmentAmountType === 'total'
+                        ? 'bg-violet-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Valor total
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleInstallmentAmountType('parcel')}
+                    className={`px-2 py-0.5 rounded-md font-medium transition-all ${
+                      installmentAmountType === 'parcel'
+                        ? 'bg-violet-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Por parcela
+                  </button>
+                </div>
+              )}
+            </div>
+
             <Controller
               name="amount"
               control={control}
@@ -312,6 +366,21 @@ export default function TransactionForm({
                 />
               )}
             />
+
+            {/* Resumo do cálculo em tempo real */}
+            {isInstallment && watchAmount > 0 && watchInstallmentCount && watchInstallmentCount >= 2 && (
+              <div className="mt-1.5 p-2.5 bg-violet-950/30 border border-violet-800/40 rounded-xl flex items-center justify-between text-xs">
+                <span className="text-violet-300 font-medium">
+                  {installmentAmountType === 'total' ? 'Divisão das parcelas:' : 'Total calculado da compra:'}
+                </span>
+                <span className="text-violet-200 font-bold tabular-nums">
+                  {installmentAmountType === 'total'
+                    ? `${watchInstallmentCount}x de ${formatCurrency(watchAmount / watchInstallmentCount)}`
+                    : `${watchInstallmentCount}x de ${formatCurrency(watchAmount)} = ${formatCurrency(watchAmount * watchInstallmentCount)}`}
+                </span>
+              </div>
+            )}
+
             {transaction?.installmentGroupId && (
               <p className="text-[11px] text-violet-400 mt-1">
                 ✦ O novo valor será sincronizado em todas as {transaction.installmentTotal} parcelas deste parcelamento.
