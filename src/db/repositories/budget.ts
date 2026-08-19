@@ -402,9 +402,12 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
   currentMonthCommitments += uncategorizedExpensesByMonth.get(month) || 0
 
   // Faturas de cartão de crédito atuais que vencem no mês (deduzem diretamente do "A orçar")
+  let currentInvoicesDue = 0
   for (const acc of ccAccounts) {
     const accTxs = allTransactions.filter(t => t.accountId === acc.id)
-    currentMonthCommitments += getInvoiceForBudgetMonth(accTxs, acc, month)
+    const inv = getInvoiceForBudgetMonth(accTxs, acc, month)
+    currentMonthCommitments += inv
+    currentInvoicesDue += inv
   }
 
   // Sobra/Falta acumulada dos meses anteriores
@@ -418,6 +421,7 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
     initialFunds,
     totalIncome,
     totalBudgeted,
+    currentInvoicesDue,
     previousMonthSurplus,
     totalAllTimeBudgeted: priorBudgeted + totalBudgeted,
     toBeBudgeted,

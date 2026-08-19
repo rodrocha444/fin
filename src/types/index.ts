@@ -142,6 +142,8 @@ export interface BudgetSummary {
   totalIncome: number
   /** Total orçado no mês selecionado */
   totalBudgeted: number
+  /** Faturas de cartão com vencimento no mês selecionado */
+  currentInvoicesDue?: number
   /** Sobra/falta acumulada do mês anterior */
   previousMonthSurplus: number
   /** Gastos que excederam o orçamento em meses anteriores */
