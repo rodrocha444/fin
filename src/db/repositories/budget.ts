@@ -17,6 +17,7 @@ import type {
 import { getActivityByCategory, getIncomeByCategory } from './transactions'
 import { getProjectedScheduledUpToMonth } from './scheduled'
 import { format, subMonths } from 'date-fns'
+import { isInitialSetupCategory } from '@/utils/format'
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -178,11 +179,22 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
     db.scheduledTransactions.filter(s => s.isActive !== false).toArray(),
   ])
 
-  // Identificar categorias de despesa (apenas elas deduzem do "A orçar")
-  const incomeGroupIds = new Set(allGroups.filter(g => g.type === 'income').map(g => g.id!))
-  const incomeCategoryIds = new Set(
-    allCategories.filter(c => incomeGroupIds.has(c.groupId)).map(c => c.id!)
-  )
+  const groupMap = new Map(allGroups.map(g => [g.id!, g]))
+
+  // Identificar categorias que NÃO deduzem do "A orçar":
+  // 1. Categorias de Renda (type === 'income')
+  // 2. Categorias de Saldo Inicial / Faturas Anteriores (ex: "Faturas Anteriores", "Saldos Iniciais")
+  const ignoredCategoryIds = new Set<string>()
+  for (const cat of allCategories) {
+    if (!cat.id) continue
+    const grp = groupMap.get(cat.groupId)
+    if (
+      grp?.type === 'income' ||
+      isInitialSetupCategory(cat.name, grp?.name)
+    ) {
+      ignoredCategoryIds.add(cat.id)
+    }
+  }
 
   // Saldo inicial de contas de dinheiro/corrente/poupança (fundos iniciais disponíveis para orçar)
   const initialFunds = allAccounts
@@ -208,6 +220,10 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
 
   for (const tx of allExpenseTxs) {
     const txMonth = toMonthKey(new Date(tx.date))
+    if (tx.categoryId && ignoredCategoryIds.has(tx.categoryId)) {
+      // Faturas Anteriores e Saldos Iniciais são desconsiderados na dedução do "A Orçar"
+      continue
+    }
     if (tx.categoryId) {
       const key = `${txMonth}:${tx.categoryId}`
       expensesByMonthCategory.set(key, (expensesByMonthCategory.get(key) || 0) + tx.amount)
@@ -225,8 +241,8 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
   let priorBudgeted = 0
 
   for (const b of allBudgets) {
-    // Ignorar orçamento de renda na dedução do "A orçar"
-    if (incomeCategoryIds.has(b.categoryId)) continue
+    // Ignorar orçamento de renda e faturas anteriores na dedução do "A orçar"
+    if (ignoredCategoryIds.has(b.categoryId)) continue
 
     const amount = b.budgeted || 0
     const key = `${b.month}:${b.categoryId}`
@@ -246,20 +262,21 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
     if (m < month) pastMonths.add(m)
   }
   for (const tx of allExpenseTxs) {
+    if (tx.categoryId && ignoredCategoryIds.has(tx.categoryId)) continue
     const m = toMonthKey(new Date(tx.date))
     if (m < month) pastMonths.add(m)
   }
   for (const b of allBudgets) {
-    if (b.month < month && !incomeCategoryIds.has(b.categoryId)) pastMonths.add(b.month)
+    if (b.month < month && !ignoredCategoryIds.has(b.categoryId)) pastMonths.add(b.month)
   }
 
   // 5. Coletar categorias de despesas presentes
   const expenseCategoryIds = new Set<string>()
   for (const tx of allExpenseTxs) {
-    if (tx.categoryId && !incomeCategoryIds.has(tx.categoryId)) expenseCategoryIds.add(tx.categoryId)
+    if (tx.categoryId && !ignoredCategoryIds.has(tx.categoryId)) expenseCategoryIds.add(tx.categoryId)
   }
   for (const b of allBudgets) {
-    if (b.categoryId && !incomeCategoryIds.has(b.categoryId)) expenseCategoryIds.add(b.categoryId)
+    if (b.categoryId && !ignoredCategoryIds.has(b.categoryId)) expenseCategoryIds.add(b.categoryId)
   }
 
   // 6. Integrar projeções de transações agendadas (recorrentes / futuras) até o mês selecionado
@@ -270,7 +287,7 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
       if (p.type === 'income') {
         priorIncome += p.amount
       } else if (p.type === 'expense') {
-        if (p.categoryId && !incomeCategoryIds.has(p.categoryId)) {
+        if (p.categoryId && !ignoredCategoryIds.has(p.categoryId)) {
           const key = `${pMonth}:${p.categoryId}`
           expensesByMonthCategory.set(key, (expensesByMonthCategory.get(key) || 0) + p.amount)
           expenseCategoryIds.add(p.categoryId)
@@ -287,7 +304,7 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
       if (p.type === 'income') {
         totalIncome += p.amount
       } else if (p.type === 'expense') {
-        if (p.categoryId && !incomeCategoryIds.has(p.categoryId)) {
+        if (p.categoryId && !ignoredCategoryIds.has(p.categoryId)) {
           const key = `${month}:${p.categoryId}`
           expensesByMonthCategory.set(key, (expensesByMonthCategory.get(key) || 0) + p.amount)
           expenseCategoryIds.add(p.categoryId)

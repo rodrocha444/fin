@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Copy, Trash2, Plus, MoreHorizontal } from 'lucide-react'
 import { useBudgetRows, useIncomeBudgetRows, useBudgetSummary } from '@/hooks/useBudget'
 import { setBudget, copyFromPreviousMonth, clearMonthBudgets } from '@/db/repositories/budget'
-import { formatCurrency, currentMonth } from '@/utils/format'
+import { formatCurrency, currentMonth, isInitialSetupCategory } from '@/utils/format'
 import PriceInput from '@/components/atoms/PriceInput'
 import MonthNavigator from '@/components/atoms/MonthNavigator'
 import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
@@ -118,18 +118,22 @@ function IncomeGroupRow({
         className="cursor-pointer select-none bg-emerald-950/20 border-t border-emerald-900/30 hover:bg-emerald-950/30 active:bg-emerald-950/40 transition-colors"
         onClick={() => setOpen(o => !o)}
       >
-        <td className="py-2.5 pl-3 sm:pl-6 pr-2 text-xs sm:text-sm font-semibold text-emerald-400 uppercase tracking-wider truncate">
-          <span className="flex items-center gap-1.5 min-w-0">
-            <span className="text-emerald-500 text-xs flex-shrink-0">{open ? '▾' : '▸'}</span>
-            <span className="truncate" title={row.group.name}>{row.group.name}</span>
-          </span>
-        </td>
-        <td colSpan={3} className="py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm text-emerald-400 font-semibold tabular-nums">
-          {row.totalReceived > 0 ? `+${formatCurrency(row.totalReceived)}` : <span className="text-slate-600">—</span>}
+        <td colSpan={4} className="py-2.5 px-3 sm:px-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-emerald-400 text-xs">{open ? '▼' : '▶'}</span>
+              <span className="font-semibold text-xs sm:text-sm text-emerald-300 uppercase tracking-wider">
+                {row.group.name}
+              </span>
+            </div>
+            <span className="text-xs sm:text-sm font-bold text-emerald-400 tabular-nums">
+              +{formatCurrency(row.totalReceived)}
+            </span>
+          </div>
         </td>
       </tr>
-      {open && row.categories.map(cat => (
-        <IncomeCategoryRow key={cat.category.id} row={cat} onSelectCategory={onSelectCategory} />
+      {open && row.categories.map(c => (
+        <IncomeCategoryRow key={c.category.id} row={c} onSelectCategory={onSelectCategory} />
       ))}
     </>
   )
@@ -153,6 +157,8 @@ function CategoryRow({
     [month, row.category.id]
   )
 
+  const isInitialSetup = isInitialSetupCategory(row.category.name)
+
   const availColor =
     row.available > 0 ? 'text-emerald-400 font-medium' :
     row.available < 0 ? 'text-rose-400 font-medium' : 'text-slate-500 font-normal'
@@ -173,9 +179,16 @@ function CategoryRow({
         className="py-2.5 pl-6 sm:pl-10 pr-2 text-xs sm:text-sm text-slate-300 truncate cursor-pointer"
         title="Clique para ver as transações desta categoria no mês"
       >
-        <span className="truncate block group-hover:text-indigo-300 transition-colors" title={row.category.name}>
-          {row.category.name}
-        </span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="truncate group-hover:text-indigo-300 transition-colors" title={row.category.name}>
+            {row.category.name}
+          </span>
+          {isInitialSetup && (
+            <span className="text-[10px] text-amber-400 bg-amber-950/40 border border-amber-800/40 px-1.5 py-0.5 rounded flex-shrink-0" title="Categoria de ajuste/saldo inicial (não deduz do valor A Orçar)">
+              Ajuste Inicial
+            </span>
+          )}
+        </div>
       </td>
       {/* Orçado */}
       <td className="py-2.5 px-2 text-right">

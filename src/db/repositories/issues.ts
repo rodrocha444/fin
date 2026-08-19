@@ -7,6 +7,7 @@
 import { db } from '../schema'
 import { getActivityByCategory } from './transactions'
 import { toMonthKey } from './budget'
+import { isInitialSetupCategory } from '@/utils/format'
 import type { PendingIssue } from '@/types'
 
 type IssueRuleFn = () => Promise<PendingIssue | null>
@@ -41,20 +42,24 @@ async function checkUncategorizedTransactions(): Promise<PendingIssue | null> {
 /** Regra 2: Categorias com gastos excedendo o valor orçado no mês atual */
 async function checkOverspentCategories(): Promise<PendingIssue | null> {
   const currentMonth = toMonthKey(new Date())
-  const [activityMap, budgetRecords, categories] = await Promise.all([
+  const [activityMap, budgetRecords, categories, groups] = await Promise.all([
     getActivityByCategory(currentMonth),
     db.budgetMonths.where('month').equals(currentMonth).toArray(),
     db.categories.toArray(),
+    db.categoryGroups.toArray(),
   ])
 
   const budgetByCategory = new Map(budgetRecords.map(b => [b.categoryId, b.budgeted]))
   const categoryMap = new Map(categories.map(c => [c.id!, c]))
+  const groupMap = new Map(groups.map(g => [g.id!, g]))
 
   const overspent: Array<{ id: string; title: string; subtitle: string; amount: number }> = []
 
   for (const [catId, spent] of activityMap.entries()) {
     const budgeted = budgetByCategory.get(catId) ?? 0
     const cat = categoryMap.get(catId)
+    const grp = cat ? groupMap.get(cat.groupId) : undefined
+    if (cat && isInitialSetupCategory(cat.name, grp?.name)) continue
     if (spent > budgeted && cat && !cat.isHidden) {
       const excess = spent - budgeted
       overspent.push({
