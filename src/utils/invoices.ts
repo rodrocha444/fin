@@ -229,3 +229,35 @@ export function getClosedUnpaidInvoices(
 
   return closedUnpaid
 }
+
+/**
+ * Retorna o valor total das faturas de cartão de crédito cujo vencimento ocorre no mês do orçamento ('YYYY-MM')
+ */
+export function getInvoiceForBudgetMonth(
+  transactions: Transaction[],
+  account: Account,
+  budgetMonth: string
+): number {
+  if (!account.statementClosingDay) return 0
+
+  const closingDay = account.statementClosingDay
+  const dueDay = account.paymentDueDay
+
+  const [y, m] = budgetMonth.split('-').map(Number)
+  const checkMonths = [-1, 0, 1].map(delta => {
+    const d = addMonths(new Date(y, m - 1, 1), delta)
+    return format(d, 'yyyy-MM')
+  })
+
+  let totalInvoice = 0
+
+  for (const monthKey of checkMonths) {
+    const cycle = getInvoiceCycle(monthKey, closingDay, dueDay)
+    if (format(cycle.dueDate, 'yyyy-MM') === budgetMonth) {
+      const data = getInvoiceData(transactions, cycle)
+      totalInvoice += data.totalAmount
+    }
+  }
+
+  return totalInvoice
+}

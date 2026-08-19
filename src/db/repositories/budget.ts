@@ -18,6 +18,7 @@ import { getActivityByCategory, getIncomeByCategory } from './transactions'
 import { getProjectedScheduledUpToMonth } from './scheduled'
 import { format, subMonths } from 'date-fns'
 import { isInitialSetupCategory } from '@/utils/format'
+import { getInvoiceForBudgetMonth } from '@/utils/invoices'
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -83,15 +84,72 @@ export async function clearMonthBudgets(month: string): Promise<void> {
   )
 }
 
+/** Garante a existência do grupo e categorias fixas do sistema para Faturas Atuais de cartão */
+export async function ensureCurrentInvoicesCategories(): Promise<string> {
+  let group = await db.categoryGroups
+    .filter(g => g.name === 'Faturas Atuais' || g.name === 'Faturas de Cartão')
+    .first()
+
+  if (!group) {
+    const groupId = createId()
+    group = {
+      id: groupId,
+      name: 'Faturas Atuais',
+      type: 'expense',
+      sortOrder: -1, // No topo dos grupos de despesa
+      isHidden: false,
+      isSystem: true,
+    }
+    await db.categoryGroups.add(group)
+  }
+
+  const ccAccounts = await db.accounts.where('type').equals('credit_card').toArray()
+  const existingCategories = await db.categories.where('groupId').equals(group.id!).toArray()
+  const existingMap = new Map(existingCategories.map(c => [c.name, c]))
+
+  if (ccAccounts.length === 0) {
+    if (!existingMap.has('Faturas Atuais')) {
+      await db.categories.add({
+        id: createId(),
+        groupId: group.id!,
+        name: 'Faturas Atuais',
+        sortOrder: 0,
+        isHidden: false,
+      })
+    }
+  } else {
+    for (const acc of ccAccounts) {
+      const catName = `Fatura ${acc.name}`
+      if (!existingMap.has(catName) && !existingMap.has('Faturas Atuais')) {
+        await db.categories.add({
+          id: createId(),
+          groupId: group.id!,
+          name: catName,
+          sortOrder: 0,
+          isHidden: false,
+        })
+      }
+    }
+  }
+
+  return group.id!
+}
+
 // ── Cálculo do orçamento de Despesas ─────────────────────────
 
 export async function computeBudgetRows(month: string): Promise<GroupBudgetRow[]> {
-  const [activityMap, groups, categories, budgetRecords] = await Promise.all([
+  await ensureCurrentInvoicesCategories()
+
+  const [activityMap, groups, categories, budgetRecords, accounts, transactions] = await Promise.all([
     getActivityByCategory(month),
     db.categoryGroups.orderBy('sortOrder').toArray(),
     db.categories.orderBy('sortOrder').toArray(),
     db.budgetMonths.where('month').equals(month).toArray(),
+    db.accounts.toArray(),
+    db.transactions.toArray(),
   ])
+
+  const ccAccounts = accounts.filter(a => a.type === 'credit_card')
 
   // Filtrar apenas grupos de despesas
   const expenseGroups = groups.filter(g => g.type !== 'income')
@@ -112,7 +170,22 @@ export async function computeBudgetRows(month: string): Promise<GroupBudgetRow[]
       if (!cat.id) continue
       const budgetRec = budgetByCategory.get(cat.id)
       const budgeted = budgetRec?.budgeted ?? 0
-      const activity = activityMap.get(cat.id) ?? 0
+      let activity = activityMap.get(cat.id) ?? 0
+
+      // Se for do grupo Faturas Atuais, calcular dinamicamente o valor das faturas que vencem neste mês
+      if (group.name === 'Faturas Atuais' || group.name === 'Faturas de Cartão') {
+        const matchedAcc = ccAccounts.find(acc => cat.name.toLowerCase().includes(acc.name.toLowerCase()))
+        if (matchedAcc) {
+          const accTxs = transactions.filter(t => t.accountId === matchedAcc.id)
+          activity += getInvoiceForBudgetMonth(accTxs, matchedAcc, month)
+        } else if (ccAccounts.length > 0) {
+          for (const acc of ccAccounts) {
+            const accTxs = transactions.filter(t => t.accountId === acc.id)
+            activity += getInvoiceForBudgetMonth(accTxs, acc, month)
+          }
+        }
+      }
+
       const available = budgeted - activity // sem rollover
 
       catRows.push({ category: cat, budgeted, activity, available })
