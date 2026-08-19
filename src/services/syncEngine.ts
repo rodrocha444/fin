@@ -584,6 +584,78 @@ export async function executeSync(options: { forceAll?: boolean; forceSync?: boo
   }
 }
 
+/**
+ * Força a substituição completa dos dados do Supabase pelos dados locais atuais do Dexie.
+ * Útil após importar um backup para garantir que a nuvem reflita exatamente o backup restaurado.
+ */
+export async function overrideCloudWithLocalDatabase(): Promise<{ success: boolean; error?: string }> {
+  const client = getSupabaseClient()
+  if (!client) return { success: true }
+
+  isApplyingRemoteSync = true
+  isSyncRunning = true
+  updateState({ isSyncing: true, status: 'syncing', lastError: null })
+
+  try {
+    const nowIso = new Date().toISOString()
+
+    // 1. Limpa todas as tabelas no Supabase (em ordem reversa para respeitar chaves estrangeiras se houver)
+    const reversedTables = [...SYNC_TABLES].reverse()
+    for (const def of reversedTables) {
+      const { error } = await client
+        .from(def.supabaseName)
+        .delete()
+        .neq('id', '___force_delete_all___')
+
+      if (error) {
+        console.warn(`Aviso ao limpar ${def.supabaseName} no Supabase:`, error.message)
+      }
+    }
+
+    // 2. Envia todos os dados locais atuais do Dexie para o Supabase
+    for (const def of SYNC_TABLES) {
+      const table = (db as any)[def.dexieName]
+      if (!table) continue
+
+      const localItems = await table.toArray()
+      if (localItems.length > 0) {
+        const rows = localItems.map((item: any) => def.toSupabase(item, nowIso))
+        for (let i = 0; i < rows.length; i += 200) {
+          const chunk = rows.slice(i, i + 200)
+          const { error } = await client.from(def.supabaseName).upsert(chunk, { onConflict: 'id' })
+          if (error) {
+            throw new Error(`Erro ao enviar dados para ${def.supabaseName}: ${error.message}`)
+          }
+        }
+      }
+    }
+
+    // 3. Limpa fila de deleções locais e atualiza o lastSyncAt
+    await db.syncDeletedRecords.clear()
+    await db.syncMeta.put({ key: 'lastSyncAt', value: nowIso })
+
+    updateState({
+      status: syncState.isPaused ? 'paused' : 'synced',
+      lastSyncAt: new Date(nowIso),
+      isSyncing: false,
+      lastError: null,
+    })
+
+    return { success: true }
+  } catch (err: any) {
+    console.error('Erro ao sobrescrever dados na nuvem:', err)
+    updateState({
+      status: 'error',
+      lastError: err?.message || String(err),
+      isSyncing: false,
+    })
+    return { success: false, error: err?.message || 'Falha ao sobrescrever nuvem com backup.' }
+  } finally {
+    isApplyingRemoteSync = false
+    isSyncRunning = false
+  }
+}
+
 // ─── Agendamento e Debounce de Sincronização ─────────────────
 
 let syncTimeout: any = null

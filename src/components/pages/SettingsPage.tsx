@@ -28,7 +28,7 @@ export default function SettingsPage() {
   const categories = useLiveQuery(() => db.categories.orderBy('sortOrder').toArray(), [])
 
   // Sincronização Supabase
-  const { status: syncStatus, isSyncing, lastSyncAt, lastError, isPaused, syncNow, togglePause, resumeSync } = useSync()
+  const { status: syncStatus, isSyncing, lastSyncAt, lastError, isPaused, syncNow, togglePause, resumeSync, overrideCloud } = useSync()
   const [supabaseUrl, setSupabaseUrl] = useState(() => getSupabaseConfig()?.url || '')
   const [supabaseKey, setSupabaseKey] = useState(() => getSupabaseConfig()?.anonKey || '')
   const [testResult, setTestResult] = useState<{ success?: boolean; message: string } | null>(null)
@@ -158,7 +158,7 @@ export default function SettingsPage() {
     if (!file) return
 
     try {
-      if (!confirm('Atenção: A importação irá substituir e restaurar os dados das tabelas correspondentes. Deseja continuar?')) {
+      if (!confirm('Atenção: A importação irá substituir os dados locais e sincronizar com a nuvem. Deseja continuar?')) {
         if (fileInputRef.current) fileInputRef.current.value = ''
         return
       }
@@ -168,9 +168,24 @@ export default function SettingsPage() {
       const backupData = JSON.parse(text) as DatabaseBackup
 
       const result = await importDatabase(backupData)
+
+      let cloudMsg = ''
+      if (getSupabaseConfig()) {
+        try {
+          const cloudRes = await overrideCloud()
+          if (cloudRes.success) {
+            cloudMsg = ' e nuvem atualizada com sucesso'
+          } else {
+            cloudMsg = ` (aviso na nuvem: ${cloudRes.error})`
+          }
+        } catch (syncErr: any) {
+          cloudMsg = ` (aviso na nuvem: ${syncErr?.message || syncErr})`
+        }
+      }
+
       setBackupStatus({
         type: 'success',
-        message: `Importação concluída! ${result.totalRecords} registros restaurados em ${result.importedTables.length} tabelas.`,
+        message: `Importação concluída! ${result.totalRecords} registros restaurados em ${result.importedTables.length} tabelas${cloudMsg}.`,
       })
     } catch (err: any) {
       setBackupStatus({ type: 'error', message: err?.message || 'Falha ao importar backup.' })
@@ -452,10 +467,24 @@ export default function SettingsPage() {
                     onClick={() => syncNow(true)}
                     disabled={isSyncing}
                     className="btn-secondary py-1.5 px-2.5 text-xs flex items-center gap-1.5 hover:text-sky-300"
-                    title="Forçar sincronização completa agora"
+                    title="Forçar sincronização completa agora (mesclar)"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-sky-400' : ''}`} />
                     <span>{isSyncing ? 'Sincronizando…' : 'Sincronizar'}</span>
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      if (confirm('Atenção: Deseja sobrescrever os dados na nuvem com os dados deste dispositivo? Todos os registros na nuvem serão substituídos.')) {
+                        await overrideCloud()
+                      }
+                    }}
+                    disabled={isSyncing}
+                    className="btn-secondary py-1.5 px-2.5 text-xs flex items-center gap-1.5 hover:text-amber-300 hover:border-amber-700/60"
+                    title="Sobrescrever a base do Supabase com os dados locais atuais"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Enviar p/ Nuvem</span>
                   </button>
                 </>
               )}

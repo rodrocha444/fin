@@ -8,6 +8,7 @@ import {
   pauseSync,
   resumeSync,
   toggleSyncPause,
+  overrideCloudWithLocalDatabase,
   type SyncState,
 } from '@/services/syncEngine'
 
@@ -26,12 +27,17 @@ export function useSync() {
     scheduleSync(delayMs)
   }
 
+  const overrideCloud = async () => {
+    return await overrideCloudWithLocalDatabase()
+  }
+
   return {
     ...state,
     syncNow,
     triggerSync,
     pauseSync,
     resumeSync,
+    overrideCloud,
     togglePause: toggleSyncPause,
   }
 }
