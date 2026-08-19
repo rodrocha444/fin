@@ -45,6 +45,30 @@ interface TransactionFormProps {
   defaultPayee?: string
 }
 
+const LAST_TX_DATE_KEY = 'fin_last_tx_date'
+
+function getLastTxDate(): string {
+  try {
+    const saved = localStorage.getItem(LAST_TX_DATE_KEY)
+    if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved)) {
+      return saved
+    }
+  } catch {
+    // ignore
+  }
+  return format(new Date(), 'yyyy-MM-dd')
+}
+
+function saveLastTxDate(dateStr: string) {
+  try {
+    if (dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      localStorage.setItem(LAST_TX_DATE_KEY, dateStr)
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export default function TransactionForm({
   onClose,
   transaction,
@@ -77,10 +101,12 @@ export default function TransactionForm({
           : undefined
       ))
 
-  const { register, handleSubmit, watch, control, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
+
+  const { register, handleSubmit, watch, setValue, control, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      date: transaction ? format(new Date(transaction.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+      date: transaction ? format(new Date(transaction.date), 'yyyy-MM-dd') : getLastTxDate(),
       accountId: initialAccountId ?? '',
       transferAccountId: transaction?.transferAccountId ?? defaultTransferAccountId ?? '',
       amount: transaction?.amount ?? defaultAmount,
@@ -91,6 +117,8 @@ export default function TransactionForm({
     },
   })
 
+  const selectedDate = watch('date')
+
   const groupedCategories = groups?.map(g => ({
     group: g,
     cats: categories?.filter(c => c.groupId === g.id && !c.isHidden) ?? [],
@@ -99,6 +127,7 @@ export default function TransactionForm({
   const isInstallment = mode === 'expense' && expensePaymentType === 'installment'
 
   const onSubmit = async (data: FormData) => {
+    saveLastTxDate(data.date)
     const txDate = new Date(data.date + 'T12:00:00')
     const selectedCat = categories?.find(c => c.id === data.categoryId)
     const finalPayee = data.payee?.trim() || selectedCat?.name || (mode === 'transfer' ? 'Transferência' : 'Despesa')
@@ -229,8 +258,33 @@ export default function TransactionForm({
 
           {/* Data */}
           <div>
-            <label className="label">Data</label>
-            <input {...register('date')} type="date" className="input-base w-full max-w-full min-w-0" />
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="label mb-0">Data</label>
+              {selectedDate !== todayStr && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setValue('date', todayStr, { shouldValidate: true })
+                    saveLastTxDate(todayStr)
+                  }}
+                  className="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors cursor-pointer"
+                >
+                  Usar hoje
+                </button>
+              )}
+            </div>
+            <input
+              {...register('date')}
+              type="date"
+              className="input-base w-full max-w-full min-w-0"
+              onChange={e => {
+                register('date').onChange(e)
+                if (e.target.value) {
+                  saveLastTxDate(e.target.value)
+                }
+              }}
+            />
+            {errors.date && <p className="text-rose-400 text-xs mt-1">{errors.date.message}</p>}
           </div>
 
           {/* Valor */}
