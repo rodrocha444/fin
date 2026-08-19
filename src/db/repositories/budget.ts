@@ -12,6 +12,8 @@ import type {
   CategoryBudgetRow,
   IncomeGroupBudgetRow,
   IncomeCategoryBudgetRow,
+  InvoiceGroupBudgetRow,
+  InvoiceCategoryBudgetRow,
   BudgetSummary,
 } from '@/types'
 import { getActivityByCategory, getIncomeByCategory } from './transactions'
@@ -86,72 +88,75 @@ export async function clearMonthBudgets(month: string): Promise<void> {
 
 // ── Cálculo do orçamento de Despesas ─────────────────────────
 
-export async function computeBudgetRows(month: string): Promise<GroupBudgetRow[]> {
-  const [activityMap, groups, categories, budgetRecords, accounts, transactions] = await Promise.all([
+// ── Cálculo de Faturas de Cartão (Grupo Especial com 1 coluna) ──
+
+export async function computeInvoiceBudgetRows(month: string): Promise<InvoiceGroupBudgetRow[]> {
+  const [activityMap, accounts, transactions] = await Promise.all([
     getActivityByCategory(month),
-    db.categoryGroups.orderBy('sortOrder').toArray(),
-    db.categories.orderBy('sortOrder').toArray(),
-    db.budgetMonths.where('month').equals(month).toArray(),
     db.accounts.toArray(),
     db.transactions.toArray(),
   ])
 
   const ccAccounts = accounts.filter(a => a.type === 'credit_card')
+  if (ccAccounts.length === 0) return []
 
-  // Indexar budget records por categoryId
-  const budgetByCategory = new Map(budgetRecords.map(b => [b.categoryId, b]))
+  const faturasGroup = {
+    id: 'system_cc_invoices',
+    name: 'Faturas de Cartão',
+    type: 'expense' as const,
+    sortOrder: -1,
+    isHidden: false,
+    isSystem: true,
+  }
 
-  const rows: GroupBudgetRow[] = []
+  const faturasCatRows: InvoiceCategoryBudgetRow[] = []
 
-  // 1. Grupo fixo do sistema para Faturas Atuais (Cartões de Crédito)
-  if (ccAccounts.length > 0) {
-    const faturasGroup = {
-      id: 'system_cc_invoices',
-      name: 'Faturas Atuais',
-      type: 'expense' as const,
-      sortOrder: -1,
-      isHidden: false,
-      isSystem: true,
-    }
+  for (const acc of ccAccounts) {
+    if (!acc.id) continue
+    const catId = `cc_invoice_${acc.id}`
+    const catName = `Fatura ${acc.name}`
 
-    const faturasCatRows: CategoryBudgetRow[] = []
+    const accTxs = transactions.filter(t => t.accountId === acc.id)
+    const invoiceActivity = getInvoiceForBudgetMonth(accTxs, acc, month)
+    const directActivity = activityMap.get(catId) ?? 0
+    const activity = invoiceActivity + directActivity
 
-    for (const acc of ccAccounts) {
-      if (!acc.id) continue
-      const catId = `cc_invoice_${acc.id}`
-      const catName = `Fatura ${acc.name}`
-
-      const accTxs = transactions.filter(t => t.accountId === acc.id)
-      const invoiceActivity = getInvoiceForBudgetMonth(accTxs, acc, month)
-      const directActivity = activityMap.get(catId) ?? 0
-      const activity = invoiceActivity + directActivity
-      const budgeted = activity
-      const available = 0
-
-      faturasCatRows.push({
-        category: {
-          id: catId,
-          groupId: 'system_cc_invoices',
-          name: catName,
-          sortOrder: 0,
-          isHidden: false,
-        },
-        budgeted,
-        activity,
-        available,
-      })
-    }
-
-    rows.push({
-      group: faturasGroup,
-      categories: faturasCatRows,
-      totalBudgeted: faturasCatRows.reduce((s, r) => s + r.budgeted, 0),
-      totalActivity: faturasCatRows.reduce((s, r) => s + r.activity, 0),
-      totalAvailable: faturasCatRows.reduce((s, r) => s + r.available, 0),
+    faturasCatRows.push({
+      category: {
+        id: catId,
+        groupId: 'system_cc_invoices',
+        name: catName,
+        sortOrder: 0,
+        isHidden: false,
+      },
+      activity,
     })
   }
 
-  // 2. Outros grupos de despesa do banco de dados (ignorando Faturas Anteriores e Saldos Iniciais)
+  return [
+    {
+      group: faturasGroup,
+      categories: faturasCatRows,
+      totalActivity: faturasCatRows.reduce((s, r) => s + r.activity, 0),
+    },
+  ]
+}
+
+// ── Cálculo do orçamento de Despesas ─────────────────────────
+
+export async function computeBudgetRows(month: string): Promise<GroupBudgetRow[]> {
+  const [activityMap, groups, categories, budgetRecords] = await Promise.all([
+    getActivityByCategory(month),
+    db.categoryGroups.orderBy('sortOrder').toArray(),
+    db.categories.orderBy('sortOrder').toArray(),
+    db.budgetMonths.where('month').equals(month).toArray(),
+  ])
+
+  // Indexar budget records por categoryId
+  const budgetByCategory = new Map(budgetRecords.map(b => [b.categoryId, b]))
+  const rows: GroupBudgetRow[] = []
+
+  // Grupos de despesa do banco de dados (ignorando Faturas de Cartão e Saldos Iniciais)
   const expenseGroups = groups.filter(
     g => g.type !== 'income' && g.name !== 'Faturas Atuais' && g.name !== 'Faturas de Cartão'
   )

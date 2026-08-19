@@ -180,6 +180,17 @@ export interface IncomeGroupBudgetRow {
   totalReceived: number
 }
 
+export interface InvoiceCategoryBudgetRow {
+  category: Category
+  activity: number
+}
+
+export interface InvoiceGroupBudgetRow {
+  group: CategoryGroup
+  categories: InvoiceCategoryBudgetRow[]
+  totalActivity: number
+}
+
 // ── Tipos de Pendências e Regras do Sistema ──────────────────
 
 export type IssueSeverity = 'warning' | 'error' | 'info'
