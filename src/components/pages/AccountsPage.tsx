@@ -26,7 +26,6 @@ export default function AccountsPage() {
   const balances = useAllBalances()
   const [showForm, setShowForm] = useState(false)
   const [editingAccount, setEditingAccount] = useState<Account | undefined>()
-  const [showTxForm, setShowTxForm] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
 
   const installmentGroups = useLiveQuery(() => db.installmentGroups.toArray(), [])
@@ -97,15 +96,6 @@ export default function AccountsPage() {
           <div className="lg:hidden">
             <SyncStatusBadge compact={true} />
           </div>
-          <button
-            onClick={() => setShowTxForm(true)}
-            className="btn-secondary flex items-center gap-1.5 py-1.5 px-3 text-xs"
-            title="Lançar nova transação"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Novo lançamento</span>
-            <span className="sm:hidden">Lançamento</span>
-          </button>
           <button
             onClick={() => setShowForm(true)}
             className="btn-primary flex items-center gap-1.5 py-1.5 px-3 text-xs"
@@ -255,9 +245,6 @@ export default function AccountsPage() {
 
       {/* Modal de formulário de conta */}
       {showForm && <AccountForm account={editingAccount} onClose={closeForm} />}
-
-      {/* Modal de nova transação */}
-      {showTxForm && <TransactionForm onClose={() => setShowTxForm(false)} />}
 
       {/* Modal de edição de transação */}
       {editingTx && <TransactionForm transaction={editingTx} onClose={() => setEditingTx(null)} />}
