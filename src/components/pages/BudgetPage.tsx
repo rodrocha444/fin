@@ -157,6 +157,8 @@ function CategoryRow({
     [month, row.category.id]
   )
 
+  const isCurrentInvoice = row.category.groupId === 'system_cc_invoices' || row.category.id?.startsWith('cc_invoice_')
+
   const availColor =
     row.available > 0 ? 'text-emerald-400 font-medium' :
     row.available < 0 ? 'text-rose-400 font-medium' : 'text-slate-500 font-normal'
@@ -183,7 +185,13 @@ function CategoryRow({
       </td>
       {/* Orçado */}
       <td className="py-2.5 px-2 text-right">
-        <BudgetCell value={row.budgeted} onSave={handleSave} />
+        {isCurrentInvoice ? (
+          <span className="text-slate-600 block text-right pr-2 select-none" title="Fatura fixa — valor devido no mês independente de orçamento">
+            —
+          </span>
+        ) : (
+          <BudgetCell value={row.budgeted} onSave={handleSave} />
+        )}
       </td>
       {/* Gasto */}
       <td
@@ -235,6 +243,7 @@ function GroupRow({
   onSelectCategory: (data: CategoryModalData) => void
 }) {
   const [open, setOpen] = useState(true)
+  const isCurrentInvoicesGroup = row.group.id === 'system_cc_invoices' || row.group.name === 'Faturas Atuais'
 
   return (
     <>
@@ -249,7 +258,7 @@ function GroupRow({
           </span>
         </td>
         <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-semibold text-slate-400 tabular-nums">
-          {row.totalBudgeted > 0 ? formatCurrency(row.totalBudgeted) : <span className="text-slate-600">—</span>}
+          {!isCurrentInvoicesGroup && row.totalBudgeted > 0 ? formatCurrency(row.totalBudgeted) : <span className="text-slate-600">—</span>}
         </td>
         <td className="py-2.5 px-2 text-right text-xs sm:text-sm text-rose-400/80 font-semibold tabular-nums">
           {row.totalActivity > 0 ? formatCurrency(row.totalActivity) : <span className="text-slate-600">—</span>}
