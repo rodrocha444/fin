@@ -81,14 +81,18 @@ export default function TransactionForm({
   defaultPayee,
 }: TransactionFormProps) {
   const isEdit = !!transaction
+  const isExistingInstallment = !!transaction?.installmentGroupId
+
   const initialMode: TxMode = transaction
     ? (transaction.type === 'transfer' ? 'transfer' : transaction.type === 'income' ? 'income' : 'expense')
     : (defaultMode === 'installment' ? 'expense' : defaultMode)
 
+  const initialExpenseType: ExpensePaymentType = transaction
+    ? (transaction.installmentGroupId ? 'installment' : 'single')
+    : (defaultMode === 'installment' ? 'installment' : 'single')
+
   const [mode, setMode] = useState<TxMode>(initialMode)
-  const [expensePaymentType, setExpensePaymentType] = useState<ExpensePaymentType>(
-    defaultMode === 'installment' ? 'installment' : 'single'
-  )
+  const [expensePaymentType, setExpensePaymentType] = useState<ExpensePaymentType>(initialExpenseType)
   const [installmentAmountType, setInstallmentAmountType] = useState<'total' | 'parcel'>('total')
   const accounts = useAccounts() ?? []
   const categoryType = mode === 'income' ? 'income' : 'expense'
@@ -115,7 +119,7 @@ export default function TransactionForm({
       payee: transaction?.payee ?? defaultPayee,
       categoryId: transaction?.categoryId ?? defaultCategoryId ?? '',
       notes: transaction?.notes,
-      installmentCount: 2,
+      installmentCount: transaction?.installmentTotal ?? 2,
     },
   })
 
@@ -142,7 +146,7 @@ export default function TransactionForm({
     cats: categories?.filter(c => c.groupId === g.id && !c.isHidden) ?? [],
   })).filter(g => g.cats.length > 0) ?? []
 
-  const isInstallment = mode === 'expense' && expensePaymentType === 'installment'
+  const isInstallment = (mode === 'expense' && expensePaymentType === 'installment') || isExistingInstallment
 
   const onSubmit = async (data: FormData) => {
     saveLastTxDate(data.date)
@@ -221,9 +225,20 @@ export default function TransactionForm({
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 flex-shrink-0">
-          <h2 className="font-semibold text-slate-100 text-base sm:text-lg">
-            {isEdit ? 'Editar transação' : 'Nova transação'}
-          </h2>
+          <div>
+            <h2 className="font-semibold text-slate-100 text-base sm:text-lg">
+              {isExistingInstallment
+                ? `Editar Parcela ${transaction.installmentNumber} de ${transaction.installmentTotal}`
+                : isEdit
+                  ? 'Editar transação'
+                  : 'Nova transação'}
+            </h2>
+            {isExistingInstallment && (
+              <p className="text-xs text-violet-400 mt-0.5">
+                Compra parcelada no cartão
+              </p>
+            )}
+          </div>
           <button onClick={onClose} className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 active:bg-slate-700 transition-colors">
             <X className="w-5 h-5" />
           </button>
@@ -237,8 +252,9 @@ export default function TransactionForm({
                 key={m}
                 type="button"
                 onClick={() => setMode(m)}
+                disabled={isExistingInstallment && m !== 'expense'}
                 className={`flex-1 py-2.5 rounded-xl border text-xs font-medium transition-all active:scale-95 ${
-                  mode === m ? `${cfg.activeBg} ${cfg.color}` : 'border-slate-700 text-slate-500 hover:border-slate-600'
+                  mode === m ? `${cfg.activeBg} ${cfg.color}` : 'border-slate-700 text-slate-500 hover:border-slate-600 disabled:opacity-40'
                 }`}
               >
                 {cfg.label}
@@ -251,11 +267,12 @@ export default function TransactionForm({
             <div className="flex bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
               <button
                 type="button"
-                onClick={() => setExpensePaymentType('single')}
+                onClick={() => !isExistingInstallment && setExpensePaymentType('single')}
+                disabled={isExistingInstallment}
                 className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${
                   expensePaymentType === 'single'
                     ? 'bg-slate-700 text-slate-100 shadow'
-                    : 'text-slate-400 hover:text-slate-200'
+                    : 'text-slate-400 hover:text-slate-200 disabled:opacity-40 disabled:hover:text-slate-400'
                 }`}
               >
                 À vista
@@ -448,8 +465,8 @@ export default function TransactionForm({
             </div>
           )}
 
-          {/* Parcelas */}
-          {isInstallment && (
+          {/* Parcelas (apenas ao criar um novo parcelamento) */}
+          {isInstallment && !isExistingInstallment && (
             <div>
               <label className="label">Quantidade de parcelas</label>
               <input
