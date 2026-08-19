@@ -160,8 +160,10 @@ export async function computeBudgetRows(month: string): Promise<GroupBudgetRow[]
   const rows: GroupBudgetRow[] = []
 
   for (const group of expenseGroups) {
-    if (group.isHidden) continue
-    const groupCategories = categories.filter(c => c.groupId === group.id && !c.isHidden)
+    if (group.isHidden || isInitialSetupCategory(undefined, group.name)) continue
+    const groupCategories = categories.filter(
+      c => c.groupId === group.id && !c.isHidden && !isInitialSetupCategory(c.name, group.name)
+    )
     if (groupCategories.length === 0) continue
 
     const catRows: CategoryBudgetRow[] = []

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Copy, Trash2, Plus, MoreHorizontal } from 'lucide-react'
 import { useBudgetRows, useIncomeBudgetRows, useBudgetSummary } from '@/hooks/useBudget'
 import { setBudget, copyFromPreviousMonth, clearMonthBudgets } from '@/db/repositories/budget'
-import { formatCurrency, currentMonth, isInitialSetupCategory } from '@/utils/format'
+import { formatCurrency, currentMonth } from '@/utils/format'
 import PriceInput from '@/components/atoms/PriceInput'
 import MonthNavigator from '@/components/atoms/MonthNavigator'
 import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
@@ -157,8 +157,6 @@ function CategoryRow({
     [month, row.category.id]
   )
 
-  const isInitialSetup = isInitialSetupCategory(row.category.name)
-
   const availColor =
     row.available > 0 ? 'text-emerald-400 font-medium' :
     row.available < 0 ? 'text-rose-400 font-medium' : 'text-slate-500 font-normal'
@@ -179,16 +177,9 @@ function CategoryRow({
         className="py-2.5 pl-6 sm:pl-10 pr-2 text-xs sm:text-sm text-slate-300 truncate cursor-pointer"
         title="Clique para ver as transações desta categoria no mês"
       >
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="truncate group-hover:text-indigo-300 transition-colors" title={row.category.name}>
-            {row.category.name}
-          </span>
-          {isInitialSetup && (
-            <span className="text-[10px] text-amber-400 bg-amber-950/40 border border-amber-800/40 px-1.5 py-0.5 rounded flex-shrink-0" title="Categoria de ajuste/saldo inicial (não deduz do valor A Orçar)">
-              Ajuste Inicial
-            </span>
-          )}
-        </div>
+        <span className="truncate block group-hover:text-indigo-300 transition-colors" title={row.category.name}>
+          {row.category.name}
+        </span>
       </td>
       {/* Orçado */}
       <td className="py-2.5 px-2 text-right">
