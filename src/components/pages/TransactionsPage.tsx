@@ -1,7 +1,7 @@
-// src/pages/TransactionsPage.tsx — versão responsiva mobile (com filtro por conta)
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Plus, Search } from 'lucide-react'
+import { format } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/db/schema'
 import { useAccounts } from '@/hooks/useAccounts'
@@ -26,6 +26,28 @@ export default function TransactionsPage() {
   const [showSearch, setShowSearch] = useState(false)
 
   const selectedAccountId = searchParams.get('account') || undefined
+  const editTxId = searchParams.get('edit')
+
+  useEffect(() => {
+    if (editTxId) {
+      db.transactions.get(editTxId).then(tx => {
+        if (tx) {
+          const txMonth = format(new Date(tx.date), 'yyyy-MM')
+          setMonth(txMonth)
+          setEditingTx(tx)
+        }
+      })
+    }
+  }, [editTxId])
+
+  const handleCloseEdit = () => {
+    setEditingTx(null)
+    if (searchParams.has('edit')) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('edit')
+      setSearchParams(next, { replace: true })
+    }
+  }
 
   const accounts = useAccounts()
   const transactions = useMonthTransactions(month)
@@ -182,7 +204,7 @@ export default function TransactionsPage() {
       </button>
 
       {showForm && <TransactionForm onClose={() => setShowForm(false)} />}
-      {editingTx && <TransactionForm transaction={editingTx} onClose={() => setEditingTx(null)} />}
+      {editingTx && <TransactionForm transaction={editingTx} onClose={handleCloseEdit} />}
     </div>
   )
 }

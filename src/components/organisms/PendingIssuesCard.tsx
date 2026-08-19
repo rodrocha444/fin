@@ -1,6 +1,7 @@
 // src/components/organisms/PendingIssuesCard.tsx — Card/Banner de Inconsistências e Pendências
 import { useState } from 'react'
-import { AlertCircle, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Tag, ArrowRight } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { AlertCircle, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Tag, Pencil, ArrowUpRight } from 'lucide-react'
 import { usePendingIssues } from '@/hooks/usePendingIssues'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
 import { updateTransaction } from '@/db/repositories/transactions'
@@ -8,6 +9,7 @@ import { formatCurrency } from '@/utils/format'
 import type { PendingIssue } from '@/types'
 
 export default function PendingIssuesCard() {
+  const navigate = useNavigate()
   const issues = usePendingIssues() ?? []
   const [isExpanded, setIsExpanded] = useState(false)
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null)
@@ -23,6 +25,16 @@ export default function PendingIssuesCard() {
   const handleAssignCategory = async (txId: string, categoryId: string) => {
     if (!categoryId) return
     await updateTransaction(txId, { categoryId })
+  }
+
+  const handleItemClick = (issue: PendingIssue, itemId: string) => {
+    if (issue.ruleId === 'uncategorized_transactions') {
+      navigate(`/transactions?edit=${itemId}`)
+    } else if (issue.ruleId === 'overdue_scheduled') {
+      navigate('/scheduled')
+    } else if (issue.ruleId === 'overspent_categories') {
+      navigate('/')
+    }
   }
 
   const groupedCategories = groups?.map(g => ({
@@ -95,11 +107,14 @@ export default function PendingIssuesCard() {
               {activeIssue.items?.map(item => (
                 <div
                   key={item.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl bg-slate-900/90 border border-slate-800 text-xs"
+                  onClick={() => handleItemClick(activeIssue, item.id)}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl bg-slate-900/90 hover:bg-slate-850 border border-slate-800 hover:border-amber-500/40 transition-colors text-xs cursor-pointer group"
                 >
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-200 truncate">{item.title}</span>
+                      <span className="font-semibold text-slate-200 group-hover:text-amber-200 transition-colors truncate">
+                        {item.title}
+                      </span>
                       {item.amount !== undefined && (
                         <span className={`font-mono font-medium ${
                           item.type === 'income' ? 'text-emerald-400' : 'text-slate-300'
@@ -111,20 +126,16 @@ export default function PendingIssuesCard() {
                     {item.subtitle && <span className="text-[11px] text-slate-500">{item.subtitle}</span>}
                   </div>
 
-                  {/* Resolução rápida para transações sem categoria */}
-                  {activeIssue.ruleId === 'uncategorized_transactions' && (
-                    <div className="flex items-center gap-2 flex-shrink-0 mt-2 sm:mt-0">
-                      <Tag className="w-4 h-4 text-amber-400/80 flex-shrink-0" />
-                      {groupedCategories.length === 0 ? (
-                        <span className="text-[11px] text-amber-300/80 italic">
-                          Crie categorias no Orçamento
-                        </span>
-                      ) : (
+                  <div className="flex items-center gap-2 flex-shrink-0 mt-2 sm:mt-0" onClick={e => e.stopPropagation()}>
+                    {/* Resolução rápida para transações sem categoria */}
+                    {activeIssue.ruleId === 'uncategorized_transactions' && groupedCategories.length > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <Tag className="w-4 h-4 text-amber-400/80 flex-shrink-0" />
                         <select
                           onChange={e => handleAssignCategory(item.id, e.target.value)}
                           defaultValue=""
                           style={{ colorScheme: 'dark' }}
-                          className="w-full sm:w-52 px-3 py-1.5 text-xs font-medium text-slate-100 bg-slate-800 hover:bg-slate-700/80 border border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 cursor-pointer shadow-sm"
+                          className="w-full sm:w-48 px-2.5 py-1 text-xs font-medium text-slate-100 bg-slate-800 hover:bg-slate-700/80 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/50 cursor-pointer shadow-sm"
                         >
                           <option value="" disabled className="text-slate-400 bg-slate-800">
                             Atribuir categoria…
@@ -147,9 +158,21 @@ export default function PendingIssuesCard() {
                             </optgroup>
                           ))}
                         </select>
-                      )}
-                    </div>
-                  )}
+                      </div>
+                    )}
+
+                    {/* Botão de edição / navegação */}
+                    {activeIssue.ruleId === 'uncategorized_transactions' && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/transactions?edit=${item.id}`)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-amber-300 hover:bg-slate-800 transition-colors"
+                        title="Abrir e editar transação"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
