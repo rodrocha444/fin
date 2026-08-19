@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Copy, Trash2, Plus, MoreHorizontal, ArrowDownLeft, CreditCard, Layers, Receipt } from 'lucide-react'
+import { Copy, Trash2, Plus, MoreHorizontal, ArrowDownLeft, CreditCard, Layers, Receipt, History } from 'lucide-react'
 import { useBudgetRows, useIncomeBudgetRows, useBudgetSummary } from '@/hooks/useBudget'
 import { setBudget, copyFromPreviousMonth, clearMonthBudgets } from '@/db/repositories/budget'
 import { formatCurrency, currentMonth } from '@/utils/format'
@@ -321,7 +321,21 @@ export default function BudgetPage() {
         {/* To Be Budgeted */}
         {summary && (
           <div className="text-center flex-1 min-w-0">
-            <p className="text-[10px] text-slate-500">A orçar</p>
+            <div className="flex items-center justify-center gap-1.5">
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">A orçar</p>
+              {summary.previousMonthSurplus !== 0 && (
+                <span
+                  className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                    summary.previousMonthSurplus > 0
+                      ? 'text-emerald-400 bg-emerald-950/70 border border-emerald-800/60'
+                      : 'text-rose-400 bg-rose-950/70 border border-rose-800/60'
+                  }`}
+                  title="Sobra/Falta acumulada de meses anteriores"
+                >
+                  {summary.previousMonthSurplus > 0 ? '+' : ''}{formatCurrency(summary.previousMonthSurplus)} ant.
+                </span>
+              )}
+            </div>
             <p className={`text-base sm:text-lg font-bold tabular-nums truncate ${tbbColor}`}>
               {formatCurrency(Math.abs(summary.toBeBudgeted))}
             </p>
@@ -362,7 +376,33 @@ export default function BudgetPage() {
       {/* ── Resumo dos valores que influenciam o orçamento do mês atual (Fixo) ── */}
       {summary && (
         <div className="bg-slate-900/60 border-b border-slate-800/80 p-3 sm:px-6 sm:py-3 flex-shrink-0 select-none">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5">
+            {/* Sobra Mês Anterior */}
+            <div
+              className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm col-span-2 sm:col-span-1"
+              title="Recursos não orçados ou sobras acumuladas de meses anteriores (+ soma ao orçamento)"
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                summary.previousMonthSurplus >= 0
+                  ? 'bg-emerald-950/70 border border-emerald-800/60 text-emerald-400'
+                  : 'bg-rose-950/70 border border-rose-800/60 text-rose-400'
+              }`}>
+                <History className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] text-slate-500 font-medium truncate">Sobra Anterior</p>
+                <p className={`text-xs sm:text-sm font-bold tabular-nums truncate ${
+                  summary.previousMonthSurplus > 0
+                    ? 'text-emerald-400'
+                    : summary.previousMonthSurplus < 0
+                    ? 'text-rose-400'
+                    : 'text-slate-500'
+                }`}>
+                  {summary.previousMonthSurplus > 0 ? '+' : ''}{formatCurrency(summary.previousMonthSurplus)}
+                </p>
+              </div>
+            </div>
+
             {/* Receitas do Mês */}
             <div
               className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
