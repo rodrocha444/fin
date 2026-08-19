@@ -93,10 +93,10 @@ function InvoiceCategoryRow({
       className="group hover:bg-slate-800/40 active:bg-slate-800/60 cursor-pointer transition-colors"
       title="Clique para ver as transações desta fatura no mês"
     >
-      <td className="py-2.5 pl-6 sm:pl-10 pr-2 text-xs sm:text-sm text-slate-300 truncate">
+      <td className="py-2.5 pl-6 sm:pl-10 pr-2 text-xs sm:text-sm text-slate-300">
         <div className="flex items-center gap-2 min-w-0">
           <CreditCard className="w-3.5 h-3.5 text-rose-400/80 flex-shrink-0" />
-          <span className="truncate block group-hover:text-rose-300 transition-colors" title={row.category.name}>
+          <span className="break-words leading-tight block group-hover:text-rose-300 transition-colors" title={row.category.name}>
             {row.category.name}
           </span>
         </div>
@@ -126,14 +126,14 @@ function InvoiceGroupRow({
         onClick={() => setOpen(o => !o)}
       >
         <td colSpan={4} className="py-2.5 px-3 sm:px-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-rose-400 text-xs">{open ? '▼' : '▶'}</span>
-              <span className="font-semibold text-xs sm:text-sm text-rose-300 uppercase tracking-wider">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-rose-400 text-xs flex-shrink-0">{open ? '▼' : '▶'}</span>
+              <span className="font-semibold text-xs sm:text-sm text-rose-300 uppercase tracking-wider break-words leading-tight">
                 {row.group.name}
               </span>
             </div>
-            <span className="text-xs sm:text-sm font-bold text-rose-400 tabular-nums">
+            <span className="text-xs sm:text-sm font-bold text-rose-400 tabular-nums flex-shrink-0">
               {row.totalActivity > 0 ? `-${formatCurrency(row.totalActivity)}` : <span className="text-slate-600">—</span>}
             </span>
           </div>
@@ -167,8 +167,8 @@ function IncomeCategoryRow({
       className="group hover:bg-slate-800/40 active:bg-slate-800/60 cursor-pointer transition-colors"
       title="Clique para ver as transações desta categoria no mês"
     >
-      <td className="py-2.5 pl-6 sm:pl-10 pr-2 text-xs sm:text-sm text-slate-300 truncate">
-        <span className="truncate block group-hover:text-emerald-300 transition-colors" title={row.category.name}>
+      <td className="py-2.5 pl-6 sm:pl-10 pr-2 text-xs sm:text-sm text-slate-300">
+        <span className="break-words leading-tight block group-hover:text-emerald-300 transition-colors" title={row.category.name}>
           {row.category.name}
         </span>
       </td>
@@ -197,14 +197,14 @@ function IncomeGroupRow({
         onClick={() => setOpen(o => !o)}
       >
         <td colSpan={4} className="py-2.5 px-3 sm:px-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-emerald-400 text-xs">{open ? '▼' : '▶'}</span>
-              <span className="font-semibold text-xs sm:text-sm text-emerald-300 uppercase tracking-wider">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-emerald-400 text-xs flex-shrink-0">{open ? '▼' : '▶'}</span>
+              <span className="font-semibold text-xs sm:text-sm text-emerald-300 uppercase tracking-wider break-words leading-tight">
                 {row.group.name}
               </span>
             </div>
-            <span className="text-xs sm:text-sm font-bold text-emerald-400 tabular-nums">
+            <span className="text-xs sm:text-sm font-bold text-emerald-400 tabular-nums flex-shrink-0">
               +{formatCurrency(row.totalReceived)}
             </span>
           </div>
@@ -252,10 +252,10 @@ function CategoryRow({
             isIncome: false,
           })
         }
-        className="py-2.5 pl-6 sm:pl-10 pr-2 text-xs sm:text-sm text-slate-300 truncate cursor-pointer"
+        className="py-2.5 pl-6 sm:pl-10 pr-2 text-xs sm:text-sm text-slate-300 cursor-pointer"
         title="Clique para ver as transações desta categoria no mês"
       >
-        <span className="truncate block group-hover:text-indigo-300 transition-colors" title={row.category.name}>
+        <span className="break-words leading-tight block group-hover:text-indigo-300 transition-colors" title={row.category.name}>
           {row.category.name}
         </span>
       </td>
@@ -320,10 +320,10 @@ function GroupRow({
         className="cursor-pointer select-none bg-slate-800/40 hover:bg-slate-800/60 active:bg-slate-800/80 transition-colors"
         onClick={() => setOpen(o => !o)}
       >
-        <td className="py-2.5 pl-3 sm:pl-6 pr-2 text-xs sm:text-sm font-semibold text-slate-400 uppercase tracking-wider truncate">
+        <td className="py-2.5 pl-3 sm:pl-6 pr-2 text-xs sm:text-sm font-semibold text-slate-400 uppercase tracking-wider">
           <span className="flex items-center gap-1.5 min-w-0">
             <span className="text-slate-500 text-xs flex-shrink-0">{open ? '▾' : '▸'}</span>
-            <span className="truncate" title={row.group.name}>{row.group.name}</span>
+            <span className="break-words leading-tight" title={row.group.name}>{row.group.name}</span>
           </span>
         </td>
         <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-semibold text-slate-300 tabular-nums">
