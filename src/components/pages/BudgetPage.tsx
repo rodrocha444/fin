@@ -179,16 +179,31 @@ function CategoryRow({
         className="py-2.5 pl-6 sm:pl-10 pr-2 text-xs sm:text-sm text-slate-300 truncate cursor-pointer"
         title="Clique para ver as transações desta categoria no mês"
       >
-        <span className="truncate block group-hover:text-indigo-300 transition-colors" title={row.category.name}>
-          {row.category.name}
-        </span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          {isCurrentInvoice && (
+            <span className="p-0.5 rounded bg-indigo-950/80 text-indigo-400 border border-indigo-800/50 flex-shrink-0">
+              <CreditCard className="w-3 h-3" />
+            </span>
+          )}
+          <span className="truncate block group-hover:text-indigo-300 transition-colors" title={row.category.name}>
+            {row.category.name}
+          </span>
+        </div>
       </td>
       {/* Orçado */}
       <td className="py-2.5 px-2 text-right">
         {isCurrentInvoice ? (
-          <span className="text-slate-600 block text-right pr-2 select-none" title="Fatura fixa — valor devido no mês independente de orçamento">
-            —
-          </span>
+          <div className="flex items-center justify-end gap-1.5 text-right pr-2">
+            <span className="text-xs sm:text-sm font-semibold text-slate-200 tabular-nums">
+              {row.budgeted > 0 ? formatCurrency(row.budgeted) : <span className="text-slate-500">R$ 0,00</span>}
+            </span>
+            <span
+              className="text-[9px] font-bold text-indigo-300 bg-indigo-950/80 border border-indigo-700/60 px-1.5 py-0.5 rounded uppercase tracking-wider"
+              title="Orçado automaticamente conforme o valor da fatura do mês"
+            >
+              Auto
+            </span>
+          </div>
         ) : (
           <BudgetCell value={row.budgeted} onSave={handleSave} />
         )}
@@ -225,7 +240,13 @@ function CategoryRow({
         className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums cursor-pointer hover:bg-slate-800/50 ${availColor}`}
         title="Clique para ver as transações desta categoria no mês"
       >
-        {formatCurrency(Math.abs(row.available))}
+        {isCurrentInvoice ? (
+          <span className="text-slate-500 font-normal">
+            {formatCurrency(0)}
+          </span>
+        ) : (
+          formatCurrency(Math.abs(row.available))
+        )}
       </td>
     </tr>
   )
@@ -243,7 +264,6 @@ function GroupRow({
   onSelectCategory: (data: CategoryModalData) => void
 }) {
   const [open, setOpen] = useState(true)
-  const isCurrentInvoicesGroup = row.group.id === 'system_cc_invoices' || row.group.name === 'Faturas Atuais'
 
   return (
     <>
@@ -257,8 +277,8 @@ function GroupRow({
             <span className="truncate" title={row.group.name}>{row.group.name}</span>
           </span>
         </td>
-        <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-semibold text-slate-400 tabular-nums">
-          {!isCurrentInvoicesGroup && row.totalBudgeted > 0 ? formatCurrency(row.totalBudgeted) : <span className="text-slate-600">—</span>}
+        <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-semibold text-slate-300 tabular-nums">
+          {row.totalBudgeted > 0 ? formatCurrency(row.totalBudgeted) : <span className="text-slate-600">—</span>}
         </td>
         <td className="py-2.5 px-2 text-right text-xs sm:text-sm text-rose-400/80 font-semibold tabular-nums">
           {row.totalActivity > 0 ? formatCurrency(row.totalActivity) : <span className="text-slate-600">—</span>}

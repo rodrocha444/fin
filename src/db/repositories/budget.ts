@@ -120,13 +120,13 @@ export async function computeBudgetRows(month: string): Promise<GroupBudgetRow[]
       if (!acc.id) continue
       const catId = `cc_invoice_${acc.id}`
       const catName = `Fatura ${acc.name}`
-      const budgeted = 0
 
       const accTxs = transactions.filter(t => t.accountId === acc.id)
       const invoiceActivity = getInvoiceForBudgetMonth(accTxs, acc, month)
       const directActivity = activityMap.get(catId) ?? 0
       const activity = invoiceActivity + directActivity
-      const available = -activity
+      const budgeted = activity
+      const available = 0
 
       faturasCatRows.push({
         category: {
