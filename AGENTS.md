@@ -47,3 +47,8 @@ Views completas mapeadas para rotas da aplicacao.
 3. Estender com Props: Adicionar propriedades opcionais, configuracoes de visualizacao ou callbacks sem quebrar os usos existentes.
 4. Decomposicao: Se um organismo ou molecula estiver acumulando responsabilidades demais, extraia atomos ou moleculas reutilizaveis na camada inferior.
 5. Consistencia de Design: Preservar o padrao visual (tema escuro em slate, safe-area padding em mobile, feedback interativo ativo e hover).
+
+## 4. Versionamento da Aplicacao
+- A cada novo commit, ajuste ou entrega de funcionalidade/correcao, o agente DEVE atualizar o arquivo `src/version.ts`, incrementando a versao (`APP_VERSION`, ex: `1.0.14`) e a data da alteracao (`BUILD_DATE`).
+- A versao e exibida dinamicamente no card de informacoes do aplicativo na pagina de Configuracoes (`SettingsPage.tsx`).
+

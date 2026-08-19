@@ -21,6 +21,7 @@ import { useSync } from '@/hooks/useSync'
 import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
 import ResetDatabaseModal from '@/components/organisms/ResetDatabaseModal'
 import Logo from '@/components/atoms/Logo'
+import { APP_VERSION, BUILD_DATE } from '@/version'
 
 export default function SettingsPage() {
   const groups = useLiveQuery(() => db.categoryGroups.orderBy('sortOrder').toArray(), [])
@@ -673,17 +674,21 @@ export default function SettingsPage() {
           }}
         />
 
-        {/* Card Sobre / Identidade Visual */}
-        <div className="card p-5 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 border border-slate-800 space-y-3">
+        {/* Card Sobre / Identidade Visual e Versão */}
+        <div className="card p-5 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 border border-slate-800 space-y-4">
           <div className="flex items-center justify-between">
             <Logo size="md" />
-            <span className="text-xs font-mono text-indigo-400 bg-indigo-950/60 border border-indigo-800/50 px-2.5 py-1 rounded-full">
-              v1.0.0 PWA
+            <span className="text-xs font-mono text-indigo-400 bg-indigo-950/60 border border-indigo-800/50 px-2.5 py-1 rounded-full font-semibold">
+              v{APP_VERSION}
             </span>
           </div>
           <p className="text-xs text-slate-400 leading-relaxed">
             FinPlan é um aplicativo moderno de finanças pessoais focado em orçamento por envelope, gestão completa de cartões de crédito, contas bancárias e relatórios de evolução patrimonial.
           </p>
+          <div className="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 font-mono">
+            <span>Versão da aplicação: <strong className="text-slate-400">v{APP_VERSION}</strong></span>
+            <span>Atualização: <strong className="text-slate-400">{BUILD_DATE}</strong></span>
+          </div>
         </div>
       </div>
     </div>
