@@ -59,14 +59,17 @@ export default function Layout() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden print:overflow-visible print:h-auto print:block">
 
         {/* Área de conteúdo */}
-        <main className="flex-1 overflow-y-auto bg-slate-950 pb-safe-bottom print:p-0 print:m-0 print:overflow-visible print:h-auto print:bg-white print:block" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)' }}>
-          <div className="lg:pb-0 h-full print:h-auto print:p-0 print:m-0">
+        <main className="flex-1 overflow-y-auto bg-slate-950 print:p-0 print:m-0 print:overflow-visible print:h-auto print:bg-white print:block">
+          <div className="h-full print:h-auto print:p-0 print:m-0">
             <Outlet />
           </div>
         </main>
 
         {/* ── Bottom Nav mobile (sm/md) ─────────────────── */}
-        <nav className="lg:hidden flex items-center bg-slate-900 border-t border-slate-800 flex-shrink-0 print:hidden">
+        <nav
+          className="lg:hidden flex items-center bg-slate-900 border-t border-slate-800 flex-shrink-0 print:hidden"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        >
           {NAV.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
