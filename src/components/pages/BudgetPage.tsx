@@ -359,58 +359,72 @@ export default function BudgetPage() {
         </div>
       </div>
 
-      {/* ── Resumo dos valores que influenciam o orçamento do mês atual ── */}
+      {/* ── Resumo dos valores que influenciam o orçamento do mês atual (Fixo) ── */}
       {summary && (
-        <div className="flex items-center justify-between px-3 sm:px-6 py-2.5 bg-slate-900/60 border-b border-slate-800/80 flex-shrink-0 overflow-x-auto gap-3 sm:gap-6 select-none scrollbar-none">
-          {/* Receitas do Mês */}
-          <div className="flex items-center gap-2 flex-shrink-0" title="Entradas e rendas registradas no mês (+ soma ao orçamento)">
-            <div className="w-7 h-7 rounded-lg bg-emerald-950/60 border border-emerald-800/50 flex items-center justify-center text-emerald-400 flex-shrink-0">
-              <ArrowDownLeft className="w-3.5 h-3.5" />
+        <div className="bg-slate-900/60 border-b border-slate-800/80 p-3 sm:px-6 sm:py-3 flex-shrink-0 select-none">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+            {/* Receitas do Mês */}
+            <div
+              className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
+              title="Entradas e rendas registradas no mês (+ soma ao orçamento)"
+            >
+              <div className="w-8 h-8 rounded-lg bg-emerald-950/70 border border-emerald-800/60 flex items-center justify-center text-emerald-400 flex-shrink-0">
+                <ArrowDownLeft className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] text-slate-500 font-medium truncate">Receitas Mês</p>
+                <p className="text-xs sm:text-sm font-bold text-emerald-400 tabular-nums truncate">
+                  +{formatCurrency(summary.totalIncome)}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-[10px] text-slate-500 font-medium leading-none">Receitas Mês</p>
-              <p className="text-xs sm:text-sm font-bold text-emerald-400 tabular-nums leading-tight mt-0.5">
-                +{formatCurrency(summary.totalIncome)}
-              </p>
-            </div>
-          </div>
 
-          {/* Faturas do Mês */}
-          <div className="flex items-center gap-2 flex-shrink-0" title="Faturas de cartão de crédito com vencimento neste mês (- deduz do orçamento)">
-            <div className="w-7 h-7 rounded-lg bg-rose-950/60 border border-rose-800/50 flex items-center justify-center text-rose-400 flex-shrink-0">
-              <CreditCard className="w-3.5 h-3.5" />
+            {/* Faturas do Mês */}
+            <div
+              className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
+              title="Faturas de cartão de crédito com vencimento neste mês (- deduz do orçamento)"
+            >
+              <div className="w-8 h-8 rounded-lg bg-rose-950/70 border border-rose-800/60 flex items-center justify-center text-rose-400 flex-shrink-0">
+                <CreditCard className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] text-slate-500 font-medium truncate">Faturas a Vencer</p>
+                <p className="text-xs sm:text-sm font-bold text-rose-400 tabular-nums truncate">
+                  {(summary.currentInvoicesDue ?? 0) > 0 ? `-${formatCurrency(summary.currentInvoicesDue ?? 0)}` : <span className="text-slate-600">—</span>}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-[10px] text-slate-500 font-medium leading-none">Faturas a Vencer</p>
-              <p className="text-xs sm:text-sm font-bold text-rose-400 tabular-nums leading-tight mt-0.5">
-                {(summary.currentInvoicesDue ?? 0) > 0 ? `-${formatCurrency(summary.currentInvoicesDue ?? 0)}` : <span className="text-slate-600">—</span>}
-              </p>
-            </div>
-          </div>
 
-          {/* Orçado em Categorias */}
-          <div className="flex items-center gap-2 flex-shrink-0" title="Total alocado em envelopes/categorias de despesa no mês (- deduz do orçamento)">
-            <div className="w-7 h-7 rounded-lg bg-indigo-950/60 border border-indigo-800/50 flex items-center justify-center text-indigo-400 flex-shrink-0">
-              <Layers className="w-3.5 h-3.5" />
+            {/* Orçado em Categorias */}
+            <div
+              className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
+              title="Total alocado em envelopes/categorias de despesa no mês (- deduz do orçamento)"
+            >
+              <div className="w-8 h-8 rounded-lg bg-indigo-950/70 border border-indigo-800/60 flex items-center justify-center text-indigo-400 flex-shrink-0">
+                <Layers className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] text-slate-500 font-medium truncate">Orçado Mês</p>
+                <p className="text-xs sm:text-sm font-bold text-indigo-300 tabular-nums truncate">
+                  {summary.totalBudgeted > 0 ? `-${formatCurrency(summary.totalBudgeted)}` : <span className="text-slate-600">—</span>}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-[10px] text-slate-500 font-medium leading-none">Orçado Mês</p>
-              <p className="text-xs sm:text-sm font-bold text-indigo-300 tabular-nums leading-tight mt-0.5">
-                {summary.totalBudgeted > 0 ? `-${formatCurrency(summary.totalBudgeted)}` : <span className="text-slate-600">—</span>}
-              </p>
-            </div>
-          </div>
 
-          {/* Gastos Realizados */}
-          <div className="flex items-center gap-2 flex-shrink-0" title="Total de despesas efetivamente realizadas no mês">
-            <div className="w-7 h-7 rounded-lg bg-amber-950/60 border border-amber-800/50 flex items-center justify-center text-amber-400 flex-shrink-0">
-              <Receipt className="w-3.5 h-3.5" />
-            </div>
-            <div>
-              <p className="text-[10px] text-slate-500 font-medium leading-none">Gastos Reais</p>
-              <p className="text-xs sm:text-sm font-bold text-amber-400/90 tabular-nums leading-tight mt-0.5">
-                {totalSpent > 0 ? formatCurrency(totalSpent) : <span className="text-slate-600">—</span>}
-              </p>
+            {/* Gastos Realizados */}
+            <div
+              className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
+              title="Total de despesas efetivamente realizadas no mês"
+            >
+              <div className="w-8 h-8 rounded-lg bg-amber-950/70 border border-amber-800/60 flex items-center justify-center text-amber-400 flex-shrink-0">
+                <Receipt className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] text-slate-500 font-medium truncate">Gastos Reais</p>
+                <p className="text-xs sm:text-sm font-bold text-amber-400/90 tabular-nums truncate">
+                  {totalSpent > 0 ? formatCurrency(totalSpent) : <span className="text-slate-600">—</span>}
+                </p>
+              </div>
             </div>
           </div>
         </div>
