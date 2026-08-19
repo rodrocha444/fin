@@ -198,7 +198,7 @@ export default function DebtItemForm({
               <div className="flex items-center justify-between mb-1.5">
                 <label className="label !mb-0 flex items-center gap-1.5">
                   <Layers className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Parcelamento</span>
+                  <span>Parcelas (1 = à vista)</span>
                 </label>
                 {installmentCount > 1 && currentAmount > 0 && (
                   <span className="text-xs text-indigo-400 font-semibold tabular-nums">
@@ -206,19 +206,16 @@ export default function DebtItemForm({
                   </span>
                 )}
               </div>
-              <select
+              <input
+                type="number"
+                step="1"
+                min="1"
+                max="120"
                 value={installmentCount}
-                onChange={e => setInstallmentCount(Number(e.target.value))}
-                style={{ colorScheme: 'dark' }}
+                onChange={e => setInstallmentCount(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
                 className="input-base"
-              >
-                <option value={1} className="bg-slate-900 text-slate-100">À vista / Parcela única (1x)</option>
-                {Array.from({ length: 35 }, (_, i) => i + 2).map(n => (
-                  <option key={n} value={n} className="bg-slate-900 text-slate-100">
-                    {n}x parcelas mensais
-                  </option>
-                ))}
-              </select>
+                placeholder="1 (à vista) ou quantidade de parcelas"
+              />
             </div>
           )}
 

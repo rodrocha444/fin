@@ -10,6 +10,7 @@ import { useCategoriesWithGroups } from '@/hooks/useBudget'
 import { createTransaction, createInstallmentPurchase, createTransfer, updateTransaction } from '@/db/repositories/transactions'
 import { getOrCreatePayee } from '@/db/repositories/payees'
 import PriceInput from '@/components/atoms/PriceInput'
+import { formatCurrency } from '@/utils/format'
 import type { Transaction } from '@/types'
 
 type TxMode = 'expense' | 'income' | 'transfer'
@@ -23,7 +24,7 @@ const schema = z.object({
   categoryId: z.string().optional(),
   notes: z.string().optional(),
   transferAccountId: z.string().optional(),
-  installmentCount: z.coerce.number().min(2).max(72).optional(),
+  installmentCount: z.coerce.number().int('Quantidade de parcelas deve ser um número inteiro').min(2, 'Mínimo de 2 parcelas').max(120, 'Máximo de 120 parcelas').optional(),
 })
 
 type FormData = z.infer<typeof schema>
@@ -118,6 +119,8 @@ export default function TransactionForm({
   })
 
   const selectedDate = watch('date')
+  const watchAmount = watch('amount')
+  const watchInstallmentCount = watch('installmentCount')
 
   const groupedCategories = groups?.map(g => ({
     group: g,
@@ -379,23 +382,26 @@ export default function TransactionForm({
           {/* Parcelas */}
           {isInstallment && (
             <div>
-              <label className="label">Quantidade de parcelas</label>
-              <Controller
-                name="installmentCount"
-                control={control}
-                render={({ field }) => (
-                  <select
-                    value={field.value ?? 2}
-                    onChange={e => field.onChange(Number(e.target.value))}
-                    onBlur={field.onBlur}
-                    className="input-base"
-                  >
-                    {Array.from({ length: 71 }, (_, i) => i + 2).map(n => (
-                      <option key={n} value={n}>{n}x vezes</option>
-                    ))}
-                  </select>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="label !mb-0">Quantidade de parcelas</label>
+                {watchAmount > 0 && watchInstallmentCount && watchInstallmentCount >= 2 && (
+                  <span className="text-xs text-violet-400 font-semibold tabular-nums">
+                    {watchInstallmentCount}x de {formatCurrency(watchAmount / watchInstallmentCount)}
+                  </span>
                 )}
+              </div>
+              <input
+                {...register('installmentCount')}
+                type="number"
+                step="1"
+                min="2"
+                max="120"
+                placeholder="Ex: 2, 3, 6, 12…"
+                className="input-base"
               />
+              {errors.installmentCount && (
+                <p className="text-rose-400 text-xs mt-1">{errors.installmentCount.message}</p>
+              )}
             </div>
           )}
 
