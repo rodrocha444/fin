@@ -5,6 +5,7 @@ import { useMonthSummary } from '@/hooks/useTransactions'
 import { useAllBalances, useAccounts } from '@/hooks/useAccounts'
 import { formatCurrency, currentMonth } from '@/utils/format'
 import NetWorthChartCard from '@/components/organisms/NetWorthChartCard'
+import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
 
 function ProgressBar({ value, max, overBudget }: { value: number; max: number; overBudget: boolean }) {
   const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0
@@ -38,6 +39,9 @@ export default function ReportsPage() {
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
       >
         <h1 className="text-lg sm:text-xl font-semibold text-slate-100">Relatórios</h1>
+        <div className="lg:hidden">
+          <SyncStatusBadge compact={true} />
+        </div>
       </div>
 
       <div className="p-3 sm:p-6 space-y-4">

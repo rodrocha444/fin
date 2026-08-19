@@ -7,6 +7,7 @@ import { useCategoriesWithGroups } from '@/hooks/useBudget'
 import { deleteScheduled, processScheduledTransactions } from '@/db/repositories/scheduled'
 import { formatCurrency, formatDate, frequencyLabel } from '@/utils/format'
 import ScheduledForm from '@/components/organisms/ScheduledForm'
+import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
 import type { ScheduledTransaction } from '@/types'
 
 export default function ScheduledPage() {
@@ -48,6 +49,9 @@ export default function ScheduledPage() {
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5 hidden sm:block">Transações recorrentes e programadas</p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="lg:hidden">
+            <SyncStatusBadge compact={true} />
+          </div>
           <button
             onClick={handleProcessNow}
             disabled={processing}

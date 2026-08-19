@@ -118,6 +118,58 @@ export function getProjectedScheduledUpToMonth(
   return projected
 }
 
+/**
+ * Retorna todas as ocorrências projetadas de agendamentos para uma conta específica
+ * (como pagadora ou recebedora em transferências), para os próximos meses.
+ */
+export function getProjectedScheduledForAccount(
+  accountId: string,
+  scheduledList: ScheduledTransaction[],
+  monthsAhead: number = 6,
+  afterDateExclusive: Date = new Date()
+): ProjectedScheduledOccurrence[] {
+  const projected: ProjectedScheduledOccurrence[] = []
+  const todayThreshold = new Date(afterDateExclusive)
+  const maxLimit = addMonths(new Date(), monthsAhead)
+
+  for (const s of scheduledList) {
+    if (s.isActive === false || !s.id) continue
+    if (s.accountId !== accountId && s.transferAccountId !== accountId) continue
+
+    let current = new Date(s.nextDate)
+    const end = s.endDate ? new Date(s.endDate) : null
+
+    while (true) {
+      if (current > maxLimit) break
+      if (end && current > end) break
+
+      if (current > todayThreshold) {
+        projected.push({
+          scheduledId: s.id,
+          accountId: s.accountId,
+          transferAccountId: s.transferAccountId,
+          type: s.type,
+          amount: s.amount,
+          categoryId: s.categoryId,
+          payee: s.payee || (s.type === 'transfer' ? 'Transferência agendada' : 'Transação agendada'),
+          notes: s.notes,
+          date: new Date(current),
+          isScheduledProjection: true,
+        })
+      }
+
+      if (s.frequency === 'once') break
+      else if (s.frequency === 'weekly') current = addWeeks(current, 1)
+      else if (s.frequency === 'biweekly') current = addWeeks(current, 2)
+      else if (s.frequency === 'monthly') current = addMonths(current, 1)
+      else if (s.frequency === 'yearly') current = addYears(current, 1)
+      else current = addMonths(current, 1)
+    }
+  }
+
+  return projected
+}
+
 // ── Lógica de avanço de data ─────────────────────────────────
 
 function advanceNextDate(current: Date, frequency: ScheduledTransaction['frequency']): Date {
@@ -128,6 +180,55 @@ function advanceNextDate(current: Date, frequency: ScheduledTransaction['frequen
     case 'monthly': return addMonths(current, 1)
     case 'yearly':  return addYears(current, 1)
     default:        return addMonths(current, 1)
+  }
+}
+
+/**
+ * Efetiva/confirma uma ocorrência de agendamento, transformando-a em transação real
+ * e avançando a próxima data do agendamento (ou desativando se for disparo único).
+ */
+export async function confirmScheduledOccurrence(
+  scheduledId: string,
+  occurrenceDate?: Date
+): Promise<void> {
+  const scheduled = await db.scheduledTransactions.get(scheduledId)
+  if (!scheduled) return
+
+  const txDate = occurrenceDate || new Date(scheduled.nextDate)
+
+  // 1. Criar a transação real
+  if (scheduled.type === 'transfer' && scheduled.transferAccountId) {
+    await createTransfer({
+      fromAccountId: scheduled.accountId,
+      toAccountId: scheduled.transferAccountId,
+      amount: scheduled.amount,
+      date: txDate,
+      notes: scheduled.notes,
+      payee: scheduled.payee,
+    })
+  } else {
+    await createTransaction({
+      accountId: scheduled.accountId,
+      date: txDate,
+      amount: scheduled.amount,
+      payee: scheduled.payee,
+      categoryId: scheduled.categoryId,
+      notes: scheduled.notes,
+      cleared: true,
+      type: scheduled.type,
+    })
+  }
+
+  // 2. Atualizar ou avançar o agendamento
+  if (scheduled.frequency === 'once') {
+    await db.scheduledTransactions.update(scheduledId, { isActive: false })
+  } else {
+    const nextDate = advanceNextDate(new Date(scheduled.nextDate), scheduled.frequency)
+    if (scheduled.endDate && isAfter(nextDate, new Date(scheduled.endDate))) {
+      await db.scheduledTransactions.update(scheduledId, { isActive: false, nextDate })
+    } else {
+      await db.scheduledTransactions.update(scheduledId, { nextDate })
+    }
   }
 }
 

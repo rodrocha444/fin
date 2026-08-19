@@ -22,6 +22,7 @@ import { format } from 'date-fns'
 import { useAccount, useAccountBalance } from '@/hooks/useAccounts'
 import {
   useAccountTransactions,
+  useAccountTransactionsWithScheduled,
   useCreditCardPurchases,
   type CreditCardPurchase,
 } from '@/hooks/useTransactions'
@@ -29,6 +30,7 @@ import { usePaidInvoices, useClosedUnpaidInvoices } from '@/hooks/useInvoices'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
 import { deleteTransaction, deleteInstallmentGroup } from '@/db/repositories/transactions'
 import { deleteAccount } from '@/db/repositories/accounts'
+import { deleteScheduled, confirmScheduledOccurrence } from '@/db/repositories/scheduled'
 import { formatCurrency, formatDate, formatMonthLabel, currentMonth, accountTypeLabel } from '@/utils/format'
 import {
   getCurrentOpenInvoiceMonth,
@@ -62,7 +64,11 @@ export default function AccountDetailPage() {
   const balance = useAccountBalance(accountId) ?? 0
   const isCreditCard = account?.type === 'credit_card'
 
-  const transactions = useAccountTransactions(accountId)
+  const accountTransactionsData = useAccountTransactionsWithScheduled(accountId)
+  const transactions = accountTransactionsData?.transactions
+  const futureOffset = accountTransactionsData?.futureOffset ?? 0
+  const futureBalance = balance + futureOffset
+
   const ccPurchases = useCreditCardPurchases(accountId)
   const { categories } = useCategoriesWithGroups() ?? {}
   const categoryMap = new Map(categories?.map(c => [c.id!, c]) ?? [])
@@ -147,9 +153,23 @@ export default function AccountDetailPage() {
   })
 
   const handleDeleteTx = async (tx: Transaction) => {
+    if (tx.isScheduledProjection && tx.scheduledId) {
+      if (!confirm(`Remover o agendamento de "${tx.payee}"?`)) return
+      await deleteScheduled(tx.scheduledId)
+      return
+    }
     if (!tx.id) return
     if (!confirm(tx.installmentGroupId ? 'Excluir esta parcela?' : 'Excluir esta transação?')) return
     await deleteTransaction(tx.id)
+  }
+
+  const handleConfirmScheduled = async (tx: Transaction) => {
+    if (!tx.scheduledId) return
+    try {
+      await confirmScheduledOccurrence(tx.scheduledId, tx.date)
+    } catch (err: any) {
+      alert(err.message || 'Erro ao efetivar agendamento.')
+    }
   }
 
   const handleDeletePurchase = async (p: CreditCardPurchase) => {
@@ -274,6 +294,15 @@ export default function AccountDetailPage() {
                 <p className={`text-xl sm:text-2xl font-bold tabular-nums ${isNeg ? 'text-rose-400' : 'text-slate-100'}`}>
                   {formatCurrency(balance)}
                 </p>
+
+                {/* Saldo Futuro projetado com agendamentos */}
+                <div className="mt-0.5 flex items-center justify-start sm:justify-end gap-1.5 text-xs text-slate-400">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider">Saldo Futuro:</span>
+                  <span className={`font-semibold tabular-nums ${futureBalance < 0 ? 'text-rose-400' : 'text-slate-200'}`}>
+                    {formatCurrency(futureBalance)}
+                  </span>
+                </div>
+
                 {account.type === 'credit_card' && account.creditLimit && (
                   <p className="text-xs text-slate-400 mt-0.5">
                     Disponível: <span className="font-medium text-emerald-400">{formatCurrency(account.creditLimit + balance)}</span>
@@ -558,6 +587,7 @@ export default function AccountDetailPage() {
                     categoryName={tx.categoryId ? categoryMap.get(tx.categoryId)?.name : undefined}
                     onEdit={() => setEditingTx(tx)}
                     onDelete={() => handleDeleteTx(tx)}
+                    onConfirmScheduled={tx.isScheduledProjection ? () => handleConfirmScheduled(tx) : undefined}
                   />
                 ))
               )

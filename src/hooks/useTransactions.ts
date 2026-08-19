@@ -6,7 +6,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/db/schema'
 import { getTransactionsByAccount, getTransactionsByMonth, getMonthSummary, getTransactionsByCategoryAndMonth } from '@/db/repositories/transactions'
-import { getProjectedScheduledForMonth } from '@/db/repositories/scheduled'
+import { getProjectedScheduledForMonth, getProjectedScheduledForAccount } from '@/db/repositories/scheduled'
 import { format, addMonths } from 'date-fns'
 import { getInvoiceCycle, getInvoiceData } from '@/utils/invoices'
 import type { Transaction } from '@/types'
@@ -17,6 +17,61 @@ export function useAccountTransactions(accountId: string | undefined) {
     async () => {
       if (accountId === undefined) return []
       return getTransactionsByAccount(accountId)
+    },
+    [accountId]
+  )
+}
+
+/** Transações de uma conta incluindo agendamentos futuros projetados e saldo futuro */
+export function useAccountTransactionsWithScheduled(accountId: string | undefined) {
+  return useLiveQuery(
+    async () => {
+      if (accountId === undefined) return { transactions: [] as Transaction[], futureOffset: 0 }
+
+      const [txs, scheduled] = await Promise.all([
+        getTransactionsByAccount(accountId),
+        db.scheduledTransactions.filter(s => s.isActive !== false).toArray(),
+      ])
+
+      const projected = getProjectedScheduledForAccount(accountId, scheduled, 6)
+      const projectedTxs: Transaction[] = projected.map(p => ({
+        id: `proj_${p.scheduledId}_${p.date.getTime()}`,
+        accountId: p.accountId,
+        transferAccountId: p.transferAccountId,
+        date: p.date,
+        amount: p.amount,
+        payee: p.payee,
+        categoryId: p.categoryId,
+        notes: p.notes,
+        cleared: false,
+        type: p.type,
+        isScheduledProjection: true,
+        scheduledId: p.scheduledId,
+        createdAt: p.date,
+      }))
+
+      let futureOffset = 0
+      for (const p of projected) {
+        if (p.accountId === accountId) {
+          if (p.type === 'income') futureOffset += p.amount
+          else if (p.type === 'expense' || p.type === 'transfer') futureOffset -= p.amount
+        }
+        if (p.transferAccountId === accountId && p.type === 'transfer') {
+          futureOffset += p.amount
+        }
+      }
+
+      const combined = [...txs, ...projectedTxs]
+      combined.sort((a, b) => {
+        const timeB = new Date(b.date).getTime()
+        const timeA = new Date(a.date).getTime()
+        if (timeB !== timeA) return timeB - timeA
+        const createB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
+        const createA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
+        return createB - createA
+      })
+
+      return { transactions: combined, futureOffset }
     },
     [accountId]
   )
