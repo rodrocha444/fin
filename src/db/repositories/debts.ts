@@ -76,17 +76,6 @@ export async function deleteDebtAccount(id: string): Promise<void> {
   })
 }
 
-export async function getDebtAccount(id: string): Promise<DebtAccount | undefined> {
-  return db.debtAccounts.get(id)
-}
-
-export async function getAllDebtAccounts(): Promise<DebtAccount[]> {
-  return db.debtAccounts
-    .orderBy('name')
-    .filter(a => a.isActive !== false)
-    .toArray()
-}
-
 // ── Itens de Pendência / Dívidas ─────────────────────────────
 
 export async function createDebtItem(
@@ -187,35 +176,6 @@ export async function getDebtItemsByAccount(debtAccountId: string): Promise<Debt
     if (a.status !== 'pending' && b.status === 'pending') return 1
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   })
-}
-
-export async function calculateDebtAccountBalance(debtAccountId: string): Promise<{
-  receivable: number
-  payable: number
-  balance: number
-  pendingCount: number
-  totalCount: number
-}> {
-  const items = await db.debtItems.where('debtAccountId').equals(debtAccountId).toArray()
-  let receivable = 0
-  let payable = 0
-  let pendingCount = 0
-
-  for (const item of items) {
-    if (item.status === 'pending') {
-      pendingCount++
-      if (item.type === 'receivable') receivable += item.amount
-      else if (item.type === 'payable') payable += item.amount
-    }
-  }
-
-  return {
-    receivable,
-    payable,
-    balance: receivable - payable,
-    pendingCount,
-    totalCount: items.length,
-  }
 }
 
 export async function getDebtSummary(): Promise<DebtSummary> {

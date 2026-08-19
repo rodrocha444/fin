@@ -372,31 +372,6 @@ export async function createTransfer(input: CreateTransferInput): Promise<void> 
 
 // ── Consultas especiais ──────────────────────────────────────
 
-export async function getInstallmentsByGroup(groupId: string): Promise<Transaction[]> {
-  return db.transactions
-    .where('installmentGroupId')
-    .equals(groupId)
-    .sortBy('date')
-}
-
-export async function clearTransaction(id: string): Promise<void> {
-  await db.transactions.update(id, { cleared: true })
-}
-
-export async function getTransactionsByAccountAndMonth(
-  accountId: string,
-  month: string
-): Promise<Transaction[]> {
-  const [year, mon] = month.split('-').map(Number)
-  const start = startOfMonth(new Date(year, mon - 1))
-  const end = endOfMonth(new Date(year, mon - 1))
-
-  return db.transactions
-    .where('[accountId+date]')
-    .between([accountId, start], [accountId, end], true, true)
-    .toArray()
-}
-
 export async function getTransactionsByCategoryAndMonth(
   categoryId: string,
   month: string

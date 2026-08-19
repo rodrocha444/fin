@@ -21,7 +21,7 @@ export interface DatabaseBackup {
 }
 
 /** Exporta todos os dados de todas as tabelas do banco de forma agnóstica ao schema */
-export async function exportDatabase(): Promise<DatabaseBackup> {
+async function exportDatabase(): Promise<DatabaseBackup> {
   const data: Record<string, any[]> = {}
   let totalRecords = 0
 

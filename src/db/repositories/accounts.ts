@@ -29,7 +29,7 @@ export async function createAccount(data: Omit<Account, 'id' | 'createdAt'>): Pr
   return id
 }
 
-export async function getAccountTransactionCount(accountId: string): Promise<number> {
+async function getAccountTransactionCount(accountId: string): Promise<number> {
   const countDirect = await db.transactions.where('accountId').equals(accountId).count()
   const countTransfer = await db.transactions.where('transferAccountId').equals(accountId).count()
   return countDirect + countTransfer
@@ -73,14 +73,6 @@ export async function deleteAccount(id: string): Promise<void> {
   await db.accounts.delete(id)
 }
 
-export async function getAccount(id: string): Promise<Account | undefined> {
-  return db.accounts.get(id)
-}
-
-export async function getAllAccounts(): Promise<Account[]> {
-  return db.accounts.orderBy('name').filter(a => a.isActive !== false).toArray()
-}
-
 // ── Cálculo de Saldo ─────────────────────────────────────────
 
 export async function calculateAccountBalance(accountId: string): Promise<number> {
@@ -119,31 +111,4 @@ export async function calculateAccountBalance(accountId: string): Promise<number
   }
 
   return balance
-}
-
-// Retorna saldo de todas as contas ativas
-export async function getAllAccountBalances(): Promise<Map<string, number>> {
-  const accounts = await db.accounts.filter(a => a.isActive !== false).toArray()
-  const map = new Map<string, number>()
-  await Promise.all(
-    accounts.map(async (acc) => {
-      if (acc.id !== undefined) {
-        map.set(acc.id, await calculateAccountBalance(acc.id))
-      }
-    })
-  )
-  return map
-}
-
-// Saldo total excluindo cartões de crédito (patrimônio líquido em conta)
-export async function getNetWorth(): Promise<number> {
-  const accounts = await db.accounts.filter(a => a.isActive !== false).toArray()
-  let total = 0
-  for (const acc of accounts) {
-    if (acc.id !== undefined) {
-      const bal = await calculateAccountBalance(acc.id)
-      total += bal
-    }
-  }
-  return total
 }

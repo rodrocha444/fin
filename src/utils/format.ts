@@ -17,19 +17,6 @@ export function formatCurrency(value: number): string {
   return BRL.format(value)
 }
 
-/** Formata número como +R$100 ou -R$100 com sinal explícito */
-export function formatCurrencySigned(value: number): string {
-  const formatted = BRL.format(Math.abs(value))
-  return value >= 0 ? `+${formatted}` : `-${formatted}`
-}
-
-/** Parse de string de valor BRL para número (remove R$, pontos, converte vírgula) */
-export function parseCurrencyInput(raw: string): number {
-  const cleaned = raw.replace(/[R$\s.]/g, '').replace(',', '.')
-  const num = parseFloat(cleaned)
-  return isNaN(num) ? 0 : num
-}
-
 /** Formata Date como dd/MM/yyyy */
 export function formatDate(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date
@@ -61,13 +48,6 @@ export function shiftMonth(month: string, delta: number): string {
   const [year, mon] = month.split('-').map(Number)
   const d = new Date(year, mon - 1 + delta)
   return format(d, 'yyyy-MM')
-}
-
-/** Retorna cor CSS baseada em sinal (positive = verde, negative = vermelho) */
-export function amountColor(value: number): string {
-  if (value > 0) return 'text-emerald-400'
-  if (value < 0) return 'text-rose-400'
-  return 'text-slate-400'
 }
 
 /** Frequência agendamento → label legível */

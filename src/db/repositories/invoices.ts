@@ -31,14 +31,3 @@ export async function setInvoicePaidStatus(
   const updatedMap = { ...currentMap, [key]: isPaid }
   await db.syncMeta.put({ key: PAID_INVOICES_KEY, value: updatedMap })
 }
-
-/**
- * Verifica se uma fatura específica está marcada como paga
- */
-export function isInvoicePaidInMap(
-  paidInvoicesMap: Record<string, boolean>,
-  accountId: string,
-  monthKey: string
-): boolean {
-  return Boolean(paidInvoicesMap[`${accountId}_${monthKey}`])
-}

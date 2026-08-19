@@ -9,10 +9,10 @@ import { getActivityByCategory } from './transactions'
 import { toMonthKey } from './budget'
 import type { PendingIssue } from '@/types'
 
-export type IssueRuleFn = () => Promise<PendingIssue | null>
+type IssueRuleFn = () => Promise<PendingIssue | null>
 
 /** Regra 1: Transações sem categoria definida (despesas ou receitas) */
-export async function checkUncategorizedTransactions(): Promise<PendingIssue | null> {
+async function checkUncategorizedTransactions(): Promise<PendingIssue | null> {
   const txs = await db.transactions
     .filter(t => t.type !== 'transfer' && !t.categoryId)
     .reverse()
@@ -39,7 +39,7 @@ export async function checkUncategorizedTransactions(): Promise<PendingIssue | n
 }
 
 /** Regra 2: Categorias com gastos excedendo o valor orçado no mês atual */
-export async function checkOverspentCategories(): Promise<PendingIssue | null> {
+async function checkOverspentCategories(): Promise<PendingIssue | null> {
   const currentMonth = toMonthKey(new Date())
   const [activityMap, budgetRecords, categories] = await Promise.all([
     getActivityByCategory(currentMonth),
@@ -80,7 +80,7 @@ export async function checkOverspentCategories(): Promise<PendingIssue | null> {
 }
 
 /** Regra 3: Transações agendadas vencidas aguardando processamento */
-export async function checkOverdueScheduledTransactions(): Promise<PendingIssue | null> {
+async function checkOverdueScheduledTransactions(): Promise<PendingIssue | null> {
   const today = new Date()
   today.setHours(23, 59, 59, 999)
 
@@ -109,7 +109,7 @@ export async function checkOverdueScheduledTransactions(): Promise<PendingIssue 
 }
 
 /** Registro central de regras ativas (modular e extensível) */
-export const ISSUE_RULES: IssueRuleFn[] = [
+const ISSUE_RULES: IssueRuleFn[] = [
   checkUncategorizedTransactions,
   checkOverspentCategories,
   checkOverdueScheduledTransactions,

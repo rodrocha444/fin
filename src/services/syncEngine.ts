@@ -371,7 +371,7 @@ const SYNC_TABLES: TableSyncDef[] = [
 
 // ─── Registro de Deleção Local para Propagação ──────────────
 
-export async function recordLocalDeletion(tableName: string, recordId: string): Promise<void> {
+async function recordLocalDeletion(tableName: string, recordId: string): Promise<void> {
   try {
     await db.syncDeletedRecords.add({
       tableName,

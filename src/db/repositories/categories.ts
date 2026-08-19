@@ -55,15 +55,6 @@ export async function toggleGroupVisibility(id: string): Promise<void> {
   if (group) await db.categoryGroups.update(id, { isHidden: !group.isHidden })
 }
 
-export async function getAllGroups(): Promise<CategoryGroup[]> {
-  return db.categoryGroups.orderBy('sortOrder').toArray()
-}
-
-export async function getGroupsByType(type: 'expense' | 'income' = 'expense'): Promise<CategoryGroup[]> {
-  const groups = await db.categoryGroups.orderBy('sortOrder').toArray()
-  return groups.filter(g => (type === 'income' ? g.type === 'income' : g.type !== 'income'))
-}
-
 /** Limpa grupos e categorias default de renda */
 export async function clearDefaultIncomeCategories(): Promise<void> {
   const defaultIncomeGroup = await db.categoryGroups
@@ -145,25 +136,4 @@ export async function deleteCategory(id: string): Promise<void> {
 export async function toggleCategoryVisibility(id: string): Promise<void> {
   const cat = await db.categories.get(id)
   if (cat) await db.categories.update(id, { isHidden: !cat.isHidden })
-}
-
-export async function getCategoriesByGroup(groupId: string): Promise<Category[]> {
-  return db.categories.where('groupId').equals(groupId).sortBy('sortOrder')
-}
-
-export async function getAllCategories(): Promise<Category[]> {
-  return db.categories.orderBy('sortOrder').toArray()
-}
-
-export async function getCategoryById(id: string): Promise<Category | undefined> {
-  return db.categories.get(id)
-}
-
-// Reordenar categorias dentro de um grupo
-export async function reorderCategories(categoryIds: string[]): Promise<void> {
-  await db.transaction('rw', db.categories, async () => {
-    for (let i = 0; i < categoryIds.length; i++) {
-      await db.categories.update(categoryIds[i], { sortOrder: i })
-    }
-  })
 }

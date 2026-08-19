@@ -29,14 +29,13 @@ Componentes complexos, modais de historico, graficos e formularios com regras de
 - AccountForm.tsx: Formulario e bottom-sheet de criacao e edicao de contas e cartao.
 - TransactionForm.tsx: Formulario de despesas, receitas, transferencias e compras parceladas.
 - ScheduledForm.tsx: Formulario de transacoes agendadas e recorrentes.
-- AccountHistoryModal.tsx: Modal de historico e extrato filtravel por conta.
+- InvoicePrintModal.tsx / DebtPrintModal.tsx: Modais de visualizacao e impressao PDF de faturas e acertos.
 - NetWorthChartCard.tsx: Card de evolucao historica de patrimonio liquido com SVG responsivo.
 Regra: Formularios devem aceitar props opcionais (defaultValues, mode, callbacks) para suportar multiplos fluxos sem duplicacao de modal.
 
 ### Templates (src/components/templates/)
 Esqueletos de layout e cascas estruturais.
 - Layout.tsx: Layout principal com sidebar no desktop, bottom nav no mobile e safe areas.
-- PageHeader.tsx: Cabecalho padrao de paginas com recuo seguro (safe-area-inset-top).
 
 ### Paginas (src/components/pages/)
 Views completas mapeadas para rotas da aplicacao.

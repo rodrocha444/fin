@@ -339,12 +339,3 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
     toBeBudgeted,
   }
 }
-
-/** Retorna o budgeted atual de uma categoria em um mês */
-export async function getCategoryBudget(month: string, categoryId: string): Promise<number> {
-  const rec = await db.budgetMonths
-    .where('[month+categoryId]')
-    .equals([month, categoryId])
-    .first()
-  return rec?.budgeted ?? 0
-}

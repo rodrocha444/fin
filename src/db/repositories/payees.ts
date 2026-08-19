@@ -5,11 +5,6 @@
 
 import { db } from '../schema'
 import { createId } from '@/utils/id'
-import type { Payee } from '@/types'
-
-export async function getAllPayees(): Promise<Payee[]> {
-  return db.payees.orderBy('name').toArray()
-}
 
 export async function getOrCreatePayee(name: string, defaultCategoryId?: string): Promise<string> {
   const trimmed = name.trim()
@@ -19,12 +14,4 @@ export async function getOrCreatePayee(name: string, defaultCategoryId?: string)
   const id = createId()
   await db.payees.add({ id, name: trimmed, defaultCategoryId })
   return id
-}
-
-export async function updatePayee(id: string, data: Partial<Omit<Payee, 'id'>>): Promise<void> {
-  await db.payees.update(id, data)
-}
-
-export async function deletePayee(id: string): Promise<void> {
-  await db.payees.delete(id)
 }

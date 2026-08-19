@@ -80,7 +80,7 @@ export function getSupabaseClient(): SupabaseClient | null {
 }
 
 /** Reseta a instância cached */
-export function resetSupabaseClient(): void {
+function resetSupabaseClient(): void {
   cachedClient = null
 }
 

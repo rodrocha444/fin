@@ -70,21 +70,6 @@ export function useMonthSummary(month: string) {
   return useLiveQuery(() => getMonthSummary(month), [month])
 }
 
-/** Parcelamentos de um grupo */
-export function useInstallmentGroup(groupId: string | undefined) {
-  return useLiveQuery(
-    async () => {
-      if (groupId === undefined) return undefined
-      const [group, transactions] = await Promise.all([
-        db.installmentGroups.get(groupId),
-        db.transactions.where('installmentGroupId').equals(groupId).sortBy('date'),
-      ])
-      return { group, transactions }
-    },
-    [groupId]
-  )
-}
-
 export interface CreditCardPurchase {
   id: string
   groupId?: string

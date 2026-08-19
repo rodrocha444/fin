@@ -54,23 +54,6 @@ export async function deleteScheduled(id: string): Promise<void> {
   await db.scheduledTransactions.delete(id)
 }
 
-export async function getAllScheduled(): Promise<ScheduledTransaction[]> {
-  return db.scheduledTransactions
-    .orderBy('nextDate')
-    .filter(s => s.isActive !== false)
-    .toArray()
-}
-
-export async function getUpcomingScheduled(daysAhead = 30): Promise<ScheduledTransaction[]> {
-  const today = startOfDay(new Date())
-  const future = addDays(today, daysAhead)
-  return db.scheduledTransactions
-    .where('nextDate')
-    .between(today, future, true, true)
-    .filter(s => s.isActive !== false)
-    .toArray()
-}
-
 /**
  * Retorna todas as ocorrências projetadas de agendamentos para um mês específico
  * que ainda não se tornaram transações no banco (data > hoje).
