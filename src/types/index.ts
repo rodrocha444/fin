@@ -3,7 +3,7 @@
 // Tipos globais compartilhados por toda a aplicação
 // ─────────────────────────────────────────────────────────────
 
-export type AccountType = 'checking' | 'credit_card'
+export type AccountType = 'checking' | 'credit_card' | 'off_budget'
 
 export interface Account {
   id?: string

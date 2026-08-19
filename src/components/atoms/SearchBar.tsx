@@ -22,7 +22,7 @@ export default function SearchBar({
       <input
         type="text"
         autoFocus={autoFocus}
-        className="input-base pl-9 py-2 text-xs h-9 w-full"
+        className="input-base !pl-10 py-2 text-xs h-9 w-full"
         placeholder={placeholder}
         value={value}
         onChange={e => onChange(e.target.value)}

@@ -5,6 +5,9 @@ import {
   subscribeSyncState,
   executeSync,
   scheduleSync,
+  pauseSync,
+  resumeSync,
+  toggleSyncPause,
   type SyncState,
 } from '@/services/syncEngine'
 
@@ -16,7 +19,7 @@ export function useSync() {
   }, [])
 
   const syncNow = async (forceAll = false) => {
-    return await executeSync({ forceAll })
+    return await executeSync({ forceAll, forceSync: true })
   }
 
   const triggerSync = (delayMs?: number) => {
@@ -27,5 +30,8 @@ export function useSync() {
     ...state,
     syncNow,
     triggerSync,
+    pauseSync,
+    resumeSync,
+    togglePause: toggleSyncPause,
   }
 }

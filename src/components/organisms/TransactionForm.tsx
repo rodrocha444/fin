@@ -473,17 +473,32 @@ export default function TransactionForm({
             <Controller
               name="accountId"
               control={control}
-              render={({ field }) => (
-                <select
-                  value={field.value ?? ''}
-                  onChange={e => field.onChange(e.target.value)}
-                  onBlur={field.onBlur}
-                  className="input-base"
-                >
-                  <option value="">Selecione…</option>
-                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select>
-              )}
+              render={({ field }) => {
+                const onBudgetAccs = accounts.filter(a => a.type !== 'off_budget')
+                const offBudgetAccs = accounts.filter(a => a.type === 'off_budget')
+                return (
+                  <select
+                    value={field.value ?? ''}
+                    onChange={e => field.onChange(e.target.value)}
+                    onBlur={field.onBlur}
+                    className="input-base"
+                  >
+                    <option value="">Selecione…</option>
+                    {offBudgetAccs.length > 0 ? (
+                      <>
+                        <optgroup label="No Orçamento">
+                          {onBudgetAccs.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        </optgroup>
+                        <optgroup label="Fora do Orçamento">
+                          {offBudgetAccs.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        </optgroup>
+                      </>
+                    ) : (
+                      accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)
+                    )}
+                  </select>
+                )
+              }}
             />
             {errors.accountId && <p className="text-rose-400 text-xs mt-1">{errors.accountId.message}</p>}
           </div>
@@ -495,17 +510,32 @@ export default function TransactionForm({
               <Controller
                 name="transferAccountId"
                 control={control}
-                render={({ field }) => (
-                  <select
-                    value={field.value ?? ''}
-                    onChange={e => field.onChange(e.target.value || undefined)}
-                    onBlur={field.onBlur}
-                    className="input-base"
-                  >
-                    <option value="">Selecione…</option>
-                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                  </select>
-                )}
+                render={({ field }) => {
+                  const onBudgetAccs = accounts.filter(a => a.type !== 'off_budget')
+                  const offBudgetAccs = accounts.filter(a => a.type === 'off_budget')
+                  return (
+                    <select
+                      value={field.value ?? ''}
+                      onChange={e => field.onChange(e.target.value || undefined)}
+                      onBlur={field.onBlur}
+                      className="input-base"
+                    >
+                      <option value="">Selecione…</option>
+                      {offBudgetAccs.length > 0 ? (
+                        <>
+                          <optgroup label="No Orçamento">
+                            {onBudgetAccs.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                          </optgroup>
+                          <optgroup label="Fora do Orçamento">
+                            {offBudgetAccs.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                          </optgroup>
+                        </>
+                      ) : (
+                        accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)
+                      )}
+                    </select>
+                  )
+                }}
               />
             </div>
           )}

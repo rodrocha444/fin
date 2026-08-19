@@ -15,6 +15,7 @@ import {
 import { useDebtAccounts, useDebtsSummary } from '@/hooks/useDebts'
 import { formatCurrency } from '@/utils/format'
 import DebtAccountForm from '@/components/organisms/DebtAccountForm'
+import SearchBar from '@/components/atoms/SearchBar'
 
 export default function DebtsPage() {
   const navigate = useNavigate()
@@ -127,15 +128,11 @@ export default function DebtsPage() {
         ) : (
           <>
             {/* Busca */}
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Buscar contato…"
-                className="input-base !pl-9 py-2 text-xs min-h-[38px] h-[38px]"
-              />
-            </div>
+            <SearchBar
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar contato…"
+            />
 
             {/* Lista de Contatos */}
             <div className="space-y-2">

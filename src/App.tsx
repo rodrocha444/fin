@@ -8,7 +8,6 @@ import AccountDetailPage from '@/components/pages/AccountDetailPage'
 import AccountInvoicePage from '@/components/pages/AccountInvoicePage'
 import TransactionsPage from '@/components/pages/TransactionsPage'
 import ScheduledPage from '@/components/pages/ScheduledPage'
-import DebtsPage from '@/components/pages/DebtsPage'
 import DebtAccountPage from '@/components/pages/DebtAccountPage'
 import ReportsPage from '@/components/pages/ReportsPage'
 import SettingsPage from '@/components/pages/SettingsPage'
@@ -33,8 +32,9 @@ export default function App() {
           <Route path="accounts" element={<AccountsPage />} />
           <Route path="accounts/:id" element={<AccountDetailPage />} />
           <Route path="accounts/:id/invoice" element={<AccountInvoicePage />} />
+          <Route path="accounts/debt/:id" element={<DebtAccountPage />} />
           <Route path="transactions" element={<TransactionsPage />} />
-          <Route path="debts" element={<DebtsPage />} />
+          <Route path="debts" element={<Navigate to="/accounts" replace />} />
           <Route path="debts/:id" element={<DebtAccountPage />} />
           <Route path="scheduled" element={<ScheduledPage />} />
           <Route path="reports" element={<ReportsPage />} />

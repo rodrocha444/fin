@@ -16,7 +16,6 @@ const NAV = [
   { to: '/budget', label: 'Orçamento', icon: LayoutGrid },
   { to: '/accounts', label: 'Contas', icon: Wallet },
   { to: '/transactions', label: 'Transações', icon: ArrowLeftRight },
-  { to: '/debts', label: 'Cobranças', icon: HandCoins },
   { to: '/scheduled', label: 'Agenda', icon: CalendarClock },
   { to: '/reports', label: 'Relatórios', icon: BarChart3 },
   { to: '/settings', label: 'Config.', icon: Settings },
@@ -66,10 +65,7 @@ export default function Layout() {
         </main>
 
         {/* ── Bottom Nav mobile (sm/md) ─────────────────── */}
-        <nav
-          className="lg:hidden flex items-center bg-slate-900 border-t border-slate-800 flex-shrink-0 print:hidden"
-          style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-        >
+        <nav className="lg:hidden flex items-center bg-slate-900 border-t border-slate-800 flex-shrink-0 print:hidden">
           {NAV.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}

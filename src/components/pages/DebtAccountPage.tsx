@@ -126,7 +126,7 @@ export default function DebtAccountPage() {
     if (!acc.id) return
     if (!confirm(`Excluir o contato "${acc.name}" e todas as suas pendências associadas?`)) return
     await deleteDebtAccount(acc.id)
-    navigate('/debts')
+    navigate('/accounts')
   }
 
   const handleDeleteItem = async (item: DebtItem) => {
@@ -157,8 +157,8 @@ export default function DebtAccountPage() {
       <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-500 text-sm fade-in">
         <HandCoins className="w-10 h-10 text-slate-700" />
         <p>Contato não encontrado.</p>
-        <button onClick={() => navigate('/debts')} className="btn-secondary py-2 px-4 text-xs">
-          ← Voltar
+        <button onClick={() => navigate('/accounts')} className="btn-secondary py-2 px-4 text-xs">
+          ← Voltar para Contas
         </button>
       </div>
     )
@@ -176,9 +176,9 @@ export default function DebtAccountPage() {
       >
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/debts')}
+            onClick={() => navigate('/accounts')}
             className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors flex-shrink-0"
-            title="Voltar à lista de contatos"
+            title="Voltar à lista de contas"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>

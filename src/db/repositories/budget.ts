@@ -235,8 +235,9 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
     db.scheduledTransactions.filter(s => s.isActive !== false).toArray(),
   ])
 
-  const allIncomeTxs = allTransactions.filter(t => t.type === 'income')
-  const allExpenseTxs = allTransactions.filter(t => t.type === 'expense')
+  const accountMap = new Map(allAccounts.map(a => [a.id!, a]))
+  const allIncomeTxs = allTransactions.filter(t => t.type === 'income' && accountMap.get(t.accountId)?.type !== 'off_budget')
+  const allExpenseTxs = allTransactions.filter(t => t.type === 'expense' && accountMap.get(t.accountId)?.type !== 'off_budget')
   const ccAccounts = allAccounts.filter(a => a.type === 'credit_card')
 
   const groupMap = new Map(allGroups.map(g => [g.id!, g]))
@@ -256,9 +257,9 @@ export async function getBudgetSummary(month: string): Promise<BudgetSummary> {
     }
   }
 
-  // Saldo inicial de contas de dinheiro/corrente/poupança (fundos iniciais disponíveis para orçar)
+  // Saldo inicial de contas no orçamento (fundos iniciais disponíveis para orçar)
   const initialFunds = allAccounts
-    .filter(a => a.type !== 'credit_card')
+    .filter(a => a.type === 'checking')
     .reduce((sum, a) => sum + (a.initialBalance || 0), 0)
 
   // 1. Renda passada e renda do mês selecionado

@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowDownLeft,
+  TrendingUp,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useAccount, useAccountBalance } from '@/hooks/useAccounts'
@@ -48,6 +49,7 @@ import type { Transaction } from '@/types'
 
 function accountIcon(type: string) {
   if (type === 'credit_card') return <CreditCard className="w-5 h-5" />
+  if (type === 'off_budget') return <TrendingUp className="w-5 h-5" />
   return <Landmark className="w-5 h-5" />
 }
 

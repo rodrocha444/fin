@@ -95,21 +95,6 @@ export default function TransactionsPage() {
           {/* Mês (Atom) */}
           <MonthNavigator month={month} onChangeMonth={setMonth} />
 
-          {/* Seletor de conta */}
-          <select
-            className="bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-200 px-2 py-1.5 focus:outline-none max-w-[130px] sm:max-w-[180px] truncate"
-            value={selectedAccountId ?? ''}
-            onChange={e => {
-              if (e.target.value) setSearchParams({ account: e.target.value })
-              else setSearchParams({})
-            }}
-          >
-            <option value="">Todas as contas</option>
-            {accounts?.map(acc => (
-              <option key={acc.id} value={acc.id}>{acc.name}</option>
-            ))}
-          </select>
-
           <div className="flex-1" />
 
           {/* Status de sync no mobile */}
@@ -135,9 +120,26 @@ export default function TransactionsPage() {
           </button>
         </div>
 
+        {/* Seletor de conta */}
+        <div className="px-3 sm:px-6 pt-2.5">
+          <select
+            className="w-full sm:w-auto min-w-[200px] bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-200 px-3 py-2 focus:outline-none focus:border-indigo-500 transition-colors"
+            value={selectedAccountId ?? ''}
+            onChange={e => {
+              if (e.target.value) setSearchParams({ account: e.target.value })
+              else setSearchParams({})
+            }}
+          >
+            <option value="">Todas as contas</option>
+            {accounts?.map(acc => (
+              <option key={acc.id} value={acc.id}>{acc.name}</option>
+            ))}
+          </select>
+        </div>
+
         {/* Campo de busca expansível */}
         {showSearch && (
-          <div className="px-3 sm:px-6 pb-3 pt-2">
+          <div className="px-3 sm:px-6 pt-2.5">
             <SearchBar
               autoFocus
               value={search}
@@ -148,7 +150,7 @@ export default function TransactionsPage() {
         )}
 
         {/* Totais rápidos */}
-        <div className="flex gap-4 px-3 sm:px-6 pb-2 text-xs">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 px-3 sm:px-6 pt-2.5 text-xs">
           <span className="text-slate-500">
             Renda: <span className="text-emerald-400 font-medium tabular-nums">{formatCurrency(income)}</span>
           </span>

@@ -445,22 +445,24 @@ export async function getMonthSummary(month: string) {
 
 // Agrupa activity por categoryId para um mês (incluindo transações reais e agendamentos futuros)
 export async function getActivityByCategory(month: string): Promise<Map<string, number>> {
-  const [txs, scheduled] = await Promise.all([
+  const [txs, scheduled, accounts] = await Promise.all([
     getTransactionsByMonth(month),
     db.scheduledTransactions.filter(s => s.isActive !== false).toArray(),
+    db.accounts.toArray(),
   ])
 
+  const offBudgetAccountIds = new Set(accounts.filter(a => a.type === 'off_budget').map(a => a.id!))
   const projected = getProjectedScheduledForMonth(scheduled, month)
   const map = new Map<string, number>()
 
   for (const tx of txs) {
-    if (tx.type !== 'expense' || !tx.categoryId) continue
+    if (tx.type !== 'expense' || !tx.categoryId || offBudgetAccountIds.has(tx.accountId)) continue
     const prev = map.get(tx.categoryId) ?? 0
     map.set(tx.categoryId, prev + tx.amount)
   }
 
   for (const p of projected) {
-    if (p.type !== 'expense' || !p.categoryId) continue
+    if (p.type !== 'expense' || !p.categoryId || offBudgetAccountIds.has(p.accountId)) continue
     const prev = map.get(p.categoryId) ?? 0
     map.set(p.categoryId, prev + p.amount)
   }
@@ -470,22 +472,24 @@ export async function getActivityByCategory(month: string): Promise<Map<string, 
 
 // Agrupa income por categoryId para um mês (incluindo receitas reais e agendamentos futuros)
 export async function getIncomeByCategory(month: string): Promise<Map<string, number>> {
-  const [txs, scheduled] = await Promise.all([
+  const [txs, scheduled, accounts] = await Promise.all([
     getTransactionsByMonth(month),
     db.scheduledTransactions.filter(s => s.isActive !== false).toArray(),
+    db.accounts.toArray(),
   ])
 
+  const offBudgetAccountIds = new Set(accounts.filter(a => a.type === 'off_budget').map(a => a.id!))
   const projected = getProjectedScheduledForMonth(scheduled, month)
   const map = new Map<string, number>()
 
   for (const tx of txs) {
-    if (tx.type !== 'income' || !tx.categoryId) continue
+    if (tx.type !== 'income' || !tx.categoryId || offBudgetAccountIds.has(tx.accountId)) continue
     const prev = map.get(tx.categoryId) ?? 0
     map.set(tx.categoryId, prev + tx.amount)
   }
 
   for (const p of projected) {
-    if (p.type !== 'income' || !p.categoryId) continue
+    if (p.type !== 'income' || !p.categoryId || offBudgetAccountIds.has(p.accountId)) continue
     const prev = map.get(p.categoryId) ?? 0
     map.set(p.categoryId, prev + p.amount)
   }

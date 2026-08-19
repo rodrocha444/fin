@@ -2,7 +2,8 @@ import { useState, useRef } from 'react'
 import {
   Plus, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronRight,
   Download, Upload, Database, CheckCircle2, Cloud, RefreshCw,
-  Copy, Check, ExternalLink, KeyRound, Server, AlertCircle
+  Copy, Check, ExternalLink, KeyRound, Server, AlertCircle,
+  Pause, Play, PauseCircle
 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/db/schema'
@@ -26,7 +27,7 @@ export default function SettingsPage() {
   const categories = useLiveQuery(() => db.categories.orderBy('sortOrder').toArray(), [])
 
   // Sincronização Supabase
-  const { status: syncStatus, isSyncing, lastSyncAt, lastError, syncNow } = useSync()
+  const { status: syncStatus, isSyncing, lastSyncAt, lastError, isPaused, syncNow, togglePause, resumeSync } = useSync()
   const [supabaseUrl, setSupabaseUrl] = useState(() => getSupabaseConfig()?.url || '')
   const [supabaseKey, setSupabaseKey] = useState(() => getSupabaseConfig()?.anonKey || '')
   const [testResult, setTestResult] = useState<{ success?: boolean; message: string } | null>(null)
@@ -429,21 +430,57 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <SyncStatusBadge compact={false} showTime={true} />
               {syncStatus !== 'unconfigured' && (
-                <button
-                  onClick={() => syncNow(true)}
-                  disabled={isSyncing}
-                  className="btn-secondary py-1.5 px-2.5 text-xs flex items-center gap-1.5 hover:text-sky-300"
-                  title="Forçar sincronização completa agora"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-sky-400' : ''}`} />
-                  <span>{isSyncing ? 'Sincronizando…' : 'Sincronizar'}</span>
-                </button>
+                <>
+                  <button
+                    onClick={() => togglePause()}
+                    className={`py-1.5 px-2.5 text-xs rounded-xl font-medium border flex items-center gap-1.5 transition-all ${
+                      isPaused
+                        ? 'bg-amber-950/50 text-amber-300 border-amber-700/60 hover:bg-amber-900/40 hover:text-amber-200'
+                        : 'bg-slate-800/80 text-slate-300 border-slate-700/60 hover:bg-slate-800 hover:text-amber-300'
+                    }`}
+                    title={isPaused ? 'Retomar sincronização automática' : 'Pausar sincronização automática'}
+                  >
+                    {isPaused ? <Play className="w-3.5 h-3.5 text-amber-400" /> : <Pause className="w-3.5 h-3.5 text-slate-400" />}
+                    <span>{isPaused ? 'Retomar' : 'Pausar'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => syncNow(true)}
+                    disabled={isSyncing}
+                    className="btn-secondary py-1.5 px-2.5 text-xs flex items-center gap-1.5 hover:text-sky-300"
+                    title="Forçar sincronização completa agora"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-sky-400' : ''}`} />
+                    <span>{isSyncing ? 'Sincronizando…' : 'Sincronizar'}</span>
+                  </button>
+                </>
               )}
             </div>
           </div>
+
+          {/* Banner de Sincronização Pausada */}
+          {isPaused && (
+            <div className="p-3.5 rounded-xl bg-amber-950/30 border border-amber-800/50 text-amber-300 text-xs flex items-start gap-3">
+              <PauseCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-400" />
+              <div className="flex-1 space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-amber-200">Sincronização em Nuvem Pausada</span>
+                  <button
+                    onClick={() => resumeSync()}
+                    className="btn-secondary py-1 px-2 text-[11px] text-amber-200 border-amber-700/50 hover:bg-amber-900/40 font-semibold"
+                  >
+                    Retomar agora
+                  </button>
+                </div>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  O envio e o recebimento de alterações com o Supabase estão suspensos. Suas alterações locais continuam salvas no dispositivo e serão enviadas quando você retomar.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Feedback de Teste / Erro */}
           {testResult && (

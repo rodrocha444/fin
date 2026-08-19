@@ -67,6 +67,7 @@ export function accountTypeLabel(type: string): string {
   const map: Record<string, string> = {
     checking: 'Conta Corrente',
     credit_card: 'Cartão de Crédito',
+    off_budget: 'Dívida / Investimento',
   }
   return map[type] ?? type
 }

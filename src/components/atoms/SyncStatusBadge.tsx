@@ -1,6 +1,6 @@
 // src/components/atoms/SyncStatusBadge.tsx — Indicador visual de sincronização em nuvem
 import { useNavigate } from 'react-router-dom'
-import { Cloud, CloudCheck, CloudOff, RefreshCw, AlertCircle, CloudUpload } from 'lucide-react'
+import { Cloud, CloudCheck, CloudOff, RefreshCw, AlertCircle, CloudUpload, PauseCircle } from 'lucide-react'
 import { useSync } from '@/hooks/useSync'
 
 interface SyncStatusBadgeProps {
@@ -23,7 +23,7 @@ export default function SyncStatusBadge({
     e.stopPropagation()
     if (!interactive) return
 
-    if (status === 'unconfigured') {
+    if (status === 'unconfigured' || status === 'paused') {
       navigate('/settings')
     } else if (!isSyncing) {
       syncNow()
@@ -45,6 +45,18 @@ export default function SyncStatusBadge({
           className={`p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors ${className}`}
         >
           <Cloud className="w-4 h-4 opacity-60" />
+        </button>
+      )
+    }
+
+    if (status === 'paused') {
+      return (
+        <button
+          onClick={handleClick}
+          title="Sincronização pausada. Clique para abrir as Configurações."
+          className={`p-1.5 rounded-lg text-amber-400 bg-amber-950/40 border border-amber-800/40 hover:bg-amber-900/40 transition-colors ${className}`}
+        >
+          <PauseCircle className="w-4 h-4" />
         </button>
       )
     }
@@ -102,6 +114,26 @@ export default function SyncStatusBadge({
       >
         <Cloud className="w-3.5 h-3.5 text-slate-500" />
         <span>Nuvem não configurada</span>
+      </button>
+    )
+  }
+
+  if (status === 'paused') {
+    return (
+      <button
+        onClick={handleClick}
+        className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-amber-950/40 text-amber-300 border border-amber-800/50 hover:bg-amber-900/30 transition-all ${className}`}
+        title="Sincronização em nuvem pausada. Clique para gerenciar em Configurações."
+      >
+        <div className="flex items-center gap-1.5">
+          <PauseCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+          <span className="font-semibold text-amber-200">Sincronização Pausada</span>
+        </div>
+        {showTime && timeLabel && (
+          <span className="text-[10px] text-amber-400/70 font-normal tabular-nums">
+            {timeLabel}
+          </span>
+        )}
       </button>
     )
   }

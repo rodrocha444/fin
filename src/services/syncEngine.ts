@@ -2,20 +2,34 @@
 import { db } from '@/db/schema'
 import { getSupabaseClient, getSupabaseConfig } from '@/services/supabase'
 
-export type SyncStatus = 'unconfigured' | 'idle' | 'syncing' | 'synced' | 'offline' | 'error'
+export type SyncStatus = 'unconfigured' | 'idle' | 'syncing' | 'synced' | 'offline' | 'error' | 'paused'
 
 export interface SyncState {
   status: SyncStatus
   lastSyncAt: Date | null
   lastError: string | null
   isSyncing: boolean
+  isPaused: boolean
 }
 
+const SYNC_PAUSED_STORAGE_KEY = 'finplan_sync_paused'
+
+function getInitialPausedState(): boolean {
+  try {
+    return localStorage.getItem(SYNC_PAUSED_STORAGE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+const initialPaused = getInitialPausedState()
+
 let syncState: SyncState = {
-  status: 'unconfigured',
+  status: initialPaused ? 'paused' : 'unconfigured',
   lastSyncAt: null,
   lastError: null,
   isSyncing: false,
+  isPaused: initialPaused,
 }
 
 const listeners = new Set<(state: SyncState) => void>()
@@ -25,6 +39,46 @@ function updateState(partial: Partial<SyncState>) {
   listeners.forEach(fn => {
     try { fn(syncState) } catch (e) { console.error('Erro no listener de sync:', e) }
   })
+}
+
+export function isSyncPaused(): boolean {
+  return syncState.isPaused
+}
+
+export function pauseSync(): void {
+  if (syncTimeout) {
+    clearTimeout(syncTimeout)
+    syncTimeout = null
+  }
+  try {
+    localStorage.setItem(SYNC_PAUSED_STORAGE_KEY, 'true')
+  } catch (e) {
+    console.error('Erro ao salvar estado de pausa no localStorage:', e)
+  }
+  updateState({ isPaused: true, status: 'paused', isSyncing: false })
+}
+
+export function resumeSync(): void {
+  try {
+    localStorage.removeItem(SYNC_PAUSED_STORAGE_KEY)
+  } catch (e) {
+    console.error('Erro ao remover estado de pausa do localStorage:', e)
+  }
+  const config = getSupabaseConfig()
+  const newStatus: SyncStatus = !config ? 'unconfigured' : !navigator.onLine ? 'offline' : 'idle'
+  updateState({ isPaused: false, status: newStatus })
+
+  if (config && navigator.onLine) {
+    scheduleSync(300)
+  }
+}
+
+export function toggleSyncPause(): void {
+  if (syncState.isPaused) {
+    resumeSync()
+  } else {
+    pauseSync()
+  }
 }
 
 export function subscribeSyncState(fn: (state: SyncState) => void): () => void {
@@ -390,15 +444,19 @@ async function recordLocalDeletion(tableName: string, recordId: string): Promise
 let isSyncRunning = false
 let isApplyingRemoteSync = false
 
-export async function executeSync(options: { forceAll?: boolean } = {}): Promise<{ success: boolean; error?: string }> {
+export async function executeSync(options: { forceAll?: boolean; forceSync?: boolean } = {}): Promise<{ success: boolean; error?: string }> {
+  if (syncState.isPaused && !options.forceSync && !options.forceAll) {
+    return { success: false, error: 'Sincronização pausada.' }
+  }
+
   if (!navigator.onLine) {
-    updateState({ status: 'offline' })
+    if (!syncState.isPaused) updateState({ status: 'offline' })
     return { success: false, error: 'Sem conexão com a internet.' }
   }
 
   const client = getSupabaseClient()
   if (!client) {
-    updateState({ status: 'unconfigured' })
+    if (!syncState.isPaused) updateState({ status: 'unconfigured' })
     return { success: false, error: 'Supabase não configurado.' }
   }
 
@@ -506,7 +564,7 @@ export async function executeSync(options: { forceAll?: boolean } = {}): Promise
     const lastSyncDate = new Date(nowIso)
 
     updateState({
-      status: 'synced',
+      status: syncState.isPaused ? 'paused' : 'synced',
       lastSyncAt: lastSyncDate,
       isSyncing: false,
       lastError: null,
@@ -516,7 +574,7 @@ export async function executeSync(options: { forceAll?: boolean } = {}): Promise
   } catch (err: any) {
     console.error('Erro na sincronização:', err)
     updateState({
-      status: 'error',
+      status: syncState.isPaused ? 'paused' : 'error',
       lastError: err?.message || String(err),
       isSyncing: false,
     })
@@ -531,6 +589,8 @@ export async function executeSync(options: { forceAll?: boolean } = {}): Promise
 let syncTimeout: any = null
 
 export function scheduleSync(delayMs = 1500): void {
+  if (syncState.isPaused) return
+
   if (!getSupabaseConfig()) {
     updateState({ status: 'unconfigured' })
     return
@@ -555,10 +615,10 @@ export async function initSyncEngine(): Promise<void> {
     const table = (db as any)[def.dexieName]
     if (table) {
       table.hook('creating', () => {
-        if (!isApplyingRemoteSync) scheduleSync(1500)
+        if (!isApplyingRemoteSync && !syncState.isPaused) scheduleSync(1500)
       })
       table.hook('updating', () => {
-        if (!isApplyingRemoteSync) scheduleSync(1500)
+        if (!isApplyingRemoteSync && !syncState.isPaused) scheduleSync(1500)
       })
       table.hook('deleting', (primKey: any) => {
         if (!isApplyingRemoteSync && primKey) {
@@ -579,7 +639,9 @@ export async function initSyncEngine(): Promise<void> {
   }
 
   const config = getSupabaseConfig()
-  if (!config) {
+  if (syncState.isPaused) {
+    updateState({ status: 'paused', isPaused: true })
+  } else if (!config) {
     updateState({ status: 'unconfigured' })
   } else if (!navigator.onLine) {
     updateState({ status: 'offline' })
@@ -587,25 +649,29 @@ export async function initSyncEngine(): Promise<void> {
     updateState({ status: 'idle' })
     // Executa sincronização inicial após carregamento
     setTimeout(() => {
-      executeSync()
+      if (!syncState.isPaused) {
+        executeSync()
+      }
     }, 500)
   }
 
   // Listeners de conexão de rede
   window.addEventListener('online', () => {
-    if (getSupabaseConfig()) {
+    if (getSupabaseConfig() && !syncState.isPaused) {
       updateState({ status: 'idle' })
       executeSync()
     }
   })
 
   window.addEventListener('offline', () => {
-    updateState({ status: 'offline' })
+    if (!syncState.isPaused) {
+      updateState({ status: 'offline' })
+    }
   })
 
   // Sincronização periódica a cada 45 segundos quando o app estiver ativo
   setInterval(() => {
-    if (navigator.onLine && getSupabaseConfig() && !isSyncRunning) {
+    if (navigator.onLine && getSupabaseConfig() && !isSyncRunning && !syncState.isPaused) {
       executeSync()
     }
   }, 45000)
