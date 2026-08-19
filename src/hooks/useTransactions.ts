@@ -7,6 +7,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/db/schema'
 import { getTransactionsByAccount, getTransactionsByMonth, getMonthSummary, getTransactionsByCategoryAndMonth } from '@/db/repositories/transactions'
 import { getProjectedScheduledForMonth } from '@/db/repositories/scheduled'
+import { format, addMonths } from 'date-fns'
+import { getInvoiceCycle, getInvoiceData } from '@/utils/invoices'
 import type { Transaction } from '@/types'
 
 /** Transações de uma conta (todas ordenadas por createdAt desc) */
@@ -25,6 +27,27 @@ export function useCategoryMonthTransactions(categoryId: string | undefined, mon
   return useLiveQuery(
     async () => {
       if (categoryId === undefined) return []
+      if (categoryId.startsWith('cc_invoice_')) {
+        const accountId = categoryId.replace('cc_invoice_', '')
+        const acc = await db.accounts.get(accountId)
+        if (acc && acc.statementClosingDay) {
+          const [y, m] = month.split('-').map(Number)
+          const checkMonths = [-1, 0, 1].map(delta => {
+            const d = addMonths(new Date(y, m - 1, 1), delta)
+            return format(d, 'yyyy-MM')
+          })
+          const txs = await db.transactions.where('accountId').equals(accountId).toArray()
+          const matchedTxs: Transaction[] = []
+          for (const mKey of checkMonths) {
+            const cycle = getInvoiceCycle(mKey, acc.statementClosingDay, acc.paymentDueDay)
+            if (format(cycle.dueDate, 'yyyy-MM') === month) {
+              const data = getInvoiceData(txs, cycle)
+              matchedTxs.push(...data.transactions)
+            }
+          }
+          return matchedTxs
+        }
+      }
       return getTransactionsByCategoryAndMonth(categoryId, month)
     },
     [categoryId, month]
