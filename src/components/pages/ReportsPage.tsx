@@ -12,6 +12,7 @@ import {
 import { useBudgetRows, useIncomeBudgetRows } from '@/hooks/useBudget'
 import { useMonthSummary } from '@/hooks/useTransactions'
 import { useAllBalances } from '@/hooks/useAccounts'
+import { useDebtsSummary } from '@/hooks/useDebts'
 import { useFinancialData } from '@/context/FinancialDataContext'
 import { formatCurrency, formatMonthLabel, currentMonth } from '@/utils/format'
 import { toMonthKey } from '@/services/api/budget'
@@ -29,6 +30,7 @@ export default function ReportsPage() {
   const incomeBudgetRows = useIncomeBudgetRows(month)
   const monthSummary = useMonthSummary(month)
   const balances = useAllBalances()
+  const debtSummary = useDebtsSummary()
 
   // Navegação de mês
   const handlePrevMonth = () => {
@@ -48,11 +50,12 @@ export default function ReportsPage() {
     setMonth(currentMonth())
   }
 
-  // Patrimônio líquido total
+  // Patrimônio líquido total consolidado (Contas Bancárias + Cartões + Cobranças a Receber - Dívidas a Pagar)
   const netWorth = useMemo(() => {
-    if (!balances) return 0
-    return Array.from(balances.values()).reduce((sum, v) => sum + v, 0)
-  }, [balances])
+    const bankTotal = balances ? Array.from(balances.values()).reduce((sum, v) => sum + v, 0) : 0
+    const debtNet = debtSummary?.netBalance ?? 0
+    return bankTotal + debtNet
+  }, [balances, debtSummary])
 
   // Métricas do mês
   const income = monthSummary?.income ?? 0
