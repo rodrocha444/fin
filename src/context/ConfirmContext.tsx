@@ -1,5 +1,5 @@
 // src/context/ConfirmContext.tsx — Contexto global para Diálogos de Confirmação e Alertas Personalizados
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react'
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import { AlertTriangle, Info, CheckCircle2, Trash2, Copy, Check } from 'lucide-react'
 import { copyToClipboard } from '@/utils/clipboard'
 import Modal from '@/components/atoms/Modal'
@@ -13,6 +13,7 @@ export interface ConfirmOptions {
   confirmText?: string
   cancelText?: string
   variant?: DialogVariant
+  countdownSeconds?: number
 }
 
 export interface AlertOptions {
@@ -50,6 +51,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isAlert, setIsAlert] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [countdown, setCountdown] = useState(0)
   const messageContainerRef = useRef<HTMLDivElement>(null)
 
   const [options, setOptions] = useState<ConfirmOptions>({
@@ -60,6 +62,23 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     variant: 'danger',
   })
   const [resolver, setResolver] = useState<((value: boolean) => void) | null>(null)
+
+  // ── Gerenciamento do timer de contagem regressiva ───────────────────────────
+  useEffect(() => {
+    if (!isOpen || countdown <= 0) return
+
+    const interval = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [isOpen, countdown])
 
   const confirm = useCallback((opts: ConfirmOptions | string): Promise<boolean> => {
     return new Promise(resolve => {
@@ -79,9 +98,11 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
               confirmText: opts.confirmText ?? 'Confirmar',
               cancelText: opts.cancelText ?? 'Cancelar',
               variant: opts.variant ?? 'danger',
+              countdownSeconds: opts.countdownSeconds,
             }
 
       setOptions(parsedOpts)
+      setCountdown(parsedOpts.countdownSeconds && parsedOpts.countdownSeconds > 0 ? parsedOpts.countdownSeconds : 0)
       setIsAlert(false)
       setCopied(false)
       setResolver(() => resolve)
@@ -108,6 +129,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             }
 
       setOptions(parsedOpts)
+      setCountdown(0)
       setIsAlert(true)
       setCopied(false)
       setResolver(() => () => resolve())
@@ -116,12 +138,14 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const handleConfirm = () => {
+    if (countdown > 0) return
     setIsOpen(false)
     resolver?.(true)
   }
 
   const handleCancel = () => {
     setIsOpen(false)
+    setCountdown(0)
     resolver?.(false)
   }
 
@@ -138,13 +162,13 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
       parts.push(`Detalhes: ${options.details.trim()}`)
     }
 
-    const textToCopy = parts.filter(Boolean).join('\n\n').trim()
-    if (!textToCopy) return
+    const fullText = parts.filter(Boolean).join('\n\n').trim()
+    if (!fullText) return
 
-    const success = await copyToClipboard(textToCopy)
+    const success = await copyToClipboard(fullText)
     if (success) {
       setCopied(true)
-      setTimeout(() => setCopied(false), 2200)
+      setTimeout(() => setCopied(false), 2500)
     }
   }
 
@@ -202,7 +226,6 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
         }
       >
         <div className="p-5 space-y-4">
-          {/* Mensagem Principal */}
           <div
             ref={messageContainerRef}
             className={`text-slate-300 text-sm leading-relaxed whitespace-pre-line select-text relative ${
@@ -222,7 +245,6 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             )}
           </div>
 
-          {/* Botão de Copiar Erro / Mensagem para Área de Transferência com suporte total a touch no iOS */}
           <div className="flex justify-end">
             <button
               type="button"
@@ -248,7 +270,29 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             </button>
           </div>
 
-          {/* Ações */}
+          {/* Barra de contagem regressiva (se houver countdown ativo) */}
+          {options.countdownSeconds && options.countdownSeconds > 0 && (
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between text-[11px] text-slate-400">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                  Tempo de segurança para confirmação
+                </span>
+                <span className="font-mono font-bold text-amber-400">
+                  {countdown > 0 ? `${countdown}s restantes` : 'Liberado para confirmar'}
+                </span>
+              </div>
+              <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="bg-amber-500 h-full transition-all duration-1000 ease-linear rounded-full"
+                  style={{
+                    width: `${Math.min(100, Math.max(0, ((options.countdownSeconds - countdown) / options.countdownSeconds) * 100))}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-2.5 pt-1">
             {!isAlert && (
               <button
@@ -263,10 +307,17 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={handleConfirm}
-              autoFocus
-              className={`flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-md active:scale-95 ${styles.btnConfirm}`}
+              disabled={countdown > 0}
+              autoFocus={countdown === 0}
+              className={`flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-md active:scale-95 ${
+                countdown > 0
+                  ? 'bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed opacity-60'
+                  : styles.btnConfirm
+              }`}
             >
-              {options.confirmText || 'Confirmar'}
+              {countdown > 0
+                ? `${options.confirmText || 'Confirmar'} (${countdown}s)`
+                : (options.confirmText || 'Confirmar')}
             </button>
           </div>
         </div>

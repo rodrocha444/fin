@@ -3,6 +3,7 @@ import { createId } from '@/utils/id'
 import { format, subMonths } from 'date-fns'
 import { isInitialSetupCategory } from '@/utils/format'
 import { getInvoiceForBudgetMonth } from '@/utils/invoices'
+import { isDateBeforeAccountingStart, isMonthBeforeAccountingStart } from '@/utils/accountingPeriod'
 import { notifyDataChanged } from './events'
 import type {
   Account,
@@ -248,8 +249,11 @@ export function calculateBudgetSummary(
   transactions: Transaction[]
 ): BudgetSummary {
   const accountMap = new Map(accounts.map(a => [a.id!, a]))
-  const allIncomeTxs = transactions.filter(t => t.type === 'income' && accountMap.get(t.accountId)?.type !== 'off_budget')
-  const allExpenseTxs = transactions.filter(t => t.type === 'expense' && accountMap.get(t.accountId)?.type !== 'off_budget')
+  
+  // Filtra apenas transações dentro do período contábil ativo
+  const validTxs = transactions.filter(t => !isDateBeforeAccountingStart(t.date))
+  const allIncomeTxs = validTxs.filter(t => t.type === 'income' && accountMap.get(t.accountId)?.type !== 'off_budget')
+  const allExpenseTxs = validTxs.filter(t => t.type === 'expense' && accountMap.get(t.accountId)?.type !== 'off_budget')
   const ccAccounts = accounts.filter(a => a.type === 'credit_card')
 
   const groupMap = new Map(categoryGroups.map(g => [g.id!, g]))
@@ -274,7 +278,7 @@ export function calculateBudgetSummary(
     const txMonth = toMonthKey(new Date(tx.date))
     if (txMonth === month) {
       totalIncome += tx.amount
-    } else if (txMonth < month) {
+    } else if (txMonth < month && !isMonthBeforeAccountingStart(txMonth)) {
       priorIncome += tx.amount
     }
   }
@@ -284,6 +288,7 @@ export function calculateBudgetSummary(
 
   for (const tx of allExpenseTxs) {
     const txMonth = toMonthKey(new Date(tx.date))
+    if (isMonthBeforeAccountingStart(txMonth)) continue
     if (tx.categoryId && ignoredCategoryIds.has(tx.categoryId)) continue
     if (tx.categoryId) {
       const key = `${txMonth}:${tx.categoryId}`
@@ -297,17 +302,23 @@ export function calculateBudgetSummary(
   }
 
   const allMonthsSet = new Set<string>()
-  for (const tx of transactions) allMonthsSet.add(toMonthKey(new Date(tx.date)))
-  for (const b of budgetMonths) allMonthsSet.add(b.month)
+  for (const tx of validTxs) {
+    const m = toMonthKey(new Date(tx.date))
+    if (!isMonthBeforeAccountingStart(m)) allMonthsSet.add(m)
+  }
+  for (const b of budgetMonths) {
+    if (!isMonthBeforeAccountingStart(b.month)) allMonthsSet.add(b.month)
+  }
   allMonthsSet.add(month)
 
-  const priorMonths = Array.from(allMonthsSet).filter(m => m < month).sort()
+  const priorMonths = Array.from(allMonthsSet).filter(m => m < month && !isMonthBeforeAccountingStart(m)).sort()
 
   let totalBudgeted = 0
   let totalAllTimeBudgeted = 0
   let priorTotalBudgeted = 0
 
   for (const b of budgetMonths) {
+    if (isMonthBeforeAccountingStart(b.month)) continue
     if (ignoredCategoryIds.has(b.categoryId)) continue
     if (b.month === month) totalBudgeted += b.budgeted
     else if (b.month < month) priorTotalBudgeted += b.budgeted

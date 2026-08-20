@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   Plus, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronRight,
   Download, Upload, Database, CheckCircle2, Cloud, RefreshCw,
-  Copy, Check, ExternalLink, KeyRound, Server, AlertCircle
+  Copy, Check, ExternalLink, KeyRound, Server, AlertCircle,
+  CalendarRange, CalendarCheck, ShieldAlert
 } from 'lucide-react'
 import { useFinancialData } from '@/context/FinancialDataContext'
 import {
@@ -17,15 +18,24 @@ import {
 import { SUPABASE_SCHEMA_SQL } from '@/services/supabaseSchema'
 import { copyToClipboard } from '@/utils/clipboard'
 import { useConfirm, useAlert } from '@/context/ConfirmContext'
+import { useAccountingPeriod } from '@/utils/accountingPeriod'
+import { formatDate } from '@/utils/format'
 import ResetDatabaseModal from '@/components/organisms/ResetDatabaseModal'
 import Logo from '@/components/atoms/Logo'
 import { APP_VERSION, BUILD_DATE } from '@/version'
 
 export default function SettingsPage() {
   const { categoryGroups: groups, categories, isLoading: isSyncing, refetch, isConfigured } = useFinancialData()
+  const { startDate, setStartDate: updateAccountingStartDate } = useAccountingPeriod()
 
   const [supabaseUrl, setSupabaseUrl] = useState(() => getSupabaseConfig()?.url || '')
   const [supabaseKey, setSupabaseKey] = useState(() => getSupabaseConfig()?.anonKey || '')
+  const [inputStartDate, setInputStartDate] = useState(startDate || '')
+
+  useEffect(() => {
+    setInputStartDate(startDate || '')
+  }, [startDate])
+
   const [testResult, setTestResult] = useState<{ success?: boolean; message: string } | null>(null)
   const [isTestingConnection, setIsTestingConnection] = useState(false)
   const [showSqlGuide, setShowSqlGuide] = useState(false)
@@ -91,6 +101,51 @@ export default function SettingsPage() {
       setCopiedSql(true)
       setTimeout(() => setCopiedSql(false), 2500)
     }
+  }
+
+  const handleSaveAccountingPeriod = async () => {
+    if (!inputStartDate) return
+
+    const ok = await confirm({
+      title: 'Alterar Início do Período Contábil?',
+      message: `Você está prestes a definir a data ${formatDate(inputStartDate)} como o marco inicial de todo o FinPlan.\n\nTodos os cálculos de orçamentos, sobras acumuladas e relatórios serão recalculados a partir desta data.\n\nAguarde o término do tempo de segurança (10s) para confirmar.`,
+      confirmText: 'Confirmar alteração',
+      cancelText: 'Cancelar',
+      variant: 'warning',
+      countdownSeconds: 10,
+    })
+
+    if (!ok) return
+
+    updateAccountingStartDate(inputStartDate)
+    refetch()
+    await showAlert({
+      title: 'Período Contábil Atualizado',
+      message: `O marco inicial contábil foi definido para ${formatDate(inputStartDate)} com sucesso.`,
+      variant: 'success',
+    })
+  }
+
+  const handleResetAccountingPeriod = async () => {
+    const ok = await confirm({
+      title: 'Redefinir Início do Período Contábil?',
+      message: `Deseja remover a data de início contábil e voltar a considerar todo o histórico financeiro desde o início dos tempos?\n\nAguarde a contagem de 10 segundos para confirmar.`,
+      confirmText: 'Confirmar redefinição',
+      cancelText: 'Cancelar',
+      variant: 'warning',
+      countdownSeconds: 10,
+    })
+
+    if (!ok) return
+
+    updateAccountingStartDate(null)
+    setInputStartDate('')
+    refetch()
+    await showAlert({
+      title: 'Período Contábil Redefinido',
+      message: 'O marco inicial foi removido. Todo o histórico financeiro agora está ativo.',
+      variant: 'info',
+    })
   }
 
   const toggleGroup = (id: string) =>
@@ -647,6 +702,84 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Card Início do Período Contábil */}
+        <div className="card p-5 space-y-4 bg-slate-900 border border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <CalendarRange className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-200">Início do Período Contábil</h2>
+                <p className="text-xs text-slate-500">Defina o marco temporal inicial para orçamentos, sobras e relatórios</p>
+              </div>
+            </div>
+
+            <div>
+              {startDate ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                  Ativo desde: {formatDate(startDate)}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700/60">
+                  Todo o histórico ativo
+                </span>
+              )}
+            </div>
+          </div>
+
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Ao configurar uma data de início, transações e movimentações anteriores a essa data são consideradas pré-período e isoladas dos cálculos de sobras mensais, orçamentos e relatórios contábeis ativos.
+          </p>
+
+          <div className="p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/20 flex items-start gap-2.5 text-xs text-amber-300/90">
+            <ShieldAlert className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-semibold text-amber-300">Proteção contra alterações acidentais</p>
+              <p className="text-[11px] text-amber-300/80 leading-normal">
+                Modificar esta data altera a base de cálculo de todo o histórico financeiro. Qualquer alteração ou remoção exige confirmação com contagem regressiva de segurança de 10 segundos.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1">
+            <div className="flex-1">
+              <label className="label text-[11px]">Data de Início Contábil</label>
+              <input
+                type="date"
+                value={inputStartDate}
+                onChange={e => setInputStartDate(e.target.value)}
+                className="input-base text-xs font-mono"
+                style={{ colorScheme: 'dark' }}
+              />
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-auto pt-0 sm:pt-4">
+              <button
+                type="button"
+                onClick={handleSaveAccountingPeriod}
+                disabled={!inputStartDate || inputStartDate === startDate}
+                className="btn-primary py-2 px-3.5 text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <CalendarCheck className="w-3.5 h-3.5" />
+                <span>Salvar Data</span>
+              </button>
+
+              {startDate && (
+                <button
+                  type="button"
+                  onClick={handleResetAccountingPeriod}
+                  className="btn-ghost py-2 px-3 text-xs text-slate-400 hover:text-rose-400 border border-slate-800 hover:border-rose-900/50"
+                  title="Remover data inicial e considerar todo o histórico"
+                >
+                  Redefinir
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Card Gerenciamento de Dados */}

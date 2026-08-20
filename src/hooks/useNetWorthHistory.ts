@@ -4,6 +4,8 @@ import { useAccountsQuery, useTransactionsQuery } from '@/hooks/queries'
 import { format, addDays, addWeeks, addMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
+import { isDateBeforeAccountingStart, getAccountingStartDate } from '@/utils/accountingPeriod'
+
 export type Granularity = 'daily' | 'weekly' | 'monthly'
 
 export interface NetWorthPoint {
@@ -34,7 +36,17 @@ export function useNetWorthHistory(
 
     const points: NetWorthPoint[] = []
 
-    let current = new Date(startDate)
+    const accountingStartStr = getAccountingStartDate()
+    let effectiveStart = new Date(startDate)
+    if (accountingStartStr) {
+      const [y, m, d] = accountingStartStr.split('-').map(Number)
+      const accStartDate = new Date(y, m - 1, d)
+      if (accStartDate > effectiveStart) {
+        effectiveStart = accStartDate
+      }
+    }
+
+    let current = new Date(effectiveStart)
     current.setHours(23, 59, 59, 999)
 
     const limit = new Date(endDate)
@@ -56,8 +68,9 @@ export function useNetWorthHistory(
         if (!acc.id) continue
         let bal = acc.type === 'credit_card' ? 0 : (acc.initialBalance || 0)
 
-        // Transações reais até a data do ponto
+        // Transações reais até a data do ponto (ignorando anteriores ao período contábil)
         for (const tx of transactions) {
+          if (isDateBeforeAccountingStart(tx.date)) continue
           const txDate = new Date(tx.date)
           if (txDate > pDate) continue
 
