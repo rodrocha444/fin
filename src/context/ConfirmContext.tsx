@@ -1,5 +1,5 @@
 // src/context/ConfirmContext.tsx — Contexto global para Diálogos de Confirmação e Alertas Personalizados
-import React, { createContext, useContext, useState, useCallback } from 'react'
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react'
 import { AlertTriangle, Info, CheckCircle2, Trash2, Copy, Check } from 'lucide-react'
 import { copyToClipboard } from '@/utils/clipboard'
 import Modal from '@/components/atoms/Modal'
@@ -30,10 +30,28 @@ interface ConfirmContextType {
 
 const ConfirmContext = createContext<ConfirmContextType | null>(null)
 
+/** Função auxiliar para extrair texto limpo de ReactNodes / JSX */
+function extractTextFromNode(node: React.ReactNode): string {
+  if (typeof node === 'string') return node
+  if (typeof node === 'number') return String(node)
+  if (!node) return ''
+  if (Array.isArray(node)) return node.map(extractTextFromNode).join(' ')
+  if (React.isValidElement(node)) {
+    const props = node.props as { children?: React.ReactNode }
+    return extractTextFromNode(props.children)
+  }
+  if (typeof node === 'object' && 'message' in (node as any)) {
+    return String((node as any).message)
+  }
+  return String(node)
+}
+
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isAlert, setIsAlert] = useState(false)
   const [copied, setCopied] = useState(false)
+  const messageContainerRef = useRef<HTMLDivElement>(null)
+
   const [options, setOptions] = useState<ConfirmOptions>({
     title: 'Confirmação',
     message: '',
@@ -108,12 +126,20 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   }
 
   const handleCopyText = async () => {
-    const textToCopy = [
-      typeof options.message === 'string' ? options.message : '',
-      options.details ? `\nDetalhes:\n${options.details}` : '',
-    ].filter(Boolean).join('\n')
+    // 1. Prioriza o texto real renderizado no DOM dentro do container
+    const domText = messageContainerRef.current?.innerText || messageContainerRef.current?.textContent || ''
+    
+    // 2. Se o DOM estiver vazio, faz fallback extraindo do ReactNode
+    const nodeText = extractTextFromNode(options.message)
+    const baseText = domText.trim() || nodeText.trim()
+    
+    const parts = [baseText]
+    if (options.details && !baseText.includes(options.details.trim())) {
+      parts.push(`Detalhes: ${options.details.trim()}`)
+    }
 
-    if (!textToCopy.trim()) return
+    const textToCopy = parts.filter(Boolean).join('\n\n').trim()
+    if (!textToCopy) return
 
     const success = await copyToClipboard(textToCopy)
     if (success) {
@@ -156,7 +182,6 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   }
 
   const styles = getVariantStyles()
-  const canCopy = typeof options.message === 'string' || !!options.details
 
   return (
     <ConfirmContext.Provider value={{ confirm, alert: showAlert }}>
@@ -179,6 +204,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
         <div className="p-5 space-y-4">
           {/* Mensagem Principal */}
           <div
+            ref={messageContainerRef}
             className={`text-slate-300 text-sm leading-relaxed whitespace-pre-line select-text relative ${
               isErrorOrWarning
                 ? 'p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 text-slate-200'
@@ -197,32 +223,30 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* Botão de Copiar Erro / Mensagem para Área de Transferência com suporte total a touch no iOS */}
-          {canCopy && (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={handleCopyText}
-                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all active:scale-95 touch-manipulation ${
-                  copied
-                    ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 shadow-sm shadow-emerald-950/20'
-                    : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700/80 text-slate-300 active:bg-slate-700'
-                }`}
-                title="Copiar mensagem para a área de transferência"
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-4 h-4 text-emerald-400" />
-                    <span className="text-emerald-300 font-semibold">Copiado para a área de transferência!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4 text-slate-400" />
-                    <span>{isErrorOrWarning ? 'Copiar descrição de erro' : 'Copiar mensagem'}</span>
-                  </>
-                )}
-              </button>
-            </div>
-          )}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleCopyText}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all active:scale-95 touch-manipulation cursor-pointer ${
+                copied
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 shadow-sm shadow-emerald-950/20'
+                  : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700/80 text-slate-300 active:bg-slate-700'
+              }`}
+              title="Copiar mensagem para a área de transferência"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  <span className="text-emerald-300 font-semibold">Copiado para a área de transferência!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4 text-slate-400" />
+                  <span>{isErrorOrWarning ? 'Copiar descrição de erro' : 'Copiar mensagem'}</span>
+                </>
+              )}
+            </button>
+          </div>
 
           {/* Ações */}
           <div className="flex items-center gap-2.5 pt-1">
