@@ -7,7 +7,7 @@ import { useAccounts } from '@/hooks/useAccounts'
 import { useMonthTransactions } from '@/hooks/useTransactions'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
 import { deleteTransaction, deleteSplitTransaction } from '@/services/api/transactions'
-import { formatCurrency, currentMonth } from '@/utils/format'
+import { formatCurrency, currentMonth, compareTransactionsByDate } from '@/utils/format'
 import { useConfirm } from '@/context/ConfirmContext'
 import MonthNavigator from '@/components/atoms/MonthNavigator'
 import SearchBar from '@/components/atoms/SearchBar'
@@ -69,12 +69,7 @@ export default function TransactionsPage() {
       const q = search.toLowerCase()
       return tx.payee.toLowerCase().includes(q) || (tx.notes ?? '').toLowerCase().includes(q)
     })
-    .sort((a, b) => {
-      const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
-      const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
-      if (timeB !== timeA) return timeB - timeA
-      return (b.id ?? '').localeCompare(a.id ?? '')
-    })
+    .sort(compareTransactionsByDate)
 
   const handleDelete = async (tx: Transaction) => {
     if (tx.splitGroupId) {

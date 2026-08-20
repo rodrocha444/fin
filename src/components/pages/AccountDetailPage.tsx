@@ -30,7 +30,7 @@ import { useCategoriesWithGroups } from '@/hooks/useBudget'
 import { deleteTransaction, deleteInstallmentGroup, deleteSplitTransaction } from '@/services/api/transactions'
 import { deleteAccount } from '@/services/api/accounts'
 import { deleteScheduled, confirmScheduledOccurrence } from '@/services/api/scheduled'
-import { formatCurrency, formatDate, formatMonthLabel, currentMonth, accountTypeLabel } from '@/utils/format'
+import { formatCurrency, formatDate, formatMonthLabel, currentMonth, accountTypeLabel, compareTransactionsByDate } from '@/utils/format'
 import {
   getCurrentOpenInvoiceMonth,
   getInvoiceCycle,
@@ -142,20 +142,17 @@ export default function AccountDetailPage() {
       const q = search.toLowerCase()
       return tx.payee.toLowerCase().includes(q) || (tx.notes ?? '').toLowerCase().includes(q)
     })
-    .sort((a, b) => {
-      const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
-      const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
-      if (timeB !== timeA) return timeB - timeA
-      return (b.id ?? '').localeCompare(a.id ?? '')
-    })
+    .sort(compareTransactionsByDate)
 
-  const filteredPurchases = (ccPurchases ?? []).filter(p => {
-    const pMonth = format(new Date(p.date), 'yyyy-MM')
-    if (pMonth !== month) return false
-    if (!search) return true
-    const q = search.toLowerCase()
-    return p.payee.toLowerCase().includes(q) || (p.notes ?? '').toLowerCase().includes(q)
-  })
+  const filteredPurchases = [...(ccPurchases ?? [])]
+    .filter(p => {
+      const pMonth = format(new Date(p.date), 'yyyy-MM')
+      if (pMonth !== month) return false
+      if (!search) return true
+      const q = search.toLowerCase()
+      return p.payee.toLowerCase().includes(q) || (p.notes ?? '').toLowerCase().includes(q)
+    })
+    .sort(compareTransactionsByDate)
 
   const handleDeleteTx = async (tx: Transaction) => {
     if (tx.isScheduledProjection && tx.scheduledId) {

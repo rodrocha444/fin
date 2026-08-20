@@ -5,6 +5,7 @@
 
 import { format, addMonths, subMonths, getDaysInMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { compareTransactionsByDate } from './format'
 import type { Account, Transaction } from '@/types'
 
 export interface InvoiceCycle {
@@ -120,13 +121,8 @@ export function getInvoiceData(
     return d >= cycle.startDate && d <= cycle.closingDate
   })
 
-  // Ordenar por data de criação decrescente (incluindo hora)
-  invoiceTransactions.sort((a, b) => {
-    const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
-    const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
-    if (timeB !== timeA) return timeB - timeA
-    return (b.id ?? '').localeCompare(a.id ?? '')
-  })
+  // Ordenar por data contábil/efetiva decrescente (mais recente primeiro)
+  invoiceTransactions.sort(compareTransactionsByDate)
 
   let chargesAmount = 0
   let refundsAmount = 0

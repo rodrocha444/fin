@@ -8,6 +8,7 @@ import {
 import { createId } from '@/utils/id'
 import { addMonths } from 'date-fns'
 import { notifyDataChanged } from './events'
+import { compareTransactionsByDate } from '@/utils/format'
 import type { Transaction, TransactionType } from '@/types'
 
 export async function getTransactions(): Promise<Transaction[]> {
@@ -43,12 +44,7 @@ export async function getTransactionsByAccount(accountId: string): Promise<Trans
   if (error) throw new Error(`Erro ao buscar transações da conta: ${error.message}`)
   const txs = (data || []).map(rowToTransaction)
 
-  return txs.sort((a, b) => {
-    const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
-    const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
-    if (timeB !== timeA) return timeB - timeA
-    return (b.id ?? '').localeCompare(a.id ?? '')
-  })
+  return txs.sort(compareTransactionsByDate)
 }
 
 export async function getTransactionsByMonth(month: string): Promise<Transaction[]> {
@@ -66,12 +62,7 @@ export async function getTransactionsByMonth(month: string): Promise<Transaction
   if (error) throw new Error(`Erro ao buscar transações do mês: ${error.message}`)
   const txs = (data || []).map(rowToTransaction)
 
-  return txs.sort((a, b) => {
-    const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
-    const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
-    if (timeB !== timeA) return timeB - timeA
-    return (b.id ?? '').localeCompare(a.id ?? '')
-  })
+  return txs.sort(compareTransactionsByDate)
 }
 
 export async function getTransactionsByCategoryAndMonth(categoryId: string, month: string): Promise<Transaction[]> {
@@ -90,12 +81,7 @@ export async function getTransactionsByCategoryAndMonth(categoryId: string, mont
   if (error) throw new Error(`Erro ao buscar transações da categoria: ${error.message}`)
   const txs = (data || []).map(rowToTransaction)
 
-  return txs.sort((a, b) => {
-    const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
-    const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
-    if (timeB !== timeA) return timeB - timeA
-    return (b.id ?? '').localeCompare(a.id ?? '')
-  })
+  return txs.sort(compareTransactionsByDate)
 }
 
 export async function getMonthSummary(month: string): Promise<{

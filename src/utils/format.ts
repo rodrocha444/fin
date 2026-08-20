@@ -94,3 +94,25 @@ export function isInitialSetupCategory(categoryName?: string, groupName?: string
     keywords.some(kw => normGrp === kw || normGrp.includes(kw))
   )
 }
+
+/**
+ * Ordenação universal e consistente para transações:
+ * 1º Critério: Data contábil/efetiva da transação (decrescente, mais recente primeiro)
+ * 2º Critério: Data/hora de cadastro/criação (decrescente para desempate no mesmo dia)
+ * 3º Critério: ID estável
+ */
+export function compareTransactionsByDate(
+  a: { date: Date | string; createdAt?: Date | string; id?: string },
+  b: { date: Date | string; createdAt?: Date | string; id?: string }
+): number {
+  const dateB = new Date(b.date).getTime()
+  const dateA = new Date(a.date).getTime()
+  if (dateB !== dateA) return dateB - dateA
+
+  const createB = b.createdAt ? new Date(b.createdAt).getTime() : dateB
+  const createA = a.createdAt ? new Date(a.createdAt).getTime() : dateA
+  if (createB !== createA) return createB - createA
+
+  return (b.id ?? '').localeCompare(a.id ?? '')
+}
+

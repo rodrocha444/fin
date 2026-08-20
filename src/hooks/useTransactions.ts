@@ -9,6 +9,7 @@ import {
 import { getProjectedScheduledForMonth, getProjectedScheduledForAccount } from '@/services/api/scheduled'
 import { format, addMonths } from 'date-fns'
 import { getInvoiceCycle, getInvoiceData } from '@/utils/invoices'
+import { compareTransactionsByDate } from '@/utils/format'
 import type { Transaction } from '@/types'
 
 export interface CreditCardPurchase {
@@ -74,12 +75,7 @@ export function useAccountTransactions(accountId: string | undefined): Transacti
 
     const consolidated = consolidateSplitTransactions(filtered)
 
-    return consolidated.sort((a, b) => {
-      const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
-      const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
-      if (timeB !== timeA) return timeB - timeA
-      return (b.id ?? '').localeCompare(a.id ?? '')
-    })
+    return consolidated.sort(compareTransactionsByDate)
   }, [transactions, accountId, isLoading])
 }
 
@@ -132,14 +128,7 @@ export function useAccountTransactionsWithScheduled(accountId: string | undefine
 
     const consolidatedTxs = consolidateSplitTransactions(txs)
     const combined = [...consolidatedTxs, ...projectedTxs]
-    combined.sort((a, b) => {
-      const timeB = new Date(b.date).getTime()
-      const timeA = new Date(a.date).getTime()
-      if (timeB !== timeA) return timeB - timeA
-      const createB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
-      const createA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
-      return createB - createA
-    })
+    combined.sort(compareTransactionsByDate)
 
     return { transactions: combined, futureOffset }
   }, [transactions, scheduledTransactions, accountId, isLoading])
@@ -187,12 +176,7 @@ export function useCategoryMonthTransactions(categoryId: string | undefined, mon
         const tTime = new Date(t.date).getTime()
         return tTime >= startDate && tTime <= endDate
       })
-      .sort((a, b) => {
-        const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
-        const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
-        if (timeB !== timeA) return timeB - timeA
-        return (b.id ?? '').localeCompare(a.id ?? '')
-      })
+      .sort(compareTransactionsByDate)
   }, [transactions, accounts, categoryId, month, isLoading])
 }
 
@@ -234,12 +218,7 @@ export function useMonthTransactions(month: string): Transaction[] | undefined {
     }))
 
     const combined = [...consolidatedTxs, ...projectedTxs]
-    return combined.sort((a, b) => {
-      const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
-      const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
-      if (timeB !== timeA) return timeB - timeA
-      return (b.id ?? '').localeCompare(a.id ?? '')
-    })
+    return combined.sort(compareTransactionsByDate)
   }, [transactions, scheduledTransactions, month, isLoading])
 }
 
@@ -367,12 +346,7 @@ export function useCreditCardPurchases(accountId: string | undefined): CreditCar
       }
     }
 
-    purchases.sort((a, b) => {
-      const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
-      const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
-      if (timeB !== timeA) return timeB - timeA
-      return (b.id ?? '').localeCompare(a.id ?? '')
-    })
+    purchases.sort(compareTransactionsByDate)
 
     return purchases
   }, [transactions, installmentGroups, accounts, accountId, isLoading])
