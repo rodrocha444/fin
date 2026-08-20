@@ -1,8 +1,11 @@
+// src/components/organisms/AdvancedFinancialChart.tsx — Gráfico Financeiro Avançado Estilo Plataforma de Corretora com Filtros por Conta, Tipos e Projeção Futura
 import { useState, useMemo, useRef, useCallback } from 'react'
 import {
   subMonths,
   subDays,
+  addMonths,
   startOfYear,
+  endOfYear,
   format,
   isBefore,
 } from 'date-fns'
@@ -15,13 +18,25 @@ import {
   BarChart2,
   LineChart,
   Filter,
+  Sparkles,
 } from 'lucide-react'
 import { useNetWorthHistory, type Granularity, type NetWorthPoint } from '@/hooks/useNetWorthHistory'
-import { useTransactionsQuery, useAccountsQuery, useDebtAccountsQuery } from '@/hooks/queries'
-import { isDateBeforeAccountingStart, getAccountingStartDate } from '@/utils/accountingPeriod'
+import { useTransactionsQuery, useAccountsQuery, useDebtAccountsQuery, useDebtItemsQuery } from '@/hooks/queries'
+import { getAccountingStartDate } from '@/utils/accountingPeriod'
 import { formatCurrency, formatDate } from '@/utils/format'
 
-type RangePreset = '1m' | '3m' | '6m' | '1y' | 'ytd' | 'all' | 'custom'
+type RangePreset =
+  | '1m'
+  | '3m'
+  | '6m'
+  | '1y'
+  | 'proj_3m'
+  | 'proj_6m'
+  | 'proj_1y'
+  | 'ytd'
+  | 'all'
+  | 'custom'
+
 type ViewMode = 'area' | 'assets_liabilities' | 'monthly_flow'
 
 export type ChartScopeType =
@@ -40,6 +55,7 @@ export default function AdvancedFinancialChart() {
   const [viewMode, setViewMode] = useState<ViewMode>('area')
   const [showSMA, setShowSMA] = useState(true)
   const [showExtremes, setShowExtremes] = useState(true)
+  const [includeFuture, setIncludeFuture] = useState(false)
   const [activePointIndex, setActivePointIndex] = useState<number | null>(null)
 
   // Escopo de visualização (Geral, Macros, Tipos ou Conta Específica)
@@ -49,41 +65,64 @@ export default function AdvancedFinancialChart() {
   const containerRef = useRef<HTMLDivElement>(null)
   const today = useMemo(() => new Date(), [])
 
+  // Transações e dados do banco
+  const { data: allTransactions = [] } = useTransactionsQuery()
+  const { data: accounts = [] } = useAccountsQuery()
+  const { data: debtAccounts = [] } = useDebtAccountsQuery()
+  const { data: debtItems = [] } = useDebtItemsQuery()
+
+  const activeAccounts = useMemo(() => accounts.filter(a => a.isActive !== false), [accounts])
+  const activeDebtAccounts = useMemo(() => debtAccounts.filter(d => d.isActive !== false), [debtAccounts])
+
+  // Data máxima futura encontrada nas parcelas/transações cadastradas
+  const maxFutureDate = useMemo(() => {
+    let max = addMonths(today, 6)
+    for (const tx of allTransactions) {
+      const d = new Date(tx.date)
+      if (d > max) max = d
+    }
+    for (const item of debtItems) {
+      if (item.dueDate) {
+        const d = new Date(item.dueDate)
+        if (d > max) max = d
+      }
+    }
+    return max
+  }, [allTransactions, debtItems, today])
+
   // Presets de datas
   const [customStart, setCustomStart] = useState(() => format(subMonths(today, 6), 'yyyy-MM-dd'))
-  const [customEnd, setCustomEnd] = useState(() => format(today, 'yyyy-MM-dd'))
+  const [customEnd, setCustomEnd] = useState(() => format(addMonths(today, 6), 'yyyy-MM-dd'))
   const [showCustomPicker, setShowCustomPicker] = useState(false)
 
   const { startDate, endDate } = useMemo(() => {
-    if (preset === '1m') return { startDate: subDays(today, 30), endDate: today }
-    if (preset === '3m') return { startDate: subMonths(today, 3), endDate: today }
-    if (preset === '6m') return { startDate: subMonths(today, 6), endDate: today }
-    if (preset === '1y') return { startDate: subMonths(today, 12), endDate: today }
-    if (preset === 'ytd') return { startDate: startOfYear(today), endDate: today }
+    // Projeções puramente futuras
+    if (preset === 'proj_3m') return { startDate: today, endDate: addMonths(today, 3) }
+    if (preset === 'proj_6m') return { startDate: today, endDate: addMonths(today, 6) }
+    if (preset === 'proj_1y') return { startDate: today, endDate: addMonths(today, 12) }
+
+    // Presets históricos (com ou sem extensão futura ativada)
+    const futureExtension = includeFuture ? addMonths(today, 6) : today
+
+    if (preset === '1m') return { startDate: subDays(today, 30), endDate: futureExtension }
+    if (preset === '3m') return { startDate: subMonths(today, 3), endDate: futureExtension }
+    if (preset === '6m') return { startDate: subMonths(today, 6), endDate: futureExtension }
+    if (preset === '1y') return { startDate: subMonths(today, 12), endDate: futureExtension }
+    if (preset === 'ytd') return { startDate: startOfYear(today), endDate: includeFuture ? endOfYear(today) : today }
     if (preset === 'all') {
       const accStart = getAccountingStartDate()
       const start = accStart ? new Date(accStart) : subMonths(today, 36)
-      return { startDate: start, endDate: today }
+      return { startDate: start, endDate: maxFutureDate }
     }
     return {
       startDate: new Date(customStart + 'T00:00:00'),
       endDate: new Date(customEnd + 'T23:59:59'),
     }
-  }, [preset, customStart, customEnd, today])
-
-  // Contas bancárias e dívidas cadastradas
-  const { data: accounts = [] } = useAccountsQuery()
-  const { data: debtAccounts = [] } = useDebtAccountsQuery()
-
-  const activeAccounts = useMemo(() => accounts.filter(a => a.isActive !== false), [accounts])
-  const activeDebtAccounts = useMemo(() => debtAccounts.filter(d => d.isActive !== false), [debtAccounts])
+  }, [preset, customStart, customEnd, today, includeFuture, maxFutureDate])
 
   // Dados de histórico patrimonial multi-conta
   const rawPoints = useNetWorthHistory(startDate, endDate, granularity)
   const points = useMemo(() => rawPoints ?? [], [rawPoints])
-
-  // Transações brutas para cálculo de fluxo (Inflow vs Outflow)
-  const { data: allTransactions = [] } = useTransactionsQuery()
 
   // Informações da conta selecionada (caso scopeType === 'account')
   const selectedAccount = useMemo(() => {
@@ -144,7 +183,6 @@ export default function AdvancedFinancialChart() {
     const map = new Map<string, { income: number; expense: number; net: number; date: Date }>()
 
     for (const tx of allTransactions) {
-      if (isDateBeforeAccountingStart(tx.date)) continue
       const txDate = new Date(tx.date)
       if (isBefore(txDate, startDate) || isBefore(endDate, txDate)) continue
 
@@ -262,6 +300,7 @@ export default function AdvancedFinancialChart() {
         smaPathD: '',
         yTicks: [],
         zeroY: 0,
+        todayIndex: -1,
       }
     }
 
@@ -314,6 +353,9 @@ export default function AdvancedFinancialChart() {
       y: getY(val),
     }))
 
+    // Índice do ponto mais próximo de hoje (para linha divisória HOJE)
+    const todayIndex = points.findIndex(p => p.isFuture)
+
     // Path de Área do Patrimônio Líquido / Escopo
     const pathD = pointCoords.reduce((acc, pt, i) => `${acc} ${i === 0 ? 'M' : 'L'} ${pt.x} ${pt.y}`, '')
     const zeroY = getY(0)
@@ -354,6 +396,7 @@ export default function AdvancedFinancialChart() {
       smaPathD,
       yTicks,
       zeroY,
+      todayIndex,
     }
   }, [points, smaPoints, chartW, chartH, padTop, padLeft, viewMode, getPointValue])
 
@@ -413,6 +456,11 @@ export default function AdvancedFinancialChart() {
             {activePoint && (
               <span className="text-[11px] font-mono text-slate-500">
                 · {formatDate(activePoint.date)}
+              </span>
+            )}
+            {activePoint?.isFuture && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 animate-pulse">
+                PROJEÇÃO
               </span>
             )}
           </div>
@@ -627,7 +675,7 @@ export default function AdvancedFinancialChart() {
             title="Evolução Contínua"
           >
             <LineChart className="w-3.5 h-3.5" />
-            <span>Curva de Evolução</span>
+            <span>Curva</span>
           </button>
 
           {scopeType === 'all' && (
@@ -664,6 +712,21 @@ export default function AdvancedFinancialChart() {
         {/* Controles de Timeframe e Indicadores */}
         <div className="flex items-center gap-2 flex-wrap">
           
+          {/* Toggle de Projeção Futura */}
+          <button
+            type="button"
+            onClick={() => setIncludeFuture(!includeFuture)}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold border transition-all ${
+              includeFuture
+                ? 'bg-indigo-500/25 text-indigo-300 border-indigo-500/50 shadow-sm shadow-indigo-500/20'
+                : 'bg-slate-950/40 text-slate-500 border-slate-800 hover:text-slate-300'
+            }`}
+            title="Estender o gráfico para incluir parcelas e faturas futuras"
+          >
+            <Sparkles className="w-3 h-3" />
+            <span>+Futuro</span>
+          </button>
+
           {/* Toggles de Indicadores */}
           {viewMode !== 'monthly_flow' && (
             <div className="flex items-center gap-1 mr-1">
@@ -695,36 +758,37 @@ export default function AdvancedFinancialChart() {
             </div>
           )}
 
-          {/* Presets Rápidos de Período (1M, 3M, 6M, 1A, YTD, MAX, Custom) */}
-          <div className="flex items-center gap-0.5 bg-slate-950/80 p-0.5 rounded-xl border border-slate-800">
-            {(['1m', '3m', '6m', '1y', 'ytd', 'all', 'custom'] as RangePreset[]).map(p => (
+          {/* Presets de Período (Passado, Projeção Futura e Panorâmica) */}
+          <div className="flex items-center gap-0.5 bg-slate-950/80 p-0.5 rounded-xl border border-slate-800 overflow-x-auto">
+            {([
+              { id: '1m', label: '1M' },
+              { id: '3m', label: '3M' },
+              { id: '6m', label: '6M' },
+              { id: '1y', label: '1A' },
+              { id: 'proj_3m', label: '+3M' },
+              { id: 'proj_6m', label: '+6M' },
+              { id: 'ytd', label: 'YTD' },
+              { id: 'all', label: 'Tudo' },
+              { id: 'custom', label: 'Data' },
+            ] as const).map(p => (
               <button
-                key={p}
+                key={p.id}
                 type="button"
                 onClick={() => {
-                  setPreset(p)
-                  if (p === 'custom') setShowCustomPicker(true)
+                  setPreset(p.id)
+                  if (p.id === 'custom') setShowCustomPicker(true)
                   else setShowCustomPicker(false)
                 }}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase transition-all ${
-                  preset === p
+                className={`px-2 py-1 rounded-lg text-[11px] font-bold uppercase transition-all whitespace-nowrap ${
+                  preset === p.id
                     ? 'bg-indigo-600 text-white shadow-sm'
+                    : p.id.startsWith('proj_')
+                    ? 'text-indigo-400/80 hover:text-indigo-200'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
+                title={p.id.startsWith('proj_') ? `Projeção futura de ${p.label}` : p.label}
               >
-                {p === '1m'
-                  ? '1M'
-                  : p === '3m'
-                  ? '3M'
-                  : p === '6m'
-                  ? '6M'
-                  : p === '1y'
-                  ? '1A'
-                  : p === 'ytd'
-                  ? 'YTD'
-                  : p === 'all'
-                  ? 'Tudo'
-                  : 'Data'}
+                {p.label}
               </button>
             ))}
           </div>
@@ -734,7 +798,7 @@ export default function AdvancedFinancialChart() {
             <select
               value={granularity}
               onChange={e => setGranularity(e.target.value as Granularity)}
-              className="bg-slate-950/80 border border-slate-800 rounded-xl px-2.5 py-1 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 font-medium"
+              className="bg-slate-950/80 border border-slate-800 rounded-xl px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 font-medium"
             >
               <option value="daily">Diário</option>
               <option value="weekly">Semanal</option>
@@ -758,7 +822,7 @@ export default function AdvancedFinancialChart() {
             />
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-xs text-slate-400 font-medium">Até:</label>
+            <label className="text-xs text-slate-400 font-medium">Até (incluindo futuro):</label>
             <input
               type="date"
               value={customEnd}
@@ -770,7 +834,7 @@ export default function AdvancedFinancialChart() {
         </div>
       )}
 
-      {/* ── 4. Canvas SVG Interativo com Crosshair HUD ──────────────────────── */}
+      {/* ── 4. Canvas SVG Interativo com Crosshair HUD e Indicador HOJE ────── */}
       <div ref={containerRef} className="relative w-full overflow-hidden select-none">
         
         {viewMode === 'monthly_flow' ? (
@@ -838,7 +902,7 @@ export default function AdvancedFinancialChart() {
             {points.length < 2 ? (
               <div className="py-24 flex flex-col items-center justify-center text-slate-500 text-xs">
                 <Activity className="w-10 h-10 text-slate-700 mb-2 animate-pulse" />
-                <p>Carregando dados históricos do período...</p>
+                <p>Carregando dados do período selecionado...</p>
               </div>
             ) : (
               <div className="relative">
@@ -847,6 +911,11 @@ export default function AdvancedFinancialChart() {
                 {activePoint && (
                   <div className="absolute top-2 left-16 z-10 flex items-center gap-3 bg-slate-950/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700/80 text-xs shadow-xl animate-in fade-in duration-100 flex-wrap">
                     <span className="font-bold text-slate-300">{formatDate(activePoint.date)}</span>
+                    {activePoint.isFuture && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/25 text-indigo-300 border border-indigo-500/40">
+                        PROJEÇÃO FUTURA
+                      </span>
+                    )}
                     <span className="text-slate-600">|</span>
                     <span className="font-extrabold tabular-nums" style={{ color: scopeConfig.color }}>
                       {formatCurrency(activePointVal)}
@@ -931,6 +1000,41 @@ export default function AdvancedFinancialChart() {
                       stroke="#475569"
                       strokeWidth="1.5"
                     />
+                  )}
+
+                  {/* Divisória "HOJE / INÍCIO DA PROJEÇÃO" se houver pontos futuros */}
+                  {chartScale.todayIndex > 0 && chartScale.todayIndex < chartScale.pointCoords.length && (
+                    <g>
+                      <line
+                        x1={chartScale.pointCoords[chartScale.todayIndex].x}
+                        y1={padTop}
+                        x2={chartScale.pointCoords[chartScale.todayIndex].x}
+                        y2={padTop + chartH}
+                        stroke="#6366f1"
+                        strokeWidth="1.5"
+                        strokeDasharray="4 3"
+                        opacity="0.6"
+                      />
+                      <rect
+                        x={chartScale.pointCoords[chartScale.todayIndex].x - 18}
+                        y={padTop - 12}
+                        width="36"
+                        height="12"
+                        rx="3"
+                        fill="#4f46e5"
+                        opacity="0.9"
+                      />
+                      <text
+                        x={chartScale.pointCoords[chartScale.todayIndex].x}
+                        y={padTop - 3}
+                        fill="#ffffff"
+                        fontSize="8"
+                        fontWeight="bold"
+                        textAnchor="middle"
+                      >
+                        HOJE
+                      </text>
+                    </g>
                   )}
 
                   {/* Renderização do Modo de Visualização */}
@@ -1072,9 +1176,9 @@ export default function AdvancedFinancialChart() {
                         key={i}
                         x={pt.x}
                         y={svgHeight - 12}
-                        fill="#64748b"
+                        fill={pt.point.isFuture ? '#818cf8' : '#64748b'}
                         fontSize="9"
-                        fontWeight="600"
+                        fontWeight={pt.point.isFuture ? 'bold' : '600'}
                         textAnchor="middle"
                         className="font-mono"
                       >

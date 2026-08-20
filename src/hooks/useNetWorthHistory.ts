@@ -72,7 +72,7 @@ export function useNetWorthHistory(
     limit.setHours(23, 59, 59, 999)
 
     let count = 0
-    const maxPoints = 500
+    const maxPoints = 200
 
     while (current <= limit && count < maxPoints) {
       count++
