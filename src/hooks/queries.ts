@@ -121,7 +121,9 @@ export async function fetchPayees(): Promise<Payee[]> {
   if (!client) return []
   const { data, error } = await client.from('payees').select('*')
   if (error) throw new Error(`payees: ${error.message}`)
-  return (data ?? []).map(rowToPayee)
+  return ((data as any[]) ?? [])
+    .filter(r => !r.id?.startsWith('system_'))
+    .map(rowToPayee)
 }
 
 // ── Opções comuns ────────────────────────────────────────────────────────────

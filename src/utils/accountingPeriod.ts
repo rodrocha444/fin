@@ -1,9 +1,11 @@
-// src/utils/accountingPeriod.ts — Gerenciamento e utilitários do Início do Período Contábil
+// src/utils/accountingPeriod.ts — Gerenciamento e sincronização nuvem do Início do Período Contábil
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
+import { getSupabaseClient } from '@/services/supabase'
 
 const STORAGE_KEY = 'fin_accounting_start_date'
 const EVENT_KEY = 'finplan_accounting_period_changed'
+const SYSTEM_PAYEE_ID = 'system_accounting_period'
 
 /**
  * Obtém a data configurada como início do período contábil (formato YYYY-MM-DD) ou null
@@ -16,16 +18,79 @@ export function getAccountingStartDate(): string | null {
 }
 
 /**
- * Salva ou remove a data de início do período contábil e notifica ouvintes
+ * Sincroniza a data de início contábil do Supabase para o dispositivo local
  */
-export function setAccountingStartDate(date: string | null): void {
-  if (typeof window === 'undefined') return
-  if (!date || date.trim() === '') {
-    localStorage.removeItem(STORAGE_KEY)
-  } else {
-    localStorage.setItem(STORAGE_KEY, date.trim())
+export async function syncAccountingStartDateWithRemote(): Promise<string | null> {
+  const client = getSupabaseClient()
+  if (!client) return getAccountingStartDate()
+
+  try {
+    const { data } = await (client.from('payees') as any)
+      .select('*')
+      .eq('id', SYSTEM_PAYEE_ID)
+      .maybeSingle()
+
+    if (data && data.name) {
+      const remoteDate = String(data.name).trim()
+      const localDate = getAccountingStartDate()
+      if (remoteDate !== localDate) {
+        localStorage.setItem(STORAGE_KEY, remoteDate)
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent(EVENT_KEY, { detail: { date: remoteDate } }))
+        }
+      }
+      return remoteDate
+    } else {
+      // Se não há no remoto, mas temos local, sincroniza para o remoto
+      const localDate = getAccountingStartDate()
+      if (localDate) {
+        await (client.from('payees') as any).upsert({
+          id: SYSTEM_PAYEE_ID,
+          name: localDate,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+      }
+    }
+  } catch {
+    // Silencioso em caso de falha transitória de rede
   }
-  window.dispatchEvent(new CustomEvent(EVENT_KEY, { detail: { date: date?.trim() || null } }))
+
+  return getAccountingStartDate()
+}
+
+/**
+ * Salva ou remove a data de início do período contábil localmente e no Supabase
+ */
+export async function setAccountingStartDate(date: string | null): Promise<void> {
+  const clean = date?.trim() || null
+
+  if (typeof window !== 'undefined') {
+    if (!clean) {
+      localStorage.removeItem(STORAGE_KEY)
+    } else {
+      localStorage.setItem(STORAGE_KEY, clean)
+    }
+    window.dispatchEvent(new CustomEvent(EVENT_KEY, { detail: { date: clean } }))
+  }
+
+  const client = getSupabaseClient()
+  if (client) {
+    try {
+      if (clean) {
+        await (client.from('payees') as any).upsert({
+          id: SYSTEM_PAYEE_ID,
+          name: clean,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+      } else {
+        await (client.from('payees') as any).delete().eq('id', SYSTEM_PAYEE_ID)
+      }
+    } catch (err) {
+      console.warn('Falha ao sincronizar período contábil no Supabase:', err)
+    }
+  }
 }
 
 /**
@@ -34,7 +99,6 @@ export function setAccountingStartDate(date: string | null): void {
 export function getAccountingStartMonth(): string | null {
   const dateStr = getAccountingStartDate()
   if (!dateStr) return null
-  // Espera formato YYYY-MM-DD
   return dateStr.substring(0, 7)
 }
 
@@ -69,6 +133,11 @@ export function useAccountingPeriod() {
   const [startDate, setStartDateState] = useState<string | null>(() => getAccountingStartDate())
 
   useEffect(() => {
+    // Sincroniza inicialmente com o Supabase para dispositivos móveis
+    syncAccountingStartDateWithRemote().then((remoteDate) => {
+      if (remoteDate) setStartDateState(remoteDate)
+    })
+
     const handleUpdate = (e: Event) => {
       const customEvent = e as CustomEvent<{ date: string | null }>
       setStartDateState(customEvent.detail?.date ?? getAccountingStartDate())

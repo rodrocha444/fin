@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { getSupabaseClient, getSupabaseConfig } from '@/services/supabase'
+import { syncAccountingStartDateWithRemote } from '@/utils/accountingPeriod'
 import {
   QUERY_KEYS,
   TABLE_INVALIDATION_MAP,
@@ -99,11 +100,17 @@ export const FinancialDataProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // ── Barramento de eventos local — integração com notifyDataChanged() ────────
   useEffect(() => {
+    // Sincroniza o período contábil nuvem com o dispositivo local
+    syncAccountingStartDateWithRemote()
+
     const handleLocalDataChanged = (e: Event) => {
       const { table } = (e as CustomEvent<{ table: string }>).detail ?? {}
       const keysToInvalidate = TABLE_INVALIDATION_MAP[table ?? 'all'] ?? Object.values(QUERY_KEYS)
       for (const key of keysToInvalidate) {
         queryClient.invalidateQueries({ queryKey: key })
+      }
+      if (table === 'payees' || table === 'all') {
+        syncAccountingStartDateWithRemote()
       }
     }
 
