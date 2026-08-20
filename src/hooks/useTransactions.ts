@@ -218,13 +218,17 @@ export function useMonthSummary(month: string): { income: number; expense: numbe
 
 /** Histórico consolidado de compras para conta do tipo Cartão de Crédito */
 export function useCreditCardPurchases(accountId: string | undefined): CreditCardPurchase[] | undefined {
-  const { transactions, installmentGroups, isLoading } = useFinancialData()
+  const { transactions, installmentGroups, accounts, isLoading } = useFinancialData()
 
   return useMemo(() => {
     if (isLoading && transactions.length === 0) return undefined
     if (!accountId) return []
 
-    const allTxs = transactions.filter(t => t.accountId === accountId)
+    const accountMap = new Map(accounts.map(a => [a.id!, a]))
+
+    const allTxs = transactions.filter(
+      t => t.accountId === accountId || (t.transferAccountId === accountId && t.type === 'transfer')
+    )
     const allGroups = installmentGroups.filter(g => g.accountId === accountId)
 
     const groupMap = new Map(allGroups.map(g => [g.id!, g]))
@@ -232,7 +236,21 @@ export function useCreditCardPurchases(accountId: string | undefined): CreditCar
     const purchases: CreditCardPurchase[] = []
 
     for (const tx of allTxs) {
-      if (tx.installmentGroupId) {
+      if (tx.transferAccountId === accountId && tx.type === 'transfer') {
+        const fromAcc = accountMap.get(tx.accountId)?.name || 'Conta'
+        purchases.push({
+          id: `tx-${tx.id}`,
+          transactionId: tx.id,
+          payee: tx.payee || `Transferência de ${fromAcc}`,
+          date: tx.date,
+          createdAt: tx.createdAt,
+          amount: tx.amount,
+          categoryId: tx.categoryId,
+          notes: tx.notes,
+          type: 'transfer',
+          isInstallment: false,
+        })
+      } else if (tx.installmentGroupId) {
         if (seenGroupIds.has(tx.installmentGroupId)) continue
         seenGroupIds.add(tx.installmentGroupId)
 
@@ -284,5 +302,5 @@ export function useCreditCardPurchases(accountId: string | undefined): CreditCar
     })
 
     return purchases
-  }, [transactions, installmentGroups, accountId, isLoading])
+  }, [transactions, installmentGroups, accounts, accountId, isLoading])
 }

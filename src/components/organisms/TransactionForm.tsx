@@ -38,6 +38,7 @@ const MODE_CONFIG: Record<TxMode, { label: string; color: string; activeBg: stri
 
 interface TransactionFormProps {
   onClose: () => void
+  onSuccess?: () => void
   transaction?: Transaction
   defaultAccountId?: string
   defaultTransferAccountId?: string
@@ -73,6 +74,7 @@ function saveLastTxDate(dateStr: string) {
 
 export default function TransactionForm({
   onClose,
+  onSuccess,
   transaction,
   defaultAccountId,
   defaultTransferAccountId,
@@ -248,6 +250,7 @@ export default function TransactionForm({
         type: mode === 'income' ? 'income' : 'expense',
       })
     }
+    onSuccess?.()
     onClose()
   }
 
