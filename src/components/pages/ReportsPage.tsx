@@ -1,158 +1,325 @@
-import { useState } from 'react'
-import { TrendingUp, TrendingDown, BarChart3 } from 'lucide-react'
-import { useBudgetRows } from '@/hooks/useBudget'
+// src/components/pages/ReportsPage.tsx — Página de Relatórios Financeiros Reformulada
+import { useState, useMemo } from 'react'
+import {
+  TrendingUp,
+  TrendingDown,
+  Wallet,
+  PiggyBank,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+} from 'lucide-react'
+import { useBudgetRows, useIncomeBudgetRows } from '@/hooks/useBudget'
 import { useMonthSummary } from '@/hooks/useTransactions'
-import { useAllBalances, useAccounts } from '@/hooks/useAccounts'
-import { formatCurrency, currentMonth } from '@/utils/format'
-import NetWorthChartCard from '@/components/organisms/NetWorthChartCard'
+import { useAllBalances } from '@/hooks/useAccounts'
+import { useFinancialData } from '@/context/FinancialDataContext'
+import { formatCurrency, formatMonthLabel, currentMonth } from '@/utils/format'
+import { toMonthKey } from '@/services/api/budget'
+import { isMonthBeforeAccountingStart } from '@/utils/accountingPeriod'
+import CategoryPieCard, { type CategoryPieItem } from '@/components/molecules/CategoryPieCard'
+import AdvancedFinancialChart from '@/components/organisms/AdvancedFinancialChart'
 import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
-
-function ProgressBar({ value, max, overBudget }: { value: number; max: number; overBudget: boolean }) {
-  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0
-  return (
-    <div className="w-full bg-slate-700/50 rounded-full h-1.5 overflow-hidden mt-1">
-      <div
-        className={`h-full rounded-full transition-all duration-500 ${overBudget ? 'bg-rose-500' : 'bg-indigo-500'}`}
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  )
-}
+import { addMonths, subMonths, parseISO, format } from 'date-fns'
 
 export default function ReportsPage() {
-  const [month] = useState(currentMonth)
-  const rows = useBudgetRows(month)
+  const [month, setMonth] = useState(() => currentMonth())
+  const { transactions = [], categories = [], categoryGroups = [] } = useFinancialData()
+
+  const budgetRows = useBudgetRows(month)
+  const incomeBudgetRows = useIncomeBudgetRows(month)
   const monthSummary = useMonthSummary(month)
-  const accounts = useAccounts() ?? []
   const balances = useAllBalances()
 
-  const netWorth = balances
-    ? Array.from(balances.values()).reduce((s, v) => s + v, 0)
-    : 0
+  // Navegação de mês
+  const handlePrevMonth = () => {
+    const d = parseISO(`${month}-01`)
+    const prev = format(subMonths(d, 1), 'yyyy-MM')
+    if (!isMonthBeforeAccountingStart(prev)) {
+      setMonth(prev)
+    }
+  }
+
+  const handleNextMonth = () => {
+    const d = parseISO(`${month}-01`)
+    setMonth(format(addMonths(d, 1), 'yyyy-MM'))
+  }
+
+  const handleCurrentMonth = () => {
+    setMonth(currentMonth())
+  }
+
+  // Patrimônio líquido total
+  const netWorth = useMemo(() => {
+    if (!balances) return 0
+    return Array.from(balances.values()).reduce((sum, v) => sum + v, 0)
+  }, [balances])
+
+  // Métricas do mês
+  const income = monthSummary?.income ?? 0
+  const expense = monthSummary?.expense ?? 0
+  const netSavings = income - expense
+  const savingsRate = income > 0 ? (netSavings / income) * 100 : 0
+
+  // ── 1. Itens de Despesa do Mês para o Gráfico de Pizza ──────────────────────
+  const expensePieItems: CategoryPieItem[] = useMemo(() => {
+    const list: CategoryPieItem[] = []
+
+    if (budgetRows && budgetRows.length > 0) {
+      for (const group of budgetRows) {
+        for (const cat of group.categories) {
+          if (cat.activity > 0) {
+            list.push({
+              id: cat.category.id || `${group.group.id}_${cat.category.name}`,
+              name: cat.category.name,
+              groupName: group.group.name,
+              amount: cat.activity,
+            })
+          }
+        }
+      }
+    }
+
+    // Adiciona eventuais despesas sem categoria
+    const uncategorizedExpense = transactions
+      .filter(t => t.type === 'expense' && !t.categoryId && toMonthKey(new Date(t.date)) === month)
+      .reduce((s, t) => s + t.amount, 0)
+
+    if (uncategorizedExpense > 0) {
+      list.push({
+        id: 'uncategorized_expense',
+        name: 'Sem Categoria',
+        groupName: 'Diversos',
+        amount: uncategorizedExpense,
+      })
+    }
+
+    return list
+  }, [budgetRows, transactions, month])
+
+  // ── 2. Itens de Receita do Mês para o Gráfico de Pizza ──────────────────────
+  const incomePieItems: CategoryPieItem[] = useMemo(() => {
+    const list: CategoryPieItem[] = []
+    const catMap = new Map(categories.map(c => [c.id!, c]))
+    const groupMap = new Map(categoryGroups.map(g => [g.id!, g]))
+
+    if (incomeBudgetRows && incomeBudgetRows.length > 0) {
+      for (const group of incomeBudgetRows) {
+        for (const cat of group.categories) {
+          if (cat.received > 0) {
+            list.push({
+              id: cat.category.id || `${group.group.id}_${cat.category.name}`,
+              name: cat.category.name,
+              groupName: group.group.name,
+              amount: cat.received,
+            })
+          }
+        }
+      }
+    }
+
+    // Se ainda não houver itens agrupados, extrai diretamente das transações de renda do mês
+    if (list.length === 0) {
+      const monthIncomeTxs = transactions.filter(
+        t => t.type === 'income' && toMonthKey(new Date(t.date)) === month
+      )
+
+      const byCategory = new Map<string, { name: string; groupName?: string; amount: number }>()
+
+      for (const tx of monthIncomeTxs) {
+        const cat = tx.categoryId ? catMap.get(tx.categoryId) : undefined
+        const grp = cat ? groupMap.get(cat.groupId) : undefined
+        const catKey = tx.categoryId || (tx.payee ? `payee_${tx.payee}` : 'uncategorized_income')
+        const catName = cat?.name || tx.payee || 'Renda Diversa'
+
+        const current = byCategory.get(catKey) || { name: catName, groupName: grp?.name, amount: 0 }
+        current.amount += tx.amount
+        byCategory.set(catKey, current)
+      }
+
+      for (const [id, data] of byCategory.entries()) {
+        if (data.amount > 0) {
+          list.push({
+            id,
+            name: data.name,
+            groupName: data.groupName,
+            amount: data.amount,
+          })
+        }
+      }
+    }
+
+    return list
+  }, [incomeBudgetRows, transactions, categories, categoryGroups, month])
 
   return (
-    <div className="fade-in">
-
-      {/* Header */}
+    <div className="fade-in pb-16">
+      
+      {/* ── Header com Seletor de Mês ────────────────────────────────────────── */}
       <div
-        className="flex items-center justify-between px-3 sm:px-6 pb-3 border-b border-slate-800 bg-slate-900"
+        className="px-3 sm:px-6 pb-3 border-b border-slate-800 bg-slate-900 sticky top-0 z-20"
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
       >
-        <h1 className="text-lg sm:text-xl font-semibold text-slate-100">Relatórios</h1>
-        <div className="lg:hidden">
-          <SyncStatusBadge compact={true} />
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold text-slate-100 flex items-center gap-2">
+              <span>Relatórios Financeiros</span>
+            </h1>
+            <p className="text-[11px] sm:text-xs text-slate-500">
+              Análise de distribuição de despesas, receitas e evolução patrimonial
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Seletor de Mês */}
+            <div className="flex items-center bg-slate-950/80 rounded-xl border border-slate-800 p-0.5">
+              <button
+                type="button"
+                onClick={handlePrevMonth}
+                disabled={isMonthBeforeAccountingStart(month)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                title="Mês anterior"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <span className="px-3 py-1 text-xs font-bold text-slate-200 capitalize min-w-[110px] text-center">
+                {formatMonthLabel(month)}
+              </span>
+
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                title="Próximo mês"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {month !== currentMonth() && (
+              <button
+                type="button"
+                onClick={handleCurrentMonth}
+                className="btn-secondary py-1.5 px-2.5 text-xs font-semibold"
+                title="Voltar para o mês atual"
+              >
+                Mês Atual
+              </button>
+            )}
+
+            <div className="lg:hidden">
+              <SyncStatusBadge compact={true} />
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="p-3 sm:p-6 space-y-4">
+      <div className="p-3 sm:p-6 space-y-6">
+        
+        {/* ── Cards de KPIs Principais do Mês ───────────────────────────────── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          
+          {/* Receitas */}
+          <div className="card !p-3.5 sm:!p-4 bg-slate-900 border border-slate-800 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-400">Receitas</span>
+              <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <TrendingUp className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <p className="text-base sm:text-xl font-extrabold text-emerald-400 tabular-nums">
+              {formatCurrency(income)}
+            </p>
+            <p className="text-[10px] text-slate-500">Entradas em {formatMonthLabel(month)}</p>
+          </div>
 
-        {/* Cards de resumo */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-4">
-          <div className="card !p-3 sm:!p-4">
-            <TrendingUp className="w-4 h-4 text-emerald-400 mb-1.5" />
-            <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Renda</p>
-            <p className="text-sm sm:text-xl font-bold text-emerald-400 tabular-nums">
-              {formatCurrency(monthSummary?.income ?? 0)}
+          {/* Despesas */}
+          <div className="card !p-3.5 sm:!p-4 bg-slate-900 border border-slate-800 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-400">Despesas</span>
+              <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                <TrendingDown className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <p className="text-base sm:text-xl font-extrabold text-rose-400 tabular-nums">
+              {formatCurrency(expense)}
+            </p>
+            <p className="text-[10px] text-slate-500">Saídas em {formatMonthLabel(month)}</p>
+          </div>
+
+          {/* Economia / Taxa de Poupança */}
+          <div className="card !p-3.5 sm:!p-4 bg-slate-900 border border-slate-800 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-400">Economia Líquida</span>
+              <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                <PiggyBank className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <p
+              className={`text-base sm:text-xl font-extrabold tabular-nums ${
+                netSavings >= 0 ? 'text-indigo-300' : 'text-rose-400'
+              }`}
+            >
+              {formatCurrency(netSavings)}
+            </p>
+            <p className="text-[10px] text-slate-500">
+              Taxa de poupança: <strong className={savingsRate >= 0 ? 'text-indigo-400' : 'text-rose-400'}>{savingsRate.toFixed(1)}%</strong>
             </p>
           </div>
-          <div className="card !p-3 sm:!p-4">
-            <TrendingDown className="w-4 h-4 text-rose-400 mb-1.5" />
-            <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Despesas</p>
-            <p className="text-sm sm:text-xl font-bold text-rose-400 tabular-nums">
-              {formatCurrency(monthSummary?.expense ?? 0)}
-            </p>
-          </div>
-          <div className="card !p-3 sm:!p-4">
-            <BarChart3 className="w-4 h-4 text-indigo-400 mb-1.5" />
-            <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Patrimônio</p>
-            <p className={`text-sm sm:text-xl font-bold tabular-nums ${netWorth >= 0 ? 'text-slate-100' : 'text-rose-400'}`}>
+
+          {/* Patrimônio Líquido */}
+          <div className="card !p-3.5 sm:!p-4 bg-slate-900 border border-slate-800 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-400">Patrimônio Líquido</span>
+              <div className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                <Wallet className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <p
+              className={`text-base sm:text-xl font-extrabold tabular-nums ${
+                netWorth >= 0 ? 'text-slate-100' : 'text-rose-400'
+              }`}
+            >
               {formatCurrency(netWorth)}
             </p>
+            <p className="text-[10px] text-slate-500">Saldo consolidado de todas as contas</p>
           </div>
+
         </div>
 
-        {/* Medidor e Gráfico de Patrimônio Líquido */}
-        <NetWorthChartCard />
+        {/* ── 2 Gráficos de Pizza Interativos com Checkbox (Despesas e Receitas) ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+          
+          {/* Pizza de Despesas do Mês */}
+          <CategoryPieCard
+            title="Despesas por Categoria"
+            type="expense"
+            items={expensePieItems}
+            monthLabel={formatMonthLabel(month)}
+          />
 
-        {/* Gastos por categoria */}
-        <div className="card">
-          <h2 className="text-sm font-semibold text-slate-300 mb-4">Gastos por categoria</h2>
-          {!rows || rows.every(r => r.totalActivity === 0) ? (
-            <p className="text-slate-600 text-sm text-center py-4">Sem despesas neste mês</p>
-          ) : (
-            <div className="space-y-4">
-              {rows
-                .filter(r => r.totalActivity > 0)
-                .sort((a, b) => b.totalActivity - a.totalActivity)
-                .map(row => (
-                  <div key={row.group.id}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-400 truncate flex-1">{row.group.name}</span>
-                      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                        <span className="text-[10px] text-slate-600 hidden sm:inline">
-                          / {formatCurrency(row.totalBudgeted)}
-                        </span>
-                        <span className="text-xs font-semibold text-rose-400 tabular-nums">
-                          {formatCurrency(row.totalActivity)}
-                        </span>
-                      </div>
-                    </div>
-                    <ProgressBar
-                      value={row.totalActivity}
-                      max={row.totalBudgeted}
-                      overBudget={row.totalActivity > row.totalBudgeted && row.totalBudgeted > 0}
-                    />
-                    <div className="mt-2 space-y-1.5 pl-3">
-                      {row.categories
-                        .filter(c => c.activity > 0)
-                        .sort((a, b) => b.activity - a.activity)
-                        .map(c => (
-                          <div key={c.category.id}>
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] sm:text-xs text-slate-500 truncate flex-1">
-                                {c.category.name}
-                              </span>
-                              <span className="text-[10px] sm:text-xs text-slate-400 tabular-nums ml-2 flex-shrink-0">
-                                {formatCurrency(c.activity)}
-                                {c.budgeted > 0 && (
-                                  <span className="text-slate-600"> / {formatCurrency(c.budgeted)}</span>
-                                )}
-                              </span>
-                            </div>
-                            <ProgressBar
-                              value={c.activity}
-                              max={c.budgeted}
-                              overBudget={c.available < 0 && c.budgeted > 0}
-                            />
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                ))}
-            </div>
-          )}
+          {/* Pizza de Receitas do Mês */}
+          <CategoryPieCard
+            title="Receitas por Categoria"
+            type="income"
+            items={incomePieItems}
+            monthLabel={formatMonthLabel(month)}
+          />
+
         </div>
 
-        {/* Saldos por conta */}
-        <div className="card">
-          <h2 className="text-sm font-semibold text-slate-300 mb-3">Saldos por conta</h2>
-          <div className="space-y-2.5">
-            {accounts.map(acc => {
-              const bal = balances?.get(acc.id!) ?? 0
-              return (
-                <div key={acc.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: acc.color }} />
-                    <span className="text-sm text-slate-300 truncate">{acc.name}</span>
-                  </div>
-                  <span className={`text-sm font-semibold tabular-nums flex-shrink-0 ml-2 ${bal >= 0 ? 'text-slate-200' : 'text-rose-400'}`}>
-                    {formatCurrency(bal)}
-                  </span>
-                </div>
-              )
-            })}
+        {/* ── Gráfico Completo Estilo Plataforma de Corretora ────────────────── */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-indigo-400" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300">
+              Terminal de Evolução e Análise Financeira
+            </h2>
           </div>
+
+          <AdvancedFinancialChart />
         </div>
+
       </div>
     </div>
   )
