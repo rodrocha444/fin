@@ -1,11 +1,11 @@
-// src/hooks/useAccounts.ts — Hooks reativos para contas e saldos (Cloud-Only)
+// src/hooks/useAccounts.ts — Hooks reativos para contas e saldos com TanStack Query v5
 import { useMemo } from 'react'
-import { useFinancialData } from '@/context/FinancialDataContext'
+import { useAccountsQuery, useTransactionsQuery } from '@/hooks/queries'
 import type { Account } from '@/types'
 
 /** Todas as contas ativas, em tempo real */
 export function useAccounts(): Account[] | undefined {
-  const { accounts, isLoading } = useFinancialData()
+  const { data: accounts = [], isLoading } = useAccountsQuery()
   return useMemo(() => {
     if (isLoading && accounts.length === 0) return undefined
     return accounts.filter(a => a.isActive !== false)
@@ -14,7 +14,7 @@ export function useAccounts(): Account[] | undefined {
 
 /** Uma conta específica pelo ID */
 export function useAccount(accountId: string | undefined): Account | undefined {
-  const { accounts } = useFinancialData()
+  const { data: accounts = [] } = useAccountsQuery()
   return useMemo(() => {
     if (!accountId) return undefined
     return accounts.find(a => a.id === accountId)
@@ -23,7 +23,8 @@ export function useAccount(accountId: string | undefined): Account | undefined {
 
 /** Saldo de uma conta específica, calculado dinamicamente */
 export function useAccountBalance(accountId: string | undefined): number | undefined {
-  const { accounts, transactions } = useFinancialData()
+  const { data: accounts = [] } = useAccountsQuery()
+  const { data: transactions = [] } = useTransactionsQuery()
 
   return useMemo(() => {
     if (!accountId) return undefined
@@ -56,7 +57,7 @@ export function useAccountBalance(accountId: string | undefined): number | undef
 
 /** Verifica se uma conta possui transações vinculadas (reativo) */
 export function useHasAccountTransactions(accountId: string | undefined): boolean {
-  const { transactions } = useFinancialData()
+  const { data: transactions = [] } = useTransactionsQuery()
   return useMemo(() => {
     if (!accountId) return false
     return transactions.some(t => t.accountId === accountId || t.transferAccountId === accountId)
@@ -65,7 +66,9 @@ export function useHasAccountTransactions(accountId: string | undefined): boolea
 
 /** Saldo de todas as contas: Map<accountId, balance> */
 export function useAllBalances(): Map<string, number> | undefined {
-  const { accounts, transactions, isLoading } = useFinancialData()
+  const { data: accounts = [], isLoading: lAccounts } = useAccountsQuery()
+  const { data: transactions = [], isLoading: lTransactions } = useTransactionsQuery()
+  const isLoading = lAccounts || lTransactions
 
   return useMemo(() => {
     if (isLoading && accounts.length === 0) return undefined

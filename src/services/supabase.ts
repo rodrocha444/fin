@@ -1,5 +1,6 @@
 // src/services/supabase.ts — Cliente e Gerenciamento de Credenciais Supabase
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database.types'
 
 export interface SupabaseConfig {
   url: string
@@ -55,18 +56,18 @@ export function clearSupabaseConfig(): void {
   resetSupabaseClient()
 }
 
-// Instância singleton em cache do cliente
-let cachedClient: SupabaseClient | null = null
+// Instância singleton em cache do cliente, tipado com o schema do banco
+let cachedClient: SupabaseClient<Database> | null = null
 
-/** Retorna a instância do cliente Supabase ou null se não configurado */
-export function getSupabaseClient(): SupabaseClient | null {
+/** Retorna a instância do cliente Supabase tipado ou null se não configurado */
+export function getSupabaseClient(): SupabaseClient<Database> | null {
   if (cachedClient) return cachedClient
 
   const config = getSupabaseConfig()
   if (!config) return null
 
   try {
-    cachedClient = createClient(config.url, config.anonKey, {
+    cachedClient = createClient<Database>(config.url, config.anonKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -92,7 +93,7 @@ export async function testSupabaseConnection(customConfig?: SupabaseConfig): Pro
   }
 
   try {
-    const testClient = createClient(config.url, config.anonKey)
+    const testClient = createClient<Database>(config.url, config.anonKey)
     // Tenta uma consulta simples na tabela accounts
     const { error } = await testClient.from('accounts').select('id').limit(1)
 

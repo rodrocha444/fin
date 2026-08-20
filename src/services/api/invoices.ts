@@ -1,4 +1,4 @@
-// src/db/repositories/invoices.ts — Gerenciamento do status de pagamento de faturas (Cloud-Only)
+// src/services/api/invoices.ts — Gerenciamento do status de pagamento de faturas
 const PAID_INVOICES_KEY = 'finplan_paid_invoices_map'
 
 export function getPaidInvoicesMap(): Record<string, boolean> {

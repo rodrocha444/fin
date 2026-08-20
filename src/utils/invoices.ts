@@ -3,7 +3,7 @@
 // Utilitários de cálculo e ciclo de faturas para cartões de crédito
 // ─────────────────────────────────────────────────────────────
 
-import { format, addMonths, subMonths, getDaysInMonth, isValid } from 'date-fns'
+import { format, addMonths, subMonths, getDaysInMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { Account, Transaction } from '@/types'
 

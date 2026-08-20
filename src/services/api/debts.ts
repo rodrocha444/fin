@@ -1,6 +1,5 @@
-// src/services/api/debts.ts — Operações de dívidas / cobranças via Supabase API
 import { getClient } from './client'
-import { rowToDebtAccount, debtAccountToRow, rowToDebtItem, debtItemToRow, toIso } from './types'
+import { rowToDebtAccount, debtAccountToRow, rowToDebtItem, debtItemToRow } from './types'
 import { createId } from '@/utils/id'
 import { addMonths } from 'date-fns'
 import { notifyDataChanged } from './events'

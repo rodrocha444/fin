@@ -1,4 +1,6 @@
 // src/services/api/types.ts — Conversores de dados entre Supabase e Typescript
+// Tipado via src/types/database.types.ts (Supabase TypeGen)
+import type { Tables } from '@/types/database.types'
 import type {
   Account,
   CategoryGroup,
@@ -12,13 +14,13 @@ import type {
   DebtItem,
 } from '@/types'
 
-export function toDate(val: any): Date | undefined {
+export function toDate(val: string | null | undefined): Date | undefined {
   if (!val) return undefined
   const d = new Date(val)
   return isNaN(d.getTime()) ? undefined : d
 }
 
-export function toIso(val: any): string | null {
+export function toIso(val: Date | string | null | undefined): string | null {
   if (!val) return null
   if (typeof val === 'string') return val
   if (val instanceof Date) return val.toISOString()
@@ -26,11 +28,11 @@ export function toIso(val: any): string | null {
 }
 
 // 1. Contas
-export function rowToAccount(row: any): Account {
+export function rowToAccount(row: Tables<'accounts'>): Account {
   return {
     id: row.id,
     name: row.name,
-    type: row.type,
+    type: row.type as Account['type'],
     initialBalance: Number(row.initial_balance ?? 0),
     creditLimit: row.credit_limit != null ? Number(row.credit_limit) : undefined,
     statementClosingDay: row.statement_closing_day ?? undefined,
@@ -42,12 +44,12 @@ export function rowToAccount(row: any): Account {
   }
 }
 
-export function accountToRow(item: Partial<Account>) {
+export function accountToRow(item: Partial<Account>): Record<string, unknown> {
   const now = new Date().toISOString()
   return {
     ...(item.id ? { id: item.id } : {}),
-    name: item.name,
-    type: item.type,
+    name: item.name ?? '',
+    type: item.type ?? 'checking',
     initial_balance: item.initialBalance ?? 0,
     credit_limit: item.creditLimit ?? null,
     statement_closing_day: item.statementClosingDay ?? null,
@@ -61,22 +63,22 @@ export function accountToRow(item: Partial<Account>) {
 }
 
 // 2. Grupos de Categorias
-export function rowToCategoryGroup(row: any): CategoryGroup {
+export function rowToCategoryGroup(row: Tables<'category_groups'>): CategoryGroup {
   return {
     id: row.id,
     name: row.name,
-    type: row.type || undefined,
+    type: (row.type as CategoryGroup['type']) || undefined,
     sortOrder: Number(row.sort_order ?? 0),
     isHidden: Boolean(row.is_hidden),
     isSystem: Boolean(row.is_system),
   }
 }
 
-export function categoryGroupToRow(item: Partial<CategoryGroup>) {
+export function categoryGroupToRow(item: Partial<CategoryGroup>): Record<string, unknown> {
   const now = new Date().toISOString()
   return {
     ...(item.id ? { id: item.id } : {}),
-    name: item.name,
+    name: item.name ?? '',
     type: item.type || null,
     sort_order: item.sortOrder ?? 0,
     is_hidden: item.isHidden ?? false,
@@ -87,7 +89,7 @@ export function categoryGroupToRow(item: Partial<CategoryGroup>) {
 }
 
 // 3. Categorias
-export function rowToCategory(row: any): Category {
+export function rowToCategory(row: Tables<'categories'>): Category {
   return {
     id: row.id,
     groupId: row.group_id,
@@ -97,12 +99,12 @@ export function rowToCategory(row: any): Category {
   }
 }
 
-export function categoryToRow(item: Partial<Category>) {
+export function categoryToRow(item: Partial<Category>): Record<string, unknown> {
   const now = new Date().toISOString()
   return {
     ...(item.id ? { id: item.id } : {}),
-    group_id: item.groupId,
-    name: item.name,
+    group_id: item.groupId ?? '',
+    name: item.name ?? '',
     sort_order: item.sortOrder ?? 0,
     is_hidden: item.isHidden ?? false,
     created_at: now,
@@ -111,7 +113,7 @@ export function categoryToRow(item: Partial<Category>) {
 }
 
 // 4. Orçamento Mensal
-export function rowToBudgetMonth(row: any): BudgetMonth {
+export function rowToBudgetMonth(row: Tables<'budget_months'>): BudgetMonth {
   return {
     id: row.id,
     month: row.month,
@@ -122,12 +124,12 @@ export function rowToBudgetMonth(row: any): BudgetMonth {
   }
 }
 
-export function budgetMonthToRow(item: Partial<BudgetMonth>) {
+export function budgetMonthToRow(item: Partial<BudgetMonth>): Record<string, unknown> {
   const now = new Date().toISOString()
   return {
     ...(item.id ? { id: item.id } : {}),
-    month: item.month,
-    category_id: item.categoryId,
+    month: item.month ?? '',
+    category_id: item.categoryId ?? '',
     budgeted: item.budgeted ?? 0,
     activity: item.activity ?? 0,
     available: item.available ?? 0,
@@ -137,7 +139,12 @@ export function budgetMonthToRow(item: Partial<BudgetMonth>) {
 }
 
 // 5. Transações
-export function rowToTransaction(row: any): Transaction {
+export function rowToTransaction(row: Tables<'transactions'>): Transaction {
+  const rawNotes = row.notes || ''
+  const splitMatch = rawNotes.match(/\[split:([a-zA-Z0-9_-]+)\]/)
+  const splitGroupId = row.split_group_id || (splitMatch ? splitMatch[1] : undefined)
+  const cleanNotes = rawNotes.replace(/\s*\[split:[a-zA-Z0-9_-]+\]/, '').trim()
+
   return {
     id: row.id,
     accountId: row.account_id,
@@ -145,31 +152,43 @@ export function rowToTransaction(row: any): Transaction {
     amount: Number(row.amount),
     payee: row.payee || '',
     categoryId: row.category_id || undefined,
-    notes: row.notes || undefined,
+    notes: cleanNotes || undefined,
     cleared: Boolean(row.cleared),
-    type: row.type || 'expense',
+    type: (row.type as Transaction['type']) || 'expense',
     transferAccountId: row.transfer_account_id || undefined,
     transferTransactionId: row.transfer_transaction_id || undefined,
     installmentGroupId: row.installment_group_id || undefined,
     installmentNumber: row.installment_number ?? undefined,
     installmentTotal: row.installment_total ?? undefined,
-    splitGroupId: row.split_group_id || undefined,
+    splitGroupId,
     isScheduledProjection: Boolean(row.is_scheduled_projection),
     scheduledId: row.scheduled_id || undefined,
     createdAt: toDate(row.created_at) || new Date(),
   }
 }
 
-export function transactionToRow(item: Partial<Transaction>) {
+export function transactionToRow(item: Partial<Transaction>): Record<string, unknown> {
   const now = new Date().toISOString()
+  let finalNotes = item.notes || null
+
+  // Adiciona a tag oculta [split:ID] nas notes se tiver splitGroupId para garantir persistência mesmo sem coluna
+  if (item.splitGroupId) {
+    const splitTag = `[split:${item.splitGroupId}]`
+    if (!finalNotes) {
+      finalNotes = splitTag
+    } else if (!finalNotes.includes(splitTag)) {
+      finalNotes = `${finalNotes} ${splitTag}`
+    }
+  }
+
   return {
     ...(item.id ? { id: item.id } : {}),
-    account_id: item.accountId,
+    account_id: item.accountId ?? '',
     date: toIso(item.date) || now,
-    amount: item.amount,
+    amount: item.amount ?? 0,
     payee: item.payee || '',
     category_id: item.categoryId || null,
-    notes: item.notes || null,
+    notes: finalNotes,
     cleared: item.cleared ?? false,
     type: item.type || 'expense',
     transfer_account_id: item.transferAccountId || null,
@@ -186,7 +205,7 @@ export function transactionToRow(item: Partial<Transaction>) {
 }
 
 // 6. Grupos de Parcelamento
-export function rowToInstallmentGroup(row: any): InstallmentGroup {
+export function rowToInstallmentGroup(row: Tables<'installment_groups'>): InstallmentGroup {
   return {
     id: row.id,
     description: row.description,
@@ -200,16 +219,16 @@ export function rowToInstallmentGroup(row: any): InstallmentGroup {
   }
 }
 
-export function installmentGroupToRow(item: Partial<InstallmentGroup>) {
+export function installmentGroupToRow(item: Partial<InstallmentGroup>): Record<string, unknown> {
   const now = new Date().toISOString()
   return {
     ...(item.id ? { id: item.id } : {}),
-    description: item.description,
-    total_amount: item.totalAmount,
-    installment_count: item.installmentCount,
-    installment_amount: item.installmentAmount,
+    description: item.description ?? '',
+    total_amount: item.totalAmount ?? 0,
+    installment_count: item.installmentCount ?? 1,
+    installment_amount: item.installmentAmount ?? 0,
     start_date: toIso(item.startDate) || now,
-    account_id: item.accountId,
+    account_id: item.accountId ?? '',
     category_id: item.categoryId || null,
     created_at: toIso(item.createdAt) || now,
     updated_at: now,
@@ -217,16 +236,16 @@ export function installmentGroupToRow(item: Partial<InstallmentGroup>) {
 }
 
 // 7. Transações Agendadas
-export function rowToScheduledTransaction(row: any): ScheduledTransaction {
+export function rowToScheduledTransaction(row: Tables<'scheduled_transactions'>): ScheduledTransaction {
   return {
     id: row.id,
     accountId: row.account_id,
     amount: Number(row.amount),
     payee: row.payee || '',
     categoryId: row.category_id || undefined,
-    type: row.type || 'expense',
+    type: (row.type as ScheduledTransaction['type']) || 'expense',
     transferAccountId: row.transfer_account_id || undefined,
-    frequency: row.frequency || 'monthly',
+    frequency: (row.frequency as ScheduledTransaction['frequency']) || 'monthly',
     nextDate: toDate(row.next_date) || new Date(),
     endDate: toDate(row.end_date),
     notes: row.notes || undefined,
@@ -235,12 +254,12 @@ export function rowToScheduledTransaction(row: any): ScheduledTransaction {
   }
 }
 
-export function scheduledTransactionToRow(item: Partial<ScheduledTransaction>) {
+export function scheduledTransactionToRow(item: Partial<ScheduledTransaction>): Record<string, unknown> {
   const now = new Date().toISOString()
   return {
     ...(item.id ? { id: item.id } : {}),
-    account_id: item.accountId,
-    amount: item.amount,
+    account_id: item.accountId ?? '',
+    amount: item.amount ?? 0,
     payee: item.payee || '',
     category_id: item.categoryId || null,
     type: item.type || 'expense',
@@ -256,7 +275,7 @@ export function scheduledTransactionToRow(item: Partial<ScheduledTransaction>) {
 }
 
 // 8. Beneficiários (Payees)
-export function rowToPayee(row: any): Payee {
+export function rowToPayee(row: Tables<'payees'>): Payee {
   return {
     id: row.id,
     name: row.name,
@@ -264,11 +283,11 @@ export function rowToPayee(row: any): Payee {
   }
 }
 
-export function payeeToRow(item: Partial<Payee>) {
+export function payeeToRow(item: Partial<Payee>): Record<string, unknown> {
   const now = new Date().toISOString()
   return {
     ...(item.id ? { id: item.id } : {}),
-    name: item.name,
+    name: item.name ?? '',
     default_category_id: item.defaultCategoryId || null,
     created_at: now,
     updated_at: now,
@@ -276,7 +295,7 @@ export function payeeToRow(item: Partial<Payee>) {
 }
 
 // 9. Contas de Cobrança / Terceiros
-export function rowToDebtAccount(row: any): DebtAccount {
+export function rowToDebtAccount(row: Tables<'debt_accounts'>): DebtAccount {
   return {
     id: row.id,
     name: row.name,
@@ -288,11 +307,11 @@ export function rowToDebtAccount(row: any): DebtAccount {
   }
 }
 
-export function debtAccountToRow(item: Partial<DebtAccount>) {
+export function debtAccountToRow(item: Partial<DebtAccount>): Record<string, unknown> {
   const now = new Date().toISOString()
   return {
     ...(item.id ? { id: item.id } : {}),
-    name: item.name,
+    name: item.name ?? '',
     phone: item.phone || null,
     notes: item.notes || null,
     color: item.color || '#6366f1',
@@ -303,16 +322,16 @@ export function debtAccountToRow(item: Partial<DebtAccount>) {
 }
 
 // 10. Itens de Cobrança / Pendências
-export function rowToDebtItem(row: any): DebtItem {
+export function rowToDebtItem(row: Tables<'debt_items'>): DebtItem {
   return {
     id: row.id,
     debtAccountId: row.debt_account_id,
     description: row.description,
-    type: row.type || 'receivable',
+    type: (row.type as DebtItem['type']) || 'receivable',
     amount: Number(row.amount),
     dueDate: toDate(row.due_date),
     settledDate: toDate(row.settled_date),
-    status: row.status || 'pending',
+    status: (row.status as DebtItem['status']) || 'pending',
     notes: row.notes || undefined,
     installmentGroupId: row.installment_group_id || undefined,
     installmentNumber: row.installment_number ?? undefined,
@@ -322,14 +341,14 @@ export function rowToDebtItem(row: any): DebtItem {
   }
 }
 
-export function debtItemToRow(item: Partial<DebtItem>) {
+export function debtItemToRow(item: Partial<DebtItem>): Record<string, unknown> {
   const now = new Date().toISOString()
   return {
     ...(item.id ? { id: item.id } : {}),
-    debt_account_id: item.debtAccountId,
-    description: item.description,
+    debt_account_id: item.debtAccountId ?? '',
+    description: item.description ?? '',
     type: item.type || 'receivable',
-    amount: item.amount,
+    amount: item.amount ?? 0,
     due_date: toIso(item.dueDate) || null,
     settled_date: toIso(item.settledDate) || null,
     status: item.status || 'pending',

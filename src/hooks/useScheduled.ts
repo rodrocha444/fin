@@ -1,11 +1,11 @@
-// src/hooks/useScheduled.ts — Hooks reativos para transações agendadas (Cloud-Only)
+// src/hooks/useScheduled.ts — Hooks reativos para transações agendadas com TanStack Query v5
 import { useMemo } from 'react'
-import { useFinancialData } from '@/context/FinancialDataContext'
+import { useScheduledTransactionsQuery } from '@/hooks/queries'
 import type { ScheduledTransaction } from '@/types'
 
 /** Todas as transações agendadas ativas */
 export function useScheduledTransactions(): ScheduledTransaction[] | undefined {
-  const { scheduledTransactions, isLoading } = useFinancialData()
+  const { data: scheduledTransactions = [], isLoading } = useScheduledTransactionsQuery()
 
   return useMemo(() => {
     if (isLoading && scheduledTransactions.length === 0) return undefined

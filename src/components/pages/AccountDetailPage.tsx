@@ -21,16 +21,15 @@ import {
 import { format } from 'date-fns'
 import { useAccount, useAccounts, useAccountBalance } from '@/hooks/useAccounts'
 import {
-  useAccountTransactions,
   useAccountTransactionsWithScheduled,
   useCreditCardPurchases,
   type CreditCardPurchase,
 } from '@/hooks/useTransactions'
 import { usePaidInvoices, useClosedUnpaidInvoices } from '@/hooks/useInvoices'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
-import { deleteTransaction, deleteInstallmentGroup, deleteSplitTransaction } from '@/db/repositories/transactions'
-import { deleteAccount } from '@/db/repositories/accounts'
-import { deleteScheduled, confirmScheduledOccurrence } from '@/db/repositories/scheduled'
+import { deleteTransaction, deleteInstallmentGroup, deleteSplitTransaction } from '@/services/api/transactions'
+import { deleteAccount } from '@/services/api/accounts'
+import { deleteScheduled, confirmScheduledOccurrence } from '@/services/api/scheduled'
 import { formatCurrency, formatDate, formatMonthLabel, currentMonth, accountTypeLabel } from '@/utils/format'
 import {
   getCurrentOpenInvoiceMonth,
@@ -43,6 +42,7 @@ import TransactionForm from '@/components/organisms/TransactionForm'
 import AccountForm from '@/components/organisms/AccountForm'
 import InvoicePrintModal from '@/components/organisms/InvoicePrintModal'
 import ConfirmInvoicePaidModal from '@/components/organisms/ConfirmInvoicePaidModal'
+import { useConfirm, useAlert } from '@/context/ConfirmContext'
 import SearchBar from '@/components/atoms/SearchBar'
 import MonthNavigator from '@/components/atoms/MonthNavigator'
 import CreditCardPurchaseItem from '@/components/molecules/CreditCardPurchaseItem'
@@ -87,6 +87,8 @@ export default function AccountDetailPage() {
 
   const closedUnpaidInvoices = useClosedUnpaidInvoices(account, transactions)
   const { setPaidStatus } = usePaidInvoices()
+  const confirm = useConfirm()
+  const showAlert = useAlert()
 
   if (accountId === undefined || (account === undefined && transactions === undefined)) {
     return (
@@ -157,17 +159,36 @@ export default function AccountDetailPage() {
 
   const handleDeleteTx = async (tx: Transaction) => {
     if (tx.isScheduledProjection && tx.scheduledId) {
-      if (!confirm(`Remover o agendamento de "${tx.payee}"?`)) return
+      const ok = await confirm({
+        title: 'Remover Agendamento',
+        message: `Deseja remover a projeção do agendamento "${tx.payee}"?`,
+        confirmText: 'Remover',
+        variant: 'danger',
+      })
+      if (!ok) return
       await deleteScheduled(tx.scheduledId)
       return
     }
     if (tx.splitGroupId) {
-      if (!confirm(`Esta transação faz parte de uma divisão de categorias (${tx.payee}). Deseja excluir todas as partes deste rateio?`)) return
+      const splitCount = (transactions ?? []).filter(t => t.splitGroupId === tx.splitGroupId).length
+      const ok = await confirm({
+        title: 'Excluir transação dividida?',
+        message: `Excluir a transação dividida "${tx.payee}" e todas as suas ${splitCount} partes?`,
+        confirmText: 'Excluir todas',
+        variant: 'danger',
+      })
+      if (!ok) return
       await deleteSplitTransaction(tx.splitGroupId)
       return
     }
     if (!tx.id) return
-    if (!confirm(tx.installmentGroupId ? 'Excluir esta parcela?' : 'Excluir esta transação?')) return
+    const ok = await confirm({
+      title: tx.installmentGroupId ? 'Excluir parcela?' : 'Excluir transação?',
+      message: `Deseja realmente excluir a transação "${tx.payee}"?`,
+      confirmText: 'Excluir',
+      variant: 'danger',
+    })
+    if (!ok) return
     await deleteTransaction(tx.id)
   }
 
@@ -176,31 +197,63 @@ export default function AccountDetailPage() {
     try {
       await confirmScheduledOccurrence(tx.scheduledId, tx.date)
     } catch (err: any) {
-      alert(err.message || 'Erro ao efetivar agendamento.')
+      await showAlert({
+        title: 'Erro no Agendamento',
+        message: err.message || 'Ocorreu um erro ao efetivar o agendamento.',
+        variant: 'danger',
+      })
     }
   }
 
   const handleDeletePurchase = async (p: CreditCardPurchase) => {
     if (p.isInstallment && p.groupId) {
-      if (!confirm(`Excluir a compra parcelada "${p.payee}" (${p.installmentCount} parcelas)? Todas as parcelas serão removidas.`)) return
+      const ok = await confirm({
+        title: 'Excluir compra parcelada?',
+        message: `Excluir a compra parcelada "${p.payee}" (${p.installmentCount} parcelas)? Todas as parcelas futuras serão removidas.`,
+        confirmText: 'Excluir compra',
+        variant: 'danger',
+      })
+      if (!ok) return
       await deleteInstallmentGroup(p.groupId)
     } else if (p.splitGroupId) {
-      if (!confirm(`Esta transação faz parte de uma divisão de categorias (${p.payee}). Deseja excluir todas as partes deste rateio?`)) return
+      const ok = await confirm({
+        title: 'Excluir transação dividida?',
+        message: `Esta transação faz parte de uma divisão de categorias (${p.payee}). Deseja excluir todas as partes deste rateio?`,
+        confirmText: 'Excluir todas',
+        variant: 'danger',
+      })
+      if (!ok) return
       await deleteSplitTransaction(p.splitGroupId)
     } else if (p.transactionId) {
-      if (!confirm(`Excluir a transação "${p.payee}"?`)) return
+      const ok = await confirm({
+        title: 'Excluir transação?',
+        message: `Deseja excluir a transação "${p.payee}"?`,
+        confirmText: 'Excluir',
+        variant: 'danger',
+      })
+      if (!ok) return
       await deleteTransaction(p.transactionId)
     }
   }
 
   const handleDeleteAccount = async () => {
     if (!account.id) return
-    if (!confirm(`Excluir a conta "${account.name}"?`)) return
+    const ok = await confirm({
+      title: 'Excluir Conta?',
+      message: `Deseja realmente excluir a conta "${account.name}"? Todos os lançamentos vinculados a ela serão afetados.`,
+      confirmText: 'Excluir Conta',
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
       await deleteAccount(account.id)
       navigate('/accounts')
     } catch (e: any) {
-      alert(e.message)
+      await showAlert({
+        title: 'Erro ao Excluir Conta',
+        message: e.message || 'Não foi possível excluir a conta.',
+        variant: 'danger',
+      })
     }
   }
 
@@ -209,6 +262,12 @@ export default function AccountDetailPage() {
       const firstTx = (transactions ?? []).find(t => t.installmentGroupId === p.groupId)
       if (firstTx) {
         setEditingTx(firstTx)
+      }
+    } else if (p.splitGroupId) {
+      // Para splits: busca qualquer membro do grupo para abrir o formulário completo
+      const splitTx = (transactions ?? []).find(t => t.splitGroupId === p.splitGroupId)
+      if (splitTx) {
+        setEditingTx(splitTx)
       }
     } else if (p.transactionId) {
       const tx = (transactions ?? []).find(t => t.id === p.transactionId)

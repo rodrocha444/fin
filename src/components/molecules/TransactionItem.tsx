@@ -87,7 +87,7 @@ export default function TransactionItem({
           )}
           {tx.splitGroupId && (
             <Badge variant="info">
-              Divisão
+              Dividida
             </Badge>
           )}
           {tx.isScheduledProjection && (
@@ -109,10 +109,12 @@ export default function TransactionItem({
           ) : (
             <>
               <span className="text-[10px] text-slate-500 truncate">
-                {tx.splitGroupId ? (
-                  <span className="text-indigo-400 font-medium">Divisão de categorias</span>
+                {categoryName ? (
+                  categoryName
+                ) : tx.splitGroupId ? (
+                  <span className="text-indigo-400 font-medium">Transação dividida em categorias</span>
                 ) : (
-                  categoryName ?? <span className="italic">Sem categoria</span>
+                  <span className="italic">Sem categoria</span>
                 )}
               </span>
               <span className="text-[10px] text-slate-600">· {accountName}</span>

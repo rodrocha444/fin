@@ -8,13 +8,14 @@ import { useFinancialData } from '@/context/FinancialDataContext'
 import {
   createGroup, updateGroup, deleteGroup, toggleGroupVisibility,
   createCategory, updateCategory, deleteCategory, toggleCategoryVisibility,
-} from '@/db/repositories/categories'
-import { downloadDatabaseBackup, importDatabase, type DatabaseBackup } from '@/db/repositories/backup'
+} from '@/services/api/categories'
+import { downloadDatabaseBackup, importDatabase, type DatabaseBackup } from '@/services/api/backup'
 import {
   getSupabaseConfig, saveSupabaseConfig, clearSupabaseConfig,
   testSupabaseConnection
 } from '@/services/supabase'
 import { SUPABASE_SCHEMA_SQL } from '@/services/supabaseSchema'
+import { useConfirm, useAlert } from '@/context/ConfirmContext'
 import ResetDatabaseModal from '@/components/organisms/ResetDatabaseModal'
 import Logo from '@/components/atoms/Logo'
 import { APP_VERSION, BUILD_DATE } from '@/version'
@@ -41,6 +42,8 @@ export default function SettingsPage() {
   const [isExporting, setIsExporting] = useState(false)
   const [showResetModal, setShowResetModal] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const confirm = useConfirm()
+  const showAlert = useAlert()
 
   const handleSaveSupabase = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
@@ -52,7 +55,7 @@ export default function SettingsPage() {
     setIsTestingConnection(true)
     setTestResult(null)
 
-    const cleanUrl = supabaseUrl.trim()
+    const cleanUrl = supabaseUrl.trim().replace(/\/$/, '')
     const cleanKey = supabaseKey.trim()
 
     const result = await testSupabaseConnection({ url: cleanUrl, anonKey: cleanKey })
@@ -65,8 +68,14 @@ export default function SettingsPage() {
     }
   }
 
-  const handleDisconnectSupabase = () => {
-    if (!confirm('Deseja desconectar o Supabase? Os dados locais permanecerão salvos no navegador.')) return
+  const handleDisconnectSupabase = async () => {
+    const ok = await confirm({
+      title: 'Desconectar Supabase?',
+      message: 'Deseja desconectar o Supabase? Os dados locais permanecerão salvos no navegador.',
+      confirmText: 'Desconectar',
+      variant: 'warning',
+    })
+    if (!ok) return
     clearSupabaseConfig()
     setSupabaseUrl('')
     setSupabaseKey('')
@@ -82,7 +91,11 @@ export default function SettingsPage() {
   const toggleGroup = (id: string) =>
     setExpandedGroups(s => {
       const next = new Set(s)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
       return next
     })
 
@@ -99,7 +112,11 @@ export default function SettingsPage() {
       })
       setNewGroupName('')
     } catch (e: any) {
-      alert(e.message || 'Erro ao criar grupo.')
+      await showAlert({
+        title: 'Erro ao Criar Grupo',
+        message: e.message || 'Não foi possível criar o grupo.',
+        variant: 'danger',
+      })
     }
   }
 
@@ -111,25 +128,49 @@ export default function SettingsPage() {
       setNewCatName('')
       setNewCatGroupId(null)
     } catch (e: any) {
-      alert(e.message || 'Erro ao criar categoria.')
+      await showAlert({
+        title: 'Erro ao Criar Categoria',
+        message: e.message || 'Não foi possível criar a categoria.',
+        variant: 'danger',
+      })
     }
   }
 
   const handleDeleteGroup = async (id: string) => {
     try {
-      if (!confirm('Excluir grupo?')) return
+      const ok = await confirm({
+        title: 'Excluir grupo?',
+        message: 'Deseja realmente excluir este grupo e suas categorias?',
+        confirmText: 'Excluir Grupo',
+        variant: 'danger',
+      })
+      if (!ok) return
       await deleteGroup(id)
     } catch (e: any) {
-      alert(e.message)
+      await showAlert({
+        title: 'Erro ao Excluir Grupo',
+        message: e.message || 'Não foi possível excluir o grupo.',
+        variant: 'danger',
+      })
     }
   }
 
   const handleDeleteCategory = async (id: string) => {
     try {
-      if (!confirm('Excluir categoria?')) return
+      const ok = await confirm({
+        title: 'Excluir categoria?',
+        message: 'Deseja realmente excluir esta categoria?',
+        confirmText: 'Excluir Categoria',
+        variant: 'danger',
+      })
+      if (!ok) return
       await deleteCategory(id)
     } catch (e: any) {
-      alert(e.message)
+      await showAlert({
+        title: 'Erro ao Excluir Categoria',
+        message: e.message || 'Não foi possível excluir a categoria.',
+        variant: 'danger',
+      })
     }
   }
 
@@ -151,7 +192,13 @@ export default function SettingsPage() {
     if (!file) return
 
     try {
-      if (!confirm('Atenção: A importação irá substituir os dados no Supabase. Deseja continuar?')) {
+      const ok = await confirm({
+        title: 'Importar Backup?',
+        message: 'Atenção: A importação irá substituir os dados no Supabase. Deseja continuar?',
+        confirmText: 'Importar e Substituir',
+        variant: 'warning',
+      })
+      if (!ok) {
         if (fileInputRef.current) fileInputRef.current.value = ''
         return
       }
@@ -266,7 +313,11 @@ export default function SettingsPage() {
                           try {
                             await updateGroup(group.id, { name: val })
                           } catch (err: any) {
-                            alert(err.message || 'Erro ao renomear grupo.')
+                            await showAlert({
+                              title: 'Erro ao Renomear Grupo',
+                              message: err.message || 'Não foi possível renomear o grupo.',
+                              variant: 'danger',
+                            })
                           }
                         }
                         setEditingGroupId(null)
@@ -335,7 +386,11 @@ export default function SettingsPage() {
                                 try {
                                   await updateCategory(cat.id, { name: val })
                                 } catch (err: any) {
-                                  alert(err.message || 'Erro ao renomear categoria.')
+                                  await showAlert({
+                                    title: 'Erro ao Renomear Categoria',
+                                    message: err.message || 'Não foi possível renomear a categoria.',
+                                    variant: 'danger',
+                                  })
                                 }
                               }
                               setEditingCategoryId(null)

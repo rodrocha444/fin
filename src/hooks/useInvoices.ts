@@ -1,6 +1,6 @@
 // src/hooks/useInvoices.ts — Hooks reativos para faturas e status de pagamento (Cloud-Only)
 import { useState, useEffect } from 'react'
-import { getPaidInvoicesMap, setInvoicePaidStatus } from '@/db/repositories/invoices'
+import { getPaidInvoicesMap, setInvoicePaidStatus } from '@/services/api/invoices'
 import { getClosedUnpaidInvoices, type InvoiceData } from '@/utils/invoices'
 import type { Account, Transaction } from '@/types'
 

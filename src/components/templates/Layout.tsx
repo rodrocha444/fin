@@ -5,7 +5,6 @@ import {
   Wallet,
   ArrowLeftRight,
   CalendarClock,
-  HandCoins,
   BarChart3,
   Settings,
 } from 'lucide-react'

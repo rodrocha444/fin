@@ -19,8 +19,9 @@ import {
   deleteDebtAccount,
   deleteDebtItem,
   setDebtItemStatus,
-} from '@/db/repositories/debts'
+} from '@/services/api/debts'
 import { formatCurrency, formatDate } from '@/utils/format'
+import { useConfirm } from '@/context/ConfirmContext'
 import Badge from '@/components/atoms/Badge'
 import DebtAccountForm from '@/components/organisms/DebtAccountForm'
 import DebtItemForm from '@/components/organisms/DebtItemForm'
@@ -67,7 +68,6 @@ function buildListEntries(allItems: DebtItem[], itemFilter: 'all' | 'pending' | 
 
   for (const [groupId, items] of groupMap) {
     const allSettled = items.every(i => i.status === 'settled')
-    const allPending = items.every(i => i.status === 'pending')
     if (itemFilter === 'pending' && allSettled) continue
     if (itemFilter === 'settled' && !allSettled) continue
 
@@ -122,16 +122,30 @@ export default function DebtAccountPage() {
     })
   }
 
+  const confirm = useConfirm()
+
   const handleDeleteAccount = async (acc: DebtAccount) => {
     if (!acc.id) return
-    if (!confirm(`Excluir o contato "${acc.name}" e todas as suas pendências associadas?`)) return
+    const ok = await confirm({
+      title: 'Excluir Contato / Conta?',
+      message: `Excluir o contato "${acc.name}" e todas as suas pendências associadas?`,
+      confirmText: 'Excluir Conta',
+      variant: 'danger',
+    })
+    if (!ok) return
     await deleteDebtAccount(acc.id)
     navigate('/accounts')
   }
 
   const handleDeleteItem = async (item: DebtItem) => {
     if (!item.id) return
-    if (!confirm(`Excluir ${item.installmentTotal ? `esta parcela (${item.installmentNumber}/${item.installmentTotal}x)` : 'esta pendência'}?`)) return
+    const ok = await confirm({
+      title: item.installmentTotal ? 'Excluir parcela?' : 'Excluir pendência?',
+      message: `Deseja realmente excluir ${item.installmentTotal ? `esta parcela (${item.installmentNumber}/${item.installmentTotal}x)` : 'esta pendência'}?`,
+      confirmText: 'Excluir',
+      variant: 'danger',
+    })
+    if (!ok) return
     await deleteDebtItem(item.id)
   }
 

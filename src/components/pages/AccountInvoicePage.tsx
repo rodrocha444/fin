@@ -35,7 +35,7 @@ import type { Transaction } from '@/types'
 
 export default function AccountInvoicePage() {
   const { id } = useParams<{ id: string }>()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const accountId = id
 
@@ -375,7 +375,6 @@ export default function AccountInvoicePage() {
                   filteredTxs.map(tx => {
                     const cat = tx.categoryId ? categoryMap.get(tx.categoryId) : undefined
                     const isExpense = tx.type === 'expense'
-                    const isIncome = tx.type === 'income' || tx.type === 'transfer'
 
                     return (
                       <div

@@ -52,3 +52,8 @@ Views completas mapeadas para rotas da aplicacao.
 - A cada novo commit, ajuste ou entrega de funcionalidade/correcao, o agente DEVE atualizar o arquivo `src/version.ts`, incrementando a versao (`APP_VERSION`, ex: `1.0.14`) e a data da alteracao (`BUILD_DATE`).
 - A versao e exibida dinamicamente no card de informacoes do aplicativo na pagina de Configuracoes (`SettingsPage.tsx`).
 
+## 5. Politica de Controle de Versao e Git (GitHub)
+- **Proibido Push Automatico**: O agente NUNCA deve executar `git push` ou enviar alteracoes para o GitHub/repositorio remoto de forma automatica.
+- **Apenas Sob Comando Explicito**: Comandos de envio para o repositorio remoto (`git push`) so devem ser executados quando o usuario solicitar expressa e textualmente (ex: "suba pro github", "faca o push").
+- **Commits Locais**: Commits locais (`git commit`) sao permitidos apos a autovalidacao (`npm run lint` e `npm run build`) e incremento de versao em `src/version.ts`.
+

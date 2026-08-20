@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS public.transactions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   deleted_at TIMESTAMPTZ
 );
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS split_group_id TEXT;
 
 -- 6. Grupos de Parcelamento
 CREATE TABLE IF NOT EXISTS public.installment_groups (

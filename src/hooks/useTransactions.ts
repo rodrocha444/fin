@@ -1,6 +1,11 @@
-// src/hooks/useTransactions.ts — Hooks reativos para transações e compras (Cloud-Only)
+// src/hooks/useTransactions.ts — Hooks reativos para transações e compras com TanStack Query v5
 import { useMemo } from 'react'
-import { useFinancialData } from '@/context/FinancialDataContext'
+import {
+  useTransactionsQuery,
+  useAccountsQuery,
+  useScheduledTransactionsQuery,
+  useInstallmentGroupsQuery,
+} from '@/hooks/queries'
 import { getProjectedScheduledForMonth, getProjectedScheduledForAccount } from '@/services/api/scheduled'
 import { format, addMonths } from 'date-fns'
 import { getInvoiceCycle, getInvoiceData } from '@/utils/invoices'
@@ -57,7 +62,7 @@ export function consolidateSplitTransactions(txs: Transaction[]): Transaction[] 
 
 /** Transações de uma conta (todas ordenadas por createdAt/date desc, com rateios consolidados) */
 export function useAccountTransactions(accountId: string | undefined): Transaction[] | undefined {
-  const { transactions, isLoading } = useFinancialData()
+  const { data: transactions = [], isLoading } = useTransactionsQuery()
 
   return useMemo(() => {
     if (isLoading && transactions.length === 0) return undefined
@@ -83,7 +88,9 @@ export function useAccountTransactionsWithScheduled(accountId: string | undefine
   transactions: Transaction[]
   futureOffset: number
 } | undefined {
-  const { transactions, scheduledTransactions, isLoading } = useFinancialData()
+  const { data: transactions = [], isLoading: l1 } = useTransactionsQuery()
+  const { data: scheduledTransactions = [], isLoading: l2 } = useScheduledTransactionsQuery()
+  const isLoading = l1 || l2
 
   return useMemo(() => {
     if (isLoading && transactions.length === 0) return undefined
@@ -140,7 +147,9 @@ export function useAccountTransactionsWithScheduled(accountId: string | undefine
 
 /** Transações de uma categoria em um mês específico (não consolida para exibir a fatia exata da categoria) */
 export function useCategoryMonthTransactions(categoryId: string | undefined, month: string): Transaction[] | undefined {
-  const { transactions, accounts, isLoading } = useFinancialData()
+  const { data: transactions = [], isLoading: l1 } = useTransactionsQuery()
+  const { data: accounts = [], isLoading: l2 } = useAccountsQuery()
+  const isLoading = l1 || l2
 
   return useMemo(() => {
     if (isLoading && transactions.length === 0) return undefined
@@ -189,7 +198,9 @@ export function useCategoryMonthTransactions(categoryId: string | undefined, mon
 
 /** Transações de um mês (YYYY-MM), incluindo agendamentos e consolidando rateios para o extrato */
 export function useMonthTransactions(month: string): Transaction[] | undefined {
-  const { transactions, scheduledTransactions, isLoading } = useFinancialData()
+  const { data: transactions = [], isLoading: l1 } = useTransactionsQuery()
+  const { data: scheduledTransactions = [], isLoading: l2 } = useScheduledTransactionsQuery()
+  const isLoading = l1 || l2
 
   return useMemo(() => {
     if (isLoading && transactions.length === 0) return undefined
@@ -256,7 +267,10 @@ export function useMonthSummary(month: string): { income: number; expense: numbe
 
 /** Histórico consolidado de compras para conta do tipo Cartão de Crédito */
 export function useCreditCardPurchases(accountId: string | undefined): CreditCardPurchase[] | undefined {
-  const { transactions, installmentGroups, accounts, isLoading } = useFinancialData()
+  const { data: transactions = [], isLoading: l1 } = useTransactionsQuery()
+  const { data: installmentGroups = [], isLoading: l2 } = useInstallmentGroupsQuery()
+  const { data: accounts = [], isLoading: l3 } = useAccountsQuery()
+  const isLoading = l1 || l2 || l3
 
   return useMemo(() => {
     if (isLoading && transactions.length === 0) return undefined

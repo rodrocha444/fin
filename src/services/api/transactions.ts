@@ -3,12 +3,10 @@ import { getClient } from './client'
 import {
   rowToTransaction,
   transactionToRow,
-  rowToInstallmentGroup,
   installmentGroupToRow,
-  toIso,
 } from './types'
 import { createId } from '@/utils/id'
-import { format, addMonths } from 'date-fns'
+import { addMonths } from 'date-fns'
 import { notifyDataChanged } from './events'
 import type { Transaction, TransactionType } from '@/types'
 
@@ -270,7 +268,7 @@ export async function updateInstallmentPurchase(
 
   const { data: txs } = await client.from('transactions').select('*').eq('installment_group_id', groupId).order('installment_number', { ascending: true })
   if (txs) {
-    for (const tx of txs) {
+    for (const tx of txs as any[]) {
       const num = tx.installment_number || 1
       await client.from('transactions').update({
         payee: `${desc} (${num}/${count})`,
@@ -400,8 +398,13 @@ export async function updateSplitTransaction(
   const client = getClient()
   const now = new Date()
 
-  // Remove os registros antigos do grupo de rateio
-  await client.from('transactions').delete().eq('split_group_id', splitGroupId)
+  // Remove os registros antigos do grupo de rateio por split_group_id ou tag em notes
+  const res1 = await client.from('transactions').delete().eq('split_group_id', splitGroupId)
+  if (res1.error && res1.error.message.includes('split_group_id')) {
+    await client.from('transactions').delete().ilike('notes', `%[split:${splitGroupId}]%`)
+  } else {
+    await client.from('transactions').delete().ilike('notes', `%[split:${splitGroupId}]%`)
+  }
 
   const validSplits = data.splits.filter(s => s.amount > 0)
   if (validSplits.length === 0) {
@@ -445,7 +448,13 @@ export async function updateSplitTransaction(
 
 export async function deleteSplitTransaction(splitGroupId: string): Promise<void> {
   const client = getClient()
-  const { error } = await client.from('transactions').delete().eq('split_group_id', splitGroupId)
+  let { error } = await client.from('transactions').delete().eq('split_group_id', splitGroupId)
+  if (error && error.message.includes('split_group_id')) {
+    const res = await client.from('transactions').delete().ilike('notes', `%[split:${splitGroupId}]%`)
+    error = res.error
+  } else {
+    await client.from('transactions').delete().ilike('notes', `%[split:${splitGroupId}]%`)
+  }
   if (error) throw new Error(`Erro ao excluir transação dividida: ${error.message}`)
   notifyDataChanged('transactions', 'delete')
 }

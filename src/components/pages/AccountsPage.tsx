@@ -10,15 +10,15 @@ import {
   Phone,
   ArrowDownLeft,
   ArrowUpRight,
-  ChevronRight,
   Sparkles,
   TrendingUp,
 } from 'lucide-react'
 import { useAccounts, useAllBalances } from '@/hooks/useAccounts'
 import { useDebtAccounts, useDebtsSummary } from '@/hooks/useDebts'
-import { deleteAccount } from '@/db/repositories/accounts'
-import { deleteDebtAccount } from '@/db/repositories/debts'
-import { formatCurrency, accountTypeLabel } from '@/utils/format'
+import { deleteAccount } from '@/services/api/accounts'
+import { deleteDebtAccount } from '@/services/api/debts'
+import { formatCurrency } from '@/utils/format'
+import { useConfirm, useAlert } from '@/context/ConfirmContext'
 import AccountForm from '@/components/organisms/AccountForm'
 import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
 import type { Account, DebtAccount } from '@/types'
@@ -41,23 +41,46 @@ export default function AccountsPage() {
   const [editingDebtAccount, setEditingDebtAccount] = useState<DebtAccount | undefined>()
   const [formCategory, setFormCategory] = useState<'on_budget' | 'off_budget'>('on_budget')
 
+  const confirm = useConfirm()
+  const showAlert = useAlert()
+
   const handleDeleteOnBudget = async (acc: Account) => {
     if (!acc.id) return
-    if (!confirm(`Excluir a conta "${acc.name}"?`)) return
+    const ok = await confirm({
+      title: 'Excluir Conta?',
+      message: `Deseja realmente excluir a conta "${acc.name}"? Todos os lançamentos vinculados a ela serão afetados.`,
+      confirmText: 'Excluir Conta',
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
       await deleteAccount(acc.id)
     } catch (err: any) {
-      alert(err.message || 'Erro ao excluir conta.')
+      await showAlert({
+        title: 'Erro ao Excluir',
+        message: err.message || 'Não foi possível excluir a conta.',
+        variant: 'danger',
+      })
     }
   }
 
   const handleDeleteOffBudget = async (debtAcc: DebtAccount) => {
     if (!debtAcc.id) return
-    if (!confirm(`Excluir a conta "${debtAcc.name}" e todas as suas pendências associadas?`)) return
+    const ok = await confirm({
+      title: 'Excluir Contato / Conta?',
+      message: `Excluir a conta "${debtAcc.name}" e todas as suas pendências associadas?`,
+      confirmText: 'Excluir',
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
       await deleteDebtAccount(debtAcc.id)
     } catch (err: any) {
-      alert(err.message || 'Erro ao excluir conta de cobrança.')
+      await showAlert({
+        title: 'Erro ao Excluir',
+        message: err.message || 'Não foi possível excluir a conta de cobrança.',
+        variant: 'danger',
+      })
     }
   }
 

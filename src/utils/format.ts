@@ -3,7 +3,7 @@
 // Utilitários de formatação para BRL e datas
 // ─────────────────────────────────────────────────────────────
 
-import { format, parseISO, isValid } from 'date-fns'
+import { format, isValid } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 const BRL = new Intl.NumberFormat('pt-BR', {

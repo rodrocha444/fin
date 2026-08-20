@@ -51,11 +51,11 @@ const PriceInput = forwardRef<HTMLInputElement, PriceInputProps>(function PriceI
   // Sincronizar se o valor externo mudar
   useEffect(() => {
     const externalCents = formatValueToCentsStr(value)
-    const currentCents = centsStr.replace(/^0+/, '')
-    const newCents = externalCents.replace(/^0+/, '')
-    if (currentCents !== newCents) {
-      setCentsStr(externalCents)
-    }
+    setCentsStr(prev => {
+      const currentCents = prev.replace(/^0+/, '')
+      const newCents = externalCents.replace(/^0+/, '')
+      return currentCents !== newCents ? externalCents : prev
+    })
     if (value !== undefined && value !== 0) {
       setIsNegative(value < 0)
     }

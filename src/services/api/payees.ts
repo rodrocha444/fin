@@ -19,7 +19,7 @@ export async function getOrCreatePayee(name: string, defaultCategoryId?: string)
   if (data) {
     const payee = rowToPayee(data)
     if (defaultCategoryId && defaultCategoryId !== payee.defaultCategoryId) {
-      await client.from('payees').update({ default_category_id: defaultCategoryId }).eq('id', payee.id)
+      await client.from('payees').update({ default_category_id: defaultCategoryId }).eq('id', payee.id!)
       notifyDataChanged('payees', 'update', payee.id)
     }
     return payee

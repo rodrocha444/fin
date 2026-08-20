@@ -1,6 +1,6 @@
-// src/hooks/useDebts.ts — Hooks reativos para Contas a Receber / Pagar e Cobranças (Cloud-Only)
+// src/hooks/useDebts.ts — Hooks reativos para Contas a Receber / Pagar com TanStack Query v5
 import { useMemo } from 'react'
-import { useFinancialData } from '@/context/FinancialDataContext'
+import { useDebtAccountsQuery, useDebtItemsQuery } from '@/hooks/queries'
 import type { DebtAccount, DebtItem, DebtSummary } from '@/types'
 
 export interface DebtAccountWithStats extends DebtAccount {
@@ -13,7 +13,9 @@ export interface DebtAccountWithStats extends DebtAccount {
 
 /** Retorna todas as contas ativas com seus respectivos saldos e contadores */
 export function useDebtAccounts(): DebtAccountWithStats[] | undefined {
-  const { debtAccounts, debtItems, isLoading } = useFinancialData()
+  const { data: debtAccounts = [], isLoading: l1 } = useDebtAccountsQuery()
+  const { data: debtItems = [], isLoading: l2 } = useDebtItemsQuery()
+  const isLoading = l1 || l2
 
   return useMemo(() => {
     if (isLoading && debtAccounts.length === 0) return undefined
@@ -63,7 +65,9 @@ export function useDebtAccountWithItems(accountId: string | undefined): {
   pendingCount: number
   totalCount: number
 } | null | undefined {
-  const { debtAccounts, debtItems, isLoading } = useFinancialData()
+  const { data: debtAccounts = [], isLoading: l1 } = useDebtAccountsQuery()
+  const { data: debtItems = [], isLoading: l2 } = useDebtItemsQuery()
+  const isLoading = l1 || l2
 
   return useMemo(() => {
     if (isLoading && debtAccounts.length === 0) return undefined
@@ -106,7 +110,7 @@ export function useDebtAccountWithItems(accountId: string | undefined): {
 
 /** Resumo geral de todas as pendências ativas */
 export function useDebtsSummary(): DebtSummary | undefined {
-  const { debtItems, isLoading } = useFinancialData()
+  const { data: debtItems = [], isLoading } = useDebtItemsQuery()
 
   return useMemo(() => {
     if (isLoading && debtItems.length === 0) return undefined

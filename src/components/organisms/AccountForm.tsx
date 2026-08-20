@@ -1,12 +1,11 @@
-// src/components/organisms/AccountForm.tsx — Modal / Form de Conta (No Orçamento e Fora do Orçamento)
-import { useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { X, Lock, Landmark, CreditCard, HandCoins, Wallet, TrendingUp } from 'lucide-react'
-import { createAccount, updateAccount } from '@/db/repositories/accounts'
-import { createDebtAccount, updateDebtAccount } from '@/db/repositories/debts'
+import { Lock, Landmark, CreditCard, HandCoins, TrendingUp } from 'lucide-react'
+import { createAccount, updateAccount } from '@/services/api/accounts'
+import { createDebtAccount, updateDebtAccount } from '@/services/api/debts'
 import { useHasAccountTransactions } from '@/hooks/useAccounts'
+import Modal from '@/components/atoms/Modal'
 import PriceInput from '@/components/atoms/PriceInput'
 import ColorPicker from '@/components/atoms/ColorPicker'
 import type { Account, DebtAccount } from '@/types'
@@ -189,31 +188,13 @@ export default function AccountForm({
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      size="md"
+      title={isEdit ? 'Editar conta' : 'Nova conta'}
     >
-      <div className="bg-slate-900 border-t sm:border border-slate-700/80 rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl sheet-up sm:fade-in max-h-[92dvh] flex flex-col">
-        {/* Handle bar (mobile) */}
-        <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0 cursor-grab">
-          <div className="w-12 h-1.5 bg-slate-700 rounded-full" />
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 flex-shrink-0">
-          <h2 className="font-semibold text-slate-100 text-base sm:text-lg">
-            {isEdit ? 'Editar conta' : 'Nova conta'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 active:bg-slate-700 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Formulário scrollável */}
-        <form onSubmit={handleSubmit(onSubmit)} className="p-5 space-y-4 overflow-y-auto flex-1">
+      <form onSubmit={handleSubmit(onSubmit)} className="p-5 space-y-4">
           {/* Seletor de Grupo: No Orçamento vs Fora do Orçamento */}
           {!isEdit && (
             <div>
@@ -487,14 +468,13 @@ export default function AccountForm({
           )}
 
           {/* Actions */}
-          <div className="flex gap-2 pt-1 pb-2">
+          <div className="flex gap-2.5 pt-2">
             <button type="button" onClick={onClose} className="btn-secondary flex-1 py-3">Cancelar</button>
-            <button type="submit" disabled={isSubmitting} className="btn-primary flex-1 py-3">
+            <button type="submit" disabled={isSubmitting} className="btn-primary flex-1 py-3 font-semibold shadow-md">
               {isSubmitting ? 'Salvando…' : isEdit ? 'Salvar' : 'Criar conta'}
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   )
 }

@@ -1,10 +1,10 @@
 // src/components/organisms/PendingIssuesCard.tsx — Card/Banner de Inconsistências e Pendências
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertCircle, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Tag, Pencil, ArrowUpRight } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronUp, Tag, Pencil } from 'lucide-react'
 import { usePendingIssues } from '@/hooks/usePendingIssues'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
-import { updateTransaction } from '@/db/repositories/transactions'
+import { updateTransaction } from '@/services/api/transactions'
 import { formatCurrency } from '@/utils/format'
 import type { PendingIssue } from '@/types'
 

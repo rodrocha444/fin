@@ -1,11 +1,12 @@
 // src/pages/ScheduledPage.tsx — versão mobile
 import { useState } from 'react'
-import { Plus, CalendarClock, Pencil, Trash2, PlayCircle, ChevronRight } from 'lucide-react'
+import { Plus, CalendarClock, Pencil, Trash2, PlayCircle } from 'lucide-react'
 import { useScheduledTransactions } from '@/hooks/useScheduled'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
-import { deleteScheduled, processScheduledTransactions } from '@/db/repositories/scheduled'
+import { deleteScheduled, processScheduledTransactions } from '@/services/api/scheduled'
 import { formatCurrency, formatDate, frequencyLabel } from '@/utils/format'
+import { useConfirm, useAlert } from '@/context/ConfirmContext'
 import ScheduledForm from '@/components/organisms/ScheduledForm'
 import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
 import type { ScheduledTransaction } from '@/types'
@@ -21,8 +22,18 @@ export default function ScheduledPage() {
   const accountMap = new Map(accounts.map(a => [a.id!, a]))
   const categoryMap = new Map(categories?.map(c => [c.id!, c]) ?? [])
 
+  const confirm = useConfirm()
+  const showAlert = useAlert()
+
   const handleDelete = async (s: ScheduledTransaction) => {
-    if (!s.id || !confirm(`Excluir agendamento "${s.payee}"?`)) return
+    if (!s.id) return
+    const ok = await confirm({
+      title: 'Excluir agendamento?',
+      message: `Deseja realmente excluir o agendamento de "${s.payee}"?`,
+      confirmText: 'Excluir',
+      variant: 'danger',
+    })
+    if (!ok) return
     await deleteScheduled(s.id)
   }
 
@@ -30,7 +41,11 @@ export default function ScheduledPage() {
     setProcessing(true)
     try {
       const count = await processScheduledTransactions()
-      alert(`${count} transação(ões) processada(s).`)
+      await showAlert({
+        title: 'Processamento Concluído',
+        message: `${count} transação(ões) processada(s) com sucesso.`,
+        variant: 'success',
+      })
     } finally {
       setProcessing(false)
     }

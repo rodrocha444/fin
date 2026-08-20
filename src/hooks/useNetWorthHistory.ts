@@ -1,6 +1,6 @@
-// src/hooks/useNetWorthHistory.ts — Histórico e projeção futura de Patrimônio Líquido (Cloud-Only)
+// src/hooks/useNetWorthHistory.ts — Histórico e projeção futura de Patrimônio Líquido com TanStack Query v5
 import { useMemo } from 'react'
-import { useFinancialData } from '@/context/FinancialDataContext'
+import { useAccountsQuery, useTransactionsQuery, useScheduledTransactionsQuery } from '@/hooks/queries'
 import { format, addDays, addWeeks, addMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { ScheduledTransaction, TransactionType } from '@/types'
@@ -21,7 +21,10 @@ export function useNetWorthHistory(
   endDate: Date,
   granularity: Granularity
 ): NetWorthPoint[] | undefined {
-  const { accounts, transactions, scheduledTransactions, isLoading } = useFinancialData()
+  const { data: accounts = [], isLoading: l1 } = useAccountsQuery()
+  const { data: transactions = [], isLoading: l2 } = useTransactionsQuery()
+  const { data: scheduledTransactions = [], isLoading: l3 } = useScheduledTransactionsQuery()
+  const isLoading = l1 || l2 || l3
 
   return useMemo(() => {
     if (isLoading && accounts.length === 0) return undefined

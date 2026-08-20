@@ -1,7 +1,6 @@
-// src/components/organisms/NetWorthChartCard.tsx
 import { useState, useMemo } from 'react'
 import { subMonths, addMonths, format } from 'date-fns'
-import { Filter, TrendingUp, Sparkles } from 'lucide-react'
+import { TrendingUp, Sparkles } from 'lucide-react'
 import { useNetWorthHistory } from '@/hooks/useNetWorthHistory'
 import type { Granularity, NetWorthPoint } from '@/hooks/useNetWorthHistory'
 import { formatCurrency, formatDate } from '@/utils/format'
@@ -38,7 +37,8 @@ export default function NetWorthChartCard() {
     }
   }, [preset, customStart, customEnd, today])
 
-  const points = useNetWorthHistory(startDate, endDate, granularity) ?? []
+  const rawPoints = useNetWorthHistory(startDate, endDate, granularity)
+  const points = useMemo(() => rawPoints ?? [], [rawPoints])
 
   const [activePointIndex, setActivePointIndex] = useState<number | null>(null)
 

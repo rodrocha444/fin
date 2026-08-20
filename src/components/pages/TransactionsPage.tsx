@@ -6,8 +6,9 @@ import { useFinancialData } from '@/context/FinancialDataContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useMonthTransactions } from '@/hooks/useTransactions'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
-import { deleteTransaction, deleteSplitTransaction } from '@/db/repositories/transactions'
+import { deleteTransaction, deleteSplitTransaction } from '@/services/api/transactions'
 import { formatCurrency, currentMonth } from '@/utils/format'
+import { useConfirm } from '@/context/ConfirmContext'
 import MonthNavigator from '@/components/atoms/MonthNavigator'
 import SearchBar from '@/components/atoms/SearchBar'
 import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
@@ -57,6 +58,8 @@ export default function TransactionsPage() {
   const categoryMap = new Map(categories?.map(c => [c.id!, c]) ?? [])
   const groupMap = new Map(installmentGroups?.map(g => [g.id!, g]) ?? [])
 
+  const confirm = useConfirm()
+
   const sorted = [...(transactions ?? [])]
     .filter(tx => {
       if (selectedAccountId && tx.accountId !== selectedAccountId && tx.transferAccountId !== selectedAccountId) {
@@ -75,12 +78,25 @@ export default function TransactionsPage() {
 
   const handleDelete = async (tx: Transaction) => {
     if (tx.splitGroupId) {
-      if (!confirm(`Esta transação faz parte de uma divisão de categorias (${tx.payee}). Deseja excluir todas as partes deste rateio?`)) return
+      const splitCount = allTransactions.filter(t => t.splitGroupId === tx.splitGroupId).length
+      const ok = await confirm({
+        title: 'Excluir transação dividida?',
+        message: `Excluir a transação dividida "${tx.payee}" e todas as suas ${splitCount} partes?`,
+        confirmText: 'Excluir todas',
+        variant: 'danger',
+      })
+      if (!ok) return
       await deleteSplitTransaction(tx.splitGroupId)
       return
     }
     if (!tx.id) return
-    if (!confirm(tx.installmentGroupId ? 'Excluir esta parcela?' : 'Excluir esta transação?')) return
+    const ok = await confirm({
+      title: tx.installmentGroupId ? 'Excluir parcela?' : 'Excluir transação?',
+      message: `Deseja realmente excluir a transação "${tx.payee}"?`,
+      confirmText: 'Excluir',
+      variant: 'danger',
+    })
+    if (!ok) return
     await deleteTransaction(tx.id)
   }
 

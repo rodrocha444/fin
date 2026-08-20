@@ -1,13 +1,14 @@
-// src/components/organisms/TransactionForm.tsx — Formulário de Transação com suporte a Rateio/Divisão de Categorias (Split)
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { X, Split, Plus, Trash2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Split, Plus, Trash2, CheckCircle2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useFinancialData } from '@/context/FinancialDataContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
+import { useAlert } from '@/context/ConfirmContext'
+import Modal from '@/components/atoms/Modal'
 import {
   createTransaction,
   createInstallmentPurchase,
@@ -17,8 +18,8 @@ import {
   createSplitTransaction,
   updateSplitTransaction,
   deleteTransaction,
-} from '@/db/repositories/transactions'
-import { getOrCreatePayee } from '@/db/repositories/payees'
+} from '@/services/api/transactions'
+import { getOrCreatePayee } from '@/services/api/payees'
 import PriceInput from '@/components/atoms/PriceInput'
 import { formatCurrency } from '@/utils/format'
 import type { Transaction } from '@/types'
@@ -101,17 +102,24 @@ export default function TransactionForm({
 }: TransactionFormProps) {
   const isEdit = !!transaction
   const isExistingInstallment = !!transaction?.installmentGroupId
+  // Uma transação que faz parte de um split nunca pode ser editada isoladamente
+  const isExistingSplit = !!transaction?.splitGroupId
   const { transactions, installmentGroups } = useFinancialData()
+  const showAlert = useAlert()
 
   // Busca os dados consolidados do grupo quando estiver editando uma compra parcelada
-  const group = transaction?.installmentGroupId
-    ? installmentGroups.find(g => g.id === transaction.installmentGroupId)
-    : undefined
+  const group = useMemo(() => {
+    return transaction?.installmentGroupId
+      ? installmentGroups.find(g => g.id === transaction.installmentGroupId)
+      : undefined
+  }, [transaction?.installmentGroupId, installmentGroups])
 
-  // Busca os registros de rateio existentes quando estiver editando transação dividida
-  const splitSiblings = transaction?.splitGroupId
-    ? transactions.filter(t => t.splitGroupId === transaction.splitGroupId)
-    : []
+  // Busca TODOS os irmãos do rateio quando estiver editando transação dividida
+  const splitSiblings = useMemo(() => {
+    return transaction?.splitGroupId
+      ? transactions.filter(t => t.splitGroupId === transaction.splitGroupId)
+      : []
+  }, [transaction?.splitGroupId, transactions])
 
   const initialMode: TxMode = transaction
     ? (transaction.type === 'transfer' ? 'transfer' : transaction.type === 'income' ? 'income' : 'expense')
@@ -124,7 +132,8 @@ export default function TransactionForm({
   const [mode, setMode] = useState<TxMode>(initialMode)
   const [expensePaymentType, setExpensePaymentType] = useState<ExpensePaymentType>(initialExpenseType)
   const [installmentAmountType, setInstallmentAmountType] = useState<'total' | 'parcel'>('total')
-  const [isSplit, setIsSplit] = useState<boolean>(!!transaction?.splitGroupId)
+  // Se a transação tem splitGroupId, SEMPRE entra em modo split — não é possível editar isoladamente
+  const [isSplit, setIsSplit] = useState<boolean>(isExistingSplit || !!transaction?.splitGroupId)
   const [splits, setSplits] = useState<SplitRow[]>(() => {
     if (splitSiblings.length > 0) {
       return splitSiblings.map((s, idx) => ({
@@ -177,6 +186,7 @@ export default function TransactionForm({
   })
 
   // Popula os dados consolidados da compra parcelada completa (valor total, contagem, data de início)
+  // ou da transação dividida (carrega todas as fatias de categorias e a soma total)
   useEffect(() => {
     if (group) {
       setValue('amount', group.totalAmount, { shouldValidate: true })
@@ -188,11 +198,22 @@ export default function TransactionForm({
       if (transaction?.notes) {
         setValue('notes', transaction.notes.replace(/\s*\(\d+\/\d+\)$/, '').trim())
       }
-    } else if (splitSiblings.length > 0) {
+    } else if (transaction?.splitGroupId && splitSiblings.length > 0) {
+      setIsSplit(true)
       const sum = splitSiblings.reduce((s, t) => s + t.amount, 0)
       setValue('amount', sum, { shouldValidate: true })
+      setValue('date', format(new Date(transaction.date), 'yyyy-MM-dd'), { shouldValidate: true })
+      setValue('accountId', transaction.accountId, { shouldValidate: true })
+      if (transaction.payee) setValue('payee', transaction.payee)
+      if (transaction.notes) setValue('notes', transaction.notes)
+      setSplits(splitSiblings.map((s, idx) => ({
+        id: s.id || `split-${idx}-${Date.now()}`,
+        categoryId: s.categoryId || '',
+        amount: s.amount,
+        notes: s.notes || '',
+      })))
     }
-  }, [group, transaction, setValue])
+  }, [group, transaction, splitSiblings, setValue])
 
   const selectedDate = watch('date')
   const watchAmount = watch('amount') || 0
@@ -277,14 +298,22 @@ export default function TransactionForm({
         const validSplits = splits.filter(s => (s.amount || 0) > 0)
         // Validação de divisões no modo rateio
         if (validSplits.length < 2) {
-          alert('Adicione pelo menos 2 categorias com valores maiores que zero para dividir a transação.')
+          await showAlert({
+            title: 'Divisão de Categorias',
+            message: 'Adicione pelo menos 2 categorias com valores maiores que zero para dividir a transação.',
+            variant: 'warning',
+          })
           return
         }
 
         const effectiveTotal = data.amount > 0 ? data.amount : sumSplits
         const diff = Math.abs(sumSplits - effectiveTotal)
         if (diff >= 0.01) {
-          alert(`A soma das divisões (${formatCurrency(sumSplits)}) deve ser exatamente igual ao valor total (${formatCurrency(effectiveTotal)}). Diferença: ${formatCurrency(remainingToDistribute)}`)
+          await showAlert({
+            title: 'Divergência nos Valores',
+            message: `A soma das divisões (${formatCurrency(sumSplits)}) deve ser exatamente igual ao valor total (${formatCurrency(effectiveTotal)}).\n\nDiferença: ${formatCurrency(remainingToDistribute)}`,
+            variant: 'warning',
+          })
           return
         }
 
@@ -410,49 +439,49 @@ export default function TransactionForm({
       onClose()
     } catch (err: any) {
       console.error('Erro ao salvar transação:', err)
-      alert(err.message || 'Erro ao salvar transação.')
+      await showAlert({
+        title: 'Erro ao Salvar',
+        message: err.message || 'Ocorreu um erro ao salvar a transação.',
+        variant: 'danger',
+      })
     }
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div className="bg-slate-900 border-t sm:border border-slate-700/80 rounded-t-3xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl sheet-up sm:fade-in max-h-[92dvh] flex flex-col">
-
-        {/* Handle */}
-        <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0 cursor-grab">
-          <div className="w-12 h-1.5 bg-slate-700 rounded-full" />
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 flex-shrink-0">
-          <div>
-            <h2 className="font-semibold text-slate-100 text-base sm:text-lg">
-              {isExistingInstallment
-                ? `Editar Parcela ${transaction.installmentNumber} de ${transaction.installmentTotal}`
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      size="lg"
+      title={
+        <div>
+          <h2 className="font-semibold text-slate-100 text-base sm:text-lg">
+            {isExistingInstallment
+              ? `Editar Parcela ${transaction.installmentNumber} de ${transaction.installmentTotal}`
+              : isExistingSplit
+                ? 'Editar transação dividida'
                 : isSplit
-                  ? (isEdit ? 'Editar divisão de categorias' : 'Nova transação dividida')
+                  ? 'Nova transação dividida'
                   : isEdit
                     ? 'Editar transação'
                     : 'Nova transação'}
-            </h2>
-            {isExistingInstallment && (
-              <p className="text-xs text-violet-400 mt-0.5">
-                Compra parcelada no cartão
-              </p>
-            )}
-            {isSplit && (
-              <p className="text-xs text-indigo-400 mt-0.5 flex items-center gap-1">
-                <Split className="w-3 h-3" /> Rateio entre {splits.length} categorias
-              </p>
-            )}
-          </div>
-          <button onClick={onClose} className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 active:bg-slate-700 transition-colors">
-            <X className="w-5 h-5" />
-          </button>
+          </h2>
+          {isExistingInstallment && (
+            <p className="text-xs text-violet-400 mt-0.5 font-normal">
+              Compra parcelada no cartão
+            </p>
+          )}
+          {isSplit && (
+            <p className="text-xs text-indigo-400 mt-0.5 flex items-center gap-1 font-normal">
+              <Split className="w-3 h-3" />
+              {isExistingSplit
+                ? `Todas as ${splits.length} partes do rateio`
+                : `Rateio entre ${splits.length} categorias`}
+            </p>
+          )}
         </div>
+      }
+    >
+      <div className="flex flex-col h-full">
 
         {/* Seletor de tipo principal */}
         <div className="px-5 pt-4 pb-1 space-y-2 flex-shrink-0">
@@ -475,13 +504,13 @@ export default function TransactionForm({
             ))}
           </div>
 
-          {/* Sub-seletor de Despesa: À vista vs Parcelado */}
+          {/* Sub-seletor de Despesa: À vista vs Parcelado (bloqueado quando editando split existente) */}
           {mode === 'expense' && (
             <div className="flex bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
               <button
                 type="button"
-                onClick={() => !isExistingInstallment && setExpensePaymentType('single')}
-                disabled={isExistingInstallment}
+                onClick={() => !isExistingInstallment && !isExistingSplit && setExpensePaymentType('single')}
+                disabled={isExistingInstallment || isExistingSplit}
                 className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${
                   expensePaymentType === 'single'
                     ? 'bg-slate-700 text-slate-100 shadow'
@@ -493,13 +522,15 @@ export default function TransactionForm({
               <button
                 type="button"
                 onClick={() => {
+                  if (isExistingSplit) return
                   setExpensePaymentType('installment')
                   setIsSplit(false)
                 }}
+                disabled={isExistingSplit}
                 className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${
                   expensePaymentType === 'installment'
                     ? 'bg-violet-600 text-white shadow'
-                    : 'text-slate-400 hover:text-slate-200'
+                    : 'text-slate-400 hover:text-slate-200 disabled:opacity-40 disabled:hover:text-slate-400'
                 }`}
               >
                 Parcelado
@@ -917,22 +948,24 @@ export default function TransactionForm({
           )}
 
           {/* Actions */}
-          <div className="flex gap-2 pt-2">
+          <div className="flex gap-2.5 pt-2">
             <button type="button" onClick={onClose} className="btn-secondary flex-1 py-3">Cancelar</button>
-            <button type="submit" disabled={isSubmitting} className="btn-primary flex-1 py-3">
+            <button type="submit" disabled={isSubmitting} className="btn-primary flex-1 py-3 font-semibold shadow-md">
               {isSubmitting
                 ? 'Salvando…'
                 : isExistingInstallment
                   ? 'Salvar compra parcelada'
-                  : isSplit
-                    ? (isEdit ? 'Salvar divisão' : 'Salvar transação dividida')
-                    : isEdit
-                      ? 'Salvar alterações'
-                      : 'Salvar'}
+                  : isExistingSplit
+                    ? 'Salvar transação dividida'
+                    : isSplit
+                      ? 'Salvar transação dividida'
+                      : isEdit
+                        ? 'Salvar alterações'
+                        : 'Salvar'}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   )
 }

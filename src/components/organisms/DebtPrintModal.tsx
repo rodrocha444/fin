@@ -1,6 +1,7 @@
 // src/components/organisms/DebtPrintModal.tsx — Visualização e impressão de extrato em PDF de cobranças/pendências
-import { Printer, X } from 'lucide-react'
+import { Printer } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/utils/format'
+import Modal from '@/components/atoms/Modal'
 import type { DebtAccount, DebtItem } from '@/types'
 
 interface DebtPrintModalProps {
@@ -92,45 +93,25 @@ export default function DebtPrintModal({
   const handlePrint = () => window.print()
 
   return (
-    <div
-      className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-2 sm:p-6 overflow-y-auto"
-      style={{
-        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)',
-        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)',
-        paddingLeft: 'calc(env(safe-area-inset-left, 0px) + 0.5rem)',
-        paddingRight: 'calc(env(safe-area-inset-right, 0px) + 0.5rem)',
-      }}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      size="full"
+      title="Extrato / Relatório em PDF"
+      description="Visualize e imprima o extrato de pendências"
+      headerRight={
+        <button
+          onClick={handlePrint}
+          className="btn-primary py-2 px-3 sm:px-3.5 text-xs font-semibold flex items-center gap-1.5 sm:gap-2 shadow-lg shadow-indigo-600/30 mr-1"
+        >
+          <Printer className="w-4 h-4" />
+          <span className="hidden sm:inline">Imprimir / Salvar PDF</span>
+          <span className="sm:hidden">Imprimir</span>
+        </button>
+      }
+      contentClassName="bg-slate-950 p-4 sm:p-8 print:bg-white print:p-0 print:m-0 print:text-black print:overflow-visible"
     >
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl shadow-2xl flex flex-col max-h-full sm:max-h-[95vh] overflow-hidden">
-        {/* Header da modal (oculto na impressão) */}
-        <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-800 flex-shrink-0 print:hidden gap-3">
-          <div className="min-w-0">
-            <h2 className="font-semibold text-slate-100 text-sm sm:text-lg truncate">Extrato / Relatório em PDF</h2>
-            <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">Visualize e imprima o extrato de pendências</p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={handlePrint}
-              className="btn-primary py-2 px-3 sm:px-3.5 text-xs font-semibold flex items-center gap-1.5 sm:gap-2 shadow-lg shadow-indigo-600/30"
-            >
-              <Printer className="w-4 h-4" />
-              <span className="hidden sm:inline">Imprimir / Salvar PDF</span>
-              <span className="sm:hidden">Imprimir</span>
-            </button>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 active:bg-slate-700 transition-colors"
-              aria-label="Fechar"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Documento Formatado */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-950 print:bg-white print:p-0 print:m-0 print:text-black print:overflow-visible">
-          <div id="printable-debt-container" className="bg-slate-900 print:bg-white text-slate-100 print:text-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-800 print:border-none space-y-6 print:space-y-3.5 print:p-0 print:m-0">
+      <div id="printable-debt-container" className="bg-slate-900 print:bg-white text-slate-100 print:text-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-800 print:border-none space-y-6 print:space-y-3.5 print:p-0 print:m-0">
 
             {/* Cabeçalho do Extrato */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 print:border-slate-300 pb-6 print:pb-3 print-avoid-break">
@@ -362,11 +343,8 @@ export default function DebtPrintModal({
               <p>Demonstrativo para conferência e acerto mútuo.</p>
               <p className="font-medium">FinPlan</p>
             </div>
-
           </div>
-        </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 

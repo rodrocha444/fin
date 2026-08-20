@@ -39,7 +39,7 @@ export default function CreditCardPurchaseItem({
           )}
           {purchase.splitGroupId && (
             <Badge variant="info">
-              Divisão
+              Rateio
             </Badge>
           )}
         </div>
@@ -53,7 +53,7 @@ export default function CreditCardPurchaseItem({
             {purchase.type === 'transfer'
               ? 'Transferência / Pagamento'
               : purchase.splitGroupId
-                ? 'Divisão de categorias'
+                ? 'Rateio de categorias • clique para ver todas as partes'
                 : categoryName ?? 'Sem categoria'}
           </span>
         </div>

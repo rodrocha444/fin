@@ -1,9 +1,10 @@
 import { useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Copy, Trash2, Plus, MoreHorizontal, ArrowDownLeft, CreditCard, Layers, Receipt, History } from 'lucide-react'
+import { Copy, Trash2, MoreHorizontal, ArrowDownLeft, CreditCard, Layers, Receipt, History } from 'lucide-react'
 import { useBudgetRows, useIncomeBudgetRows, useInvoiceBudgetRows, useBudgetSummary } from '@/hooks/useBudget'
-import { setBudget, copyFromPreviousMonth, clearMonthBudgets } from '@/db/repositories/budget'
+import { setBudget, copyFromPreviousMonth, clearMonthBudgets } from '@/services/api/budget'
 import { formatCurrency, currentMonth } from '@/utils/format'
+import { useConfirm } from '@/context/ConfirmContext'
 import PriceInput from '@/components/atoms/PriceInput'
 import MonthNavigator from '@/components/atoms/MonthNavigator'
 import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
@@ -359,6 +360,8 @@ export default function BudgetPage() {
 
   const totalSpent = (rows?.reduce((s, r) => s + r.totalActivity, 0) ?? 0) + (invoiceRows?.reduce((s, r) => s + r.totalActivity, 0) ?? 0)
 
+  const confirm = useConfirm()
+
   const handleCopy = async () => {
     setShowMenu(false)
     await copyFromPreviousMonth(month)
@@ -366,7 +369,13 @@ export default function BudgetPage() {
 
   const handleClear = async () => {
     setShowMenu(false)
-    if (confirm('Zerar todos os valores orçados deste mês?')) {
+    const ok = await confirm({
+      title: 'Zerar Orçamento?',
+      message: 'Deseja zerar todos os valores orçados deste mês?',
+      confirmText: 'Zerar Orçamento',
+      variant: 'warning',
+    })
+    if (ok) {
       await clearMonthBudgets(month)
     }
   }
