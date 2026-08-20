@@ -1,8 +1,7 @@
 // src/components/organisms/CategoryTransactionsModal.tsx — Modal para visualizar e gerenciar transações da categoria no mês
 import { useState } from 'react'
 import { X, Plus, Receipt, AlertCircle } from 'lucide-react'
-import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '@/db/schema'
+import { useFinancialData } from '@/context/FinancialDataContext'
 import { useCategoryMonthTransactions } from '@/hooks/useTransactions'
 import { useAccounts } from '@/hooks/useAccounts'
 import { deleteTransaction } from '@/db/repositories/transactions'
@@ -30,9 +29,9 @@ export default function CategoryTransactionsModal({
   isIncome = false,
   onClose,
 }: CategoryTransactionsModalProps) {
+  const { installmentGroups } = useFinancialData()
   const transactions = useCategoryMonthTransactions(category.id, month) ?? []
   const accounts = useAccounts() ?? []
-  const installmentGroups = useLiveQuery(() => db.installmentGroups.toArray(), [])
 
   const accountMap = new Map(accounts.map(a => [a.id!, a]))
   const groupMap = new Map(installmentGroups?.map(g => [g.id!, g]) ?? [])

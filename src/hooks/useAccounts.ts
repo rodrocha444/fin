@@ -1,63 +1,99 @@
-// src/hooks/useAccounts.ts
-// ─────────────────────────────────────────────────────────────
-// Hooks reativos para contas e saldos (padrão CUID)
-// ─────────────────────────────────────────────────────────────
-
-import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '@/db/schema'
-import { calculateAccountBalance } from '@/db/repositories/accounts'
+// src/hooks/useAccounts.ts — Hooks reativos para contas e saldos (Cloud-Only)
+import { useMemo } from 'react'
+import { useFinancialData } from '@/context/FinancialDataContext'
+import type { Account } from '@/types'
 
 /** Todas as contas ativas, em tempo real */
-export function useAccounts() {
-  return useLiveQuery(() => db.accounts.orderBy('name').filter(a => a.isActive !== false).toArray(), [])
+export function useAccounts(): Account[] | undefined {
+  const { accounts, isLoading } = useFinancialData()
+  return useMemo(() => {
+    if (isLoading && accounts.length === 0) return undefined
+    return accounts.filter(a => a.isActive !== false)
+  }, [accounts, isLoading])
 }
 
 /** Uma conta específica pelo ID */
-export function useAccount(accountId: string | undefined) {
-  return useLiveQuery(
-    async () => {
-      if (accountId === undefined) return undefined
-      return db.accounts.get(accountId)
-    },
-    [accountId]
-  )
+export function useAccount(accountId: string | undefined): Account | undefined {
+  const { accounts } = useFinancialData()
+  return useMemo(() => {
+    if (!accountId) return undefined
+    return accounts.find(a => a.id === accountId)
+  }, [accounts, accountId])
 }
 
 /** Saldo de uma conta específica, calculado dinamicamente */
-export function useAccountBalance(accountId: string | undefined) {
-  return useLiveQuery(
-    async () => {
-      if (accountId === undefined) return undefined
-      return calculateAccountBalance(accountId)
-    },
-    [accountId]
-  )
+export function useAccountBalance(accountId: string | undefined): number | undefined {
+  const { accounts, transactions } = useFinancialData()
+
+  return useMemo(() => {
+    if (!accountId) return undefined
+    const account = accounts.find(a => a.id === accountId)
+    if (!account) return 0
+
+    let balance = Number(account.initialBalance || 0)
+
+    // 1. Transações diretas
+    for (const tx of transactions) {
+      if (tx.accountId === accountId) {
+        const amount = Number(tx.amount || 0)
+        if (account.type === 'credit_card') {
+          if (tx.type === 'expense') balance -= amount
+          else if (tx.type === 'income' || tx.type === 'transfer') balance += amount
+        } else {
+          if (tx.type === 'income') balance += amount
+          else if (tx.type === 'expense' || tx.type === 'transfer') balance -= amount
+        }
+      }
+      // 2. Transferências de entrada
+      if (tx.transferAccountId === accountId && tx.type === 'transfer') {
+        balance += Number(tx.amount || 0)
+      }
+    }
+
+    return balance
+  }, [accounts, transactions, accountId])
 }
 
 /** Verifica se uma conta possui transações vinculadas (reativo) */
-export function useHasAccountTransactions(accountId: string | undefined) {
-  return useLiveQuery(
-    async () => {
-      if (!accountId) return false
-      const countDirect = await db.transactions.where('accountId').equals(accountId).count()
-      if (countDirect > 0) return true
-      const countTransfer = await db.transactions.where('transferAccountId').equals(accountId).count()
-      return countTransfer > 0
-    },
-    [accountId],
-    false
-  )
+export function useHasAccountTransactions(accountId: string | undefined): boolean {
+  const { transactions } = useFinancialData()
+  return useMemo(() => {
+    if (!accountId) return false
+    return transactions.some(t => t.accountId === accountId || t.transferAccountId === accountId)
+  }, [transactions, accountId])
 }
 
 /** Saldo de todas as contas: Map<accountId, balance> */
-export function useAllBalances() {
-  return useLiveQuery(async () => {
-    const accounts = await db.accounts.filter(a => a.isActive !== false).toArray()
-    const entries = await Promise.all(
-      accounts
-        .filter(a => a.id !== undefined)
-        .map(async a => [a.id!, await calculateAccountBalance(a.id!)] as [string, number])
-    )
-    return new Map(entries)
-  }, [])
+export function useAllBalances(): Map<string, number> | undefined {
+  const { accounts, transactions, isLoading } = useFinancialData()
+
+  return useMemo(() => {
+    if (isLoading && accounts.length === 0) return undefined
+    const map = new Map<string, number>()
+
+    for (const acc of accounts) {
+      if (!acc.id || acc.isActive === false) continue
+      let balance = Number(acc.initialBalance || 0)
+
+      for (const tx of transactions) {
+        if (tx.accountId === acc.id) {
+          const amount = Number(tx.amount || 0)
+          if (acc.type === 'credit_card') {
+            if (tx.type === 'expense') balance -= amount
+            else if (tx.type === 'income' || tx.type === 'transfer') balance += amount
+          } else {
+            if (tx.type === 'income') balance += amount
+            else if (tx.type === 'expense' || tx.type === 'transfer') balance -= amount
+          }
+        }
+        if (tx.transferAccountId === acc.id && tx.type === 'transfer') {
+          balance += Number(tx.amount || 0)
+        }
+      }
+
+      map.set(acc.id, balance)
+    }
+
+    return map
+  }, [accounts, transactions, isLoading])
 }

@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Plus, Search } from 'lucide-react'
 import { format } from 'date-fns'
-import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '@/db/schema'
+import { useFinancialData } from '@/context/FinancialDataContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useMonthTransactions } from '@/hooks/useTransactions'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
@@ -28,17 +27,18 @@ export default function TransactionsPage() {
   const selectedAccountId = searchParams.get('account') || undefined
   const editTxId = searchParams.get('edit')
 
+  const { transactions: allTransactions, installmentGroups } = useFinancialData()
+
   useEffect(() => {
     if (editTxId) {
-      db.transactions.get(editTxId).then(tx => {
-        if (tx) {
-          const txMonth = format(new Date(tx.date), 'yyyy-MM')
-          setMonth(txMonth)
-          setEditingTx(tx)
-        }
-      })
+      const tx = allTransactions.find(t => t.id === editTxId)
+      if (tx) {
+        const txMonth = format(new Date(tx.date), 'yyyy-MM')
+        setMonth(txMonth)
+        setEditingTx(tx)
+      }
     }
-  }, [editTxId])
+  }, [editTxId, allTransactions])
 
   const handleCloseEdit = () => {
     setEditingTx(null)
@@ -51,7 +51,6 @@ export default function TransactionsPage() {
 
   const accounts = useAccounts()
   const transactions = useMonthTransactions(month)
-  const installmentGroups = useLiveQuery(() => db.installmentGroups.toArray(), [])
   const { categories } = useCategoriesWithGroups() ?? {}
 
   const accountMap = new Map(accounts?.map(a => [a.id!, a]) ?? [])

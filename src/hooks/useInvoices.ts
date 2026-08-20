@@ -1,11 +1,17 @@
-// src/hooks/useInvoices.ts — Hooks reativos para faturas e status de pagamento
-import { useLiveQuery } from 'dexie-react-hooks'
+// src/hooks/useInvoices.ts — Hooks reativos para faturas e status de pagamento (Cloud-Only)
+import { useState, useEffect } from 'react'
 import { getPaidInvoicesMap, setInvoicePaidStatus } from '@/db/repositories/invoices'
 import { getClosedUnpaidInvoices, type InvoiceData } from '@/utils/invoices'
 import type { Account, Transaction } from '@/types'
 
 export function usePaidInvoices() {
-  const paidMap = (useLiveQuery(() => getPaidInvoicesMap(), [], {} as Record<string, boolean>) ?? {}) as Record<string, boolean>
+  const [paidMap, setPaidMap] = useState<Record<string, boolean>>(() => getPaidInvoicesMap())
+
+  useEffect(() => {
+    const handleUpdate = () => setPaidMap(getPaidInvoicesMap())
+    window.addEventListener('finplan_paid_invoices_changed', handleUpdate)
+    return () => window.removeEventListener('finplan_paid_invoices_changed', handleUpdate)
+  }, [])
 
   const isPaid = (accountId: string, monthKey: string): boolean => {
     return Boolean(paidMap[`${accountId}_${monthKey}`])

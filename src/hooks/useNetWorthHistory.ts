@@ -1,12 +1,6 @@
-// src/hooks/useNetWorthHistory.ts
-// ─────────────────────────────────────────────────────────────
-// Histórico e projeção futura de Patrimônio Líquido
-// Inclui saldo inicial, transações passadas/futuras (parcelamentos)
-// e projeção de transações agendadas/recorrentes
-// ─────────────────────────────────────────────────────────────
-
-import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '@/db/schema'
+// src/hooks/useNetWorthHistory.ts — Histórico e projeção futura de Patrimônio Líquido (Cloud-Only)
+import { useMemo } from 'react'
+import { useFinancialData } from '@/context/FinancialDataContext'
 import { format, addDays, addWeeks, addMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { ScheduledTransaction, TransactionType } from '@/types'
@@ -26,18 +20,13 @@ export function useNetWorthHistory(
   startDate: Date,
   endDate: Date,
   granularity: Granularity
-) {
-  const startKey = startDate.toISOString().split('T')[0]
-  const endKey = endDate.toISOString().split('T')[0]
+): NetWorthPoint[] | undefined {
+  const { accounts, transactions, scheduledTransactions, isLoading } = useFinancialData()
 
-  return useLiveQuery(async () => {
-    const [accounts, txs, scheduled] = await Promise.all([
-      db.accounts.filter(a => a.isActive !== false).toArray(),
-      db.transactions.toArray(),
-      db.scheduledTransactions.filter(s => s.isActive).toArray(),
-    ])
-
-    if (!accounts || accounts.length === 0) return []
+  return useMemo(() => {
+    if (isLoading && accounts.length === 0) return undefined
+    const activeAccounts = accounts.filter(a => a.isActive !== false)
+    if (activeAccounts.length === 0) return []
 
     const today = new Date()
     today.setHours(23, 59, 59, 999)
@@ -53,6 +42,8 @@ export function useNetWorthHistory(
     let count = 0
     const maxPoints = 500
 
+    const activeScheduled = scheduledTransactions.filter(s => s.isActive)
+
     while (current <= limit && count < maxPoints) {
       count++
       const pDate = new Date(current)
@@ -62,24 +53,22 @@ export function useNetWorthHistory(
       let totalAssets = 0
       let totalLiabilities = 0
 
-      // Obter ocorrências projetadas de agendamentos se a data for futura
       const projectedOccurrences = isFuture
-        ? getProjectedScheduledTransactions(scheduled, today, pDate)
+        ? getProjectedScheduledTransactions(activeScheduled, today, pDate)
         : []
 
-      for (const acc of accounts) {
-        if (acc.id === undefined) continue
+      for (const acc of activeAccounts) {
+        if (!acc.id) continue
         let bal = acc.type === 'credit_card' ? 0 : (acc.initialBalance || 0)
 
-        // 1. Transações reais (passadas e futuras já cadastradas como parcelas)
-        for (const tx of txs) {
+        // 1. Transações reais
+        for (const tx of transactions) {
           const txDate = new Date(tx.date)
           if (txDate > pDate) continue
 
           if (tx.accountId === acc.id) {
             if (tx.type === 'income') bal += tx.amount
-            else if (tx.type === 'expense') bal -= tx.amount
-            else if (tx.type === 'transfer') bal -= tx.amount
+            else if (tx.type === 'expense' || tx.type === 'transfer') bal -= tx.amount
           }
 
           if (tx.transferAccountId === acc.id && tx.type === 'transfer') {
@@ -87,12 +76,11 @@ export function useNetWorthHistory(
           }
         }
 
-        // 2. Projeção de transações agendadas
+        // 2. Projeção de agendamentos
         for (const proj of projectedOccurrences) {
           if (proj.accountId === acc.id) {
             if (proj.type === 'income') bal += proj.amount
-            else if (proj.type === 'expense') bal -= proj.amount
-            else if (proj.type === 'transfer') bal -= proj.amount
+            else if (proj.type === 'expense' || proj.type === 'transfer') bal -= proj.amount
           }
 
           if (proj.transferAccountId === acc.id && proj.type === 'transfer') {
@@ -133,7 +121,7 @@ export function useNetWorthHistory(
     }
 
     return points
-  }, [startKey, endKey, granularity])
+  }, [accounts, transactions, scheduledTransactions, startDate, endDate, granularity, isLoading])
 }
 
 function getProjectedScheduledTransactions(
@@ -147,7 +135,6 @@ function getProjectedScheduledTransactions(
     let next = new Date(s.nextDate)
     const end = s.endDate ? new Date(s.endDate) : null
 
-    // Avançar até depois de afterDateExclusive se necessário
     while (next <= upToDateInclusive) {
       if (end && next > end) break
       if (next > afterDateExclusive) {

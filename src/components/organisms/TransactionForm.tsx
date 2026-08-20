@@ -5,8 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { X } from 'lucide-react'
 import { format } from 'date-fns'
-import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '@/db/schema'
+import { useFinancialData } from '@/context/FinancialDataContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
 import { createTransaction, createInstallmentPurchase, updateInstallmentPurchase, createTransfer, updateTransaction } from '@/db/repositories/transactions'
@@ -84,12 +83,12 @@ export default function TransactionForm({
 }: TransactionFormProps) {
   const isEdit = !!transaction
   const isExistingInstallment = !!transaction?.installmentGroupId
+  const { installmentGroups } = useFinancialData()
 
   // Busca os dados consolidados do grupo quando estiver editando uma compra parcelada
-  const group = useLiveQuery(
-    () => (transaction?.installmentGroupId ? db.installmentGroups.get(transaction.installmentGroupId) : undefined),
-    [transaction?.installmentGroupId]
-  )
+  const group = transaction?.installmentGroupId
+    ? installmentGroups.find(g => g.id === transaction.installmentGroupId)
+    : undefined
 
   const initialMode: TxMode = transaction
     ? (transaction.type === 'transfer' ? 'transfer' : transaction.type === 'income' ? 'income' : 'expense')

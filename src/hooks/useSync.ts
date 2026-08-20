@@ -1,49 +1,21 @@
-// src/hooks/useSync.ts — Hook para sincronização com Supabase
-import { useState, useEffect } from 'react'
-import {
-  getSyncState,
-  subscribeSyncState,
-  executeSync,
-  scheduleSync,
-  pauseSync,
-  resumeSync,
-  toggleSyncPause,
-  overrideCloudWithLocalDatabase,
-  overrideLocalWithCloudDatabase,
-  type SyncState,
-} from '@/services/syncEngine'
+// src/hooks/useSync.ts — Compatibilidade (Cloud-Only via Supabase)
+import { useFinancialData } from '@/context/FinancialDataContext'
 
 export function useSync() {
-  const [state, setState] = useState<SyncState>(getSyncState())
-
-  useEffect(() => {
-    return subscribeSyncState(setState)
-  }, [])
-
-  const syncNow = async (forceAll = false) => {
-    return await executeSync({ forceAll, forceSync: true })
-  }
-
-  const triggerSync = (delayMs?: number) => {
-    scheduleSync(delayMs)
-  }
-
-  const overrideCloud = async () => {
-    return await overrideCloudWithLocalDatabase()
-  }
-
-  const overrideLocal = async () => {
-    return await overrideLocalWithCloudDatabase()
-  }
+  const { isConfigured, isLoading, lastUpdated, refetch } = useFinancialData()
 
   return {
-    ...state,
-    syncNow,
-    triggerSync,
-    pauseSync,
-    resumeSync,
-    overrideCloud,
-    overrideLocal,
-    togglePause: toggleSyncPause,
+    status: isConfigured ? 'synced' : 'unconfigured',
+    isSyncing: isLoading,
+    lastSyncAt: lastUpdated,
+    lastError: null,
+    isPaused: false,
+    syncNow: () => refetch(),
+    triggerSync: () => refetch(),
+    pauseSync: () => {},
+    resumeSync: () => refetch(),
+    overrideCloud: async () => ({ success: true }),
+    overrideLocal: async () => ({ success: true }),
+    togglePause: () => {},
   }
 }

@@ -1,33 +1,24 @@
-// src/db/repositories/invoices.ts — Gerenciamento do status de pagamento de faturas
-import { db } from '@/db/schema'
+// src/db/repositories/invoices.ts — Gerenciamento do status de pagamento de faturas (Cloud-Only)
+const PAID_INVOICES_KEY = 'finplan_paid_invoices_map'
 
-const PAID_INVOICES_KEY = 'paid_invoices_map'
-
-/**
- * Retorna o mapa de faturas marcadas como pagas { [accountId_monthKey]: boolean }
- */
-export async function getPaidInvoicesMap(): Promise<Record<string, boolean>> {
+export function getPaidInvoicesMap(): Record<string, boolean> {
   try {
-    const record = await db.syncMeta.get(PAID_INVOICES_KEY)
-    if (record && typeof record.value === 'object' && record.value !== null) {
-      return record.value as Record<string, boolean>
-    }
+    const raw = localStorage.getItem(PAID_INVOICES_KEY)
+    if (raw) return JSON.parse(raw)
   } catch (err) {
-    console.error('Erro ao obter mapa de faturas pagas:', err)
+    console.error('Erro ao ler faturas pagas do localStorage:', err)
   }
   return {}
 }
 
-/**
- * Define o status de pagamento de uma fatura de forma persistente
- */
-export async function setInvoicePaidStatus(
+export function setInvoicePaidStatus(
   accountId: string,
   monthKey: string,
   isPaid: boolean
-): Promise<void> {
-  const currentMap = await getPaidInvoicesMap()
+): void {
+  const current = getPaidInvoicesMap()
   const key = `${accountId}_${monthKey}`
-  const updatedMap = { ...currentMap, [key]: isPaid }
-  await db.syncMeta.put({ key: PAID_INVOICES_KEY, value: updatedMap })
+  const updated = { ...current, [key]: isPaid }
+  localStorage.setItem(PAID_INVOICES_KEY, JSON.stringify(updated))
+  window.dispatchEvent(new Event('finplan_paid_invoices_changed'))
 }

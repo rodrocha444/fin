@@ -1,11 +1,16 @@
-// src/hooks/useScheduled.ts
-import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '@/db/schema'
+// src/hooks/useScheduled.ts — Hooks reativos para transações agendadas (Cloud-Only)
+import { useMemo } from 'react'
+import { useFinancialData } from '@/context/FinancialDataContext'
+import type { ScheduledTransaction } from '@/types'
 
 /** Todas as transações agendadas ativas */
-export function useScheduledTransactions() {
-  return useLiveQuery(() =>
-    db.scheduledTransactions.orderBy('nextDate').filter(s => s.isActive !== false).toArray(),
-    []
-  )
+export function useScheduledTransactions(): ScheduledTransaction[] | undefined {
+  const { scheduledTransactions, isLoading } = useFinancialData()
+
+  return useMemo(() => {
+    if (isLoading && scheduledTransactions.length === 0) return undefined
+    return scheduledTransactions
+      .filter(s => s.isActive !== false)
+      .sort((a, b) => new Date(a.nextDate).getTime() - new Date(b.nextDate).getTime())
+  }, [scheduledTransactions, isLoading])
 }

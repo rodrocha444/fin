@@ -2,11 +2,9 @@ import { useState, useRef } from 'react'
 import {
   Plus, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronRight,
   Download, Upload, Database, CheckCircle2, Cloud, RefreshCw,
-  Copy, Check, ExternalLink, KeyRound, Server, AlertCircle,
-  Pause, Play, PauseCircle
+  Copy, Check, ExternalLink, KeyRound, Server, AlertCircle
 } from 'lucide-react'
-import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '@/db/schema'
+import { useFinancialData } from '@/context/FinancialDataContext'
 import {
   createGroup, updateGroup, deleteGroup, toggleGroupVisibility,
   createCategory, updateCategory, deleteCategory, toggleCategoryVisibility,
@@ -17,18 +15,13 @@ import {
   testSupabaseConnection
 } from '@/services/supabase'
 import { SUPABASE_SCHEMA_SQL } from '@/services/supabaseSchema'
-import { useSync } from '@/hooks/useSync'
-import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
 import ResetDatabaseModal from '@/components/organisms/ResetDatabaseModal'
 import Logo from '@/components/atoms/Logo'
 import { APP_VERSION, BUILD_DATE } from '@/version'
 
 export default function SettingsPage() {
-  const groups = useLiveQuery(() => db.categoryGroups.orderBy('sortOrder').toArray(), [])
-  const categories = useLiveQuery(() => db.categories.orderBy('sortOrder').toArray(), [])
+  const { categoryGroups: groups, categories, isLoading: isSyncing, refetch, isConfigured } = useFinancialData()
 
-  // Sincronização Supabase
-  const { status: syncStatus, isSyncing, lastSyncAt, lastError, isPaused, syncNow, togglePause, resumeSync, overrideCloud, overrideLocal } = useSync()
   const [supabaseUrl, setSupabaseUrl] = useState(() => getSupabaseConfig()?.url || '')
   const [supabaseKey, setSupabaseKey] = useState(() => getSupabaseConfig()?.anonKey || '')
   const [testResult, setTestResult] = useState<{ success?: boolean; message: string } | null>(null)
@@ -68,7 +61,7 @@ export default function SettingsPage() {
 
     if (result.success) {
       saveSupabaseConfig({ url: cleanUrl, anonKey: cleanKey })
-      syncNow(true)
+      refetch()
     }
   }
 
@@ -158,7 +151,7 @@ export default function SettingsPage() {
     if (!file) return
 
     try {
-      if (!confirm('Atenção: A importação irá substituir os dados locais e sincronizar com a nuvem. Deseja continuar?')) {
+      if (!confirm('Atenção: A importação irá substituir os dados no Supabase. Deseja continuar?')) {
         if (fileInputRef.current) fileInputRef.current.value = ''
         return
       }
@@ -168,24 +161,11 @@ export default function SettingsPage() {
       const backupData = JSON.parse(text) as DatabaseBackup
 
       const result = await importDatabase(backupData)
-
-      let cloudMsg = ''
-      if (getSupabaseConfig()) {
-        try {
-          const cloudRes = await overrideCloud()
-          if (cloudRes.success) {
-            cloudMsg = ' e nuvem atualizada com sucesso'
-          } else {
-            cloudMsg = ` (aviso na nuvem: ${cloudRes.error})`
-          }
-        } catch (syncErr: any) {
-          cloudMsg = ` (aviso na nuvem: ${syncErr?.message || syncErr})`
-        }
-      }
+      await refetch()
 
       setBackupStatus({
         type: 'success',
-        message: `Importação concluída! ${result.totalRecords} registros restaurados em ${result.importedTables.length} tabelas${cloudMsg}.`,
+        message: `Importação concluída! ${result.totalRecords} registros restaurados em ${result.importedTables.length} tabelas no Supabase.`,
       })
     } catch (err: any) {
       setBackupStatus({ type: 'error', message: err?.message || 'Falha ao importar backup.' })
@@ -441,90 +421,34 @@ export default function SettingsPage() {
                 <Cloud className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-sm font-semibold text-slate-200">Sincronização em Nuvem (Supabase)</h2>
-                <p className="text-xs text-slate-500">Backup automático e sincronização em tempo real entre dispositivos</p>
+                <h2 className="text-sm font-semibold text-slate-200">Banco de Dados em Nuvem (Supabase)</h2>
+                <p className="text-xs text-slate-500">Conexão direta e sincronização em tempo real via PostgreSQL</p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <SyncStatusBadge compact={false} showTime={true} />
-              {syncStatus !== 'unconfigured' && (
-                <>
-                  <button
-                    onClick={() => togglePause()}
-                    className={`py-1.5 px-2.5 text-xs rounded-xl font-medium border flex items-center gap-1.5 transition-all ${
-                      isPaused
-                        ? 'bg-amber-950/50 text-amber-300 border-amber-700/60 hover:bg-amber-900/40 hover:text-amber-200'
-                        : 'bg-slate-800/80 text-slate-300 border-slate-700/60 hover:bg-slate-800 hover:text-amber-300'
-                    }`}
-                    title={isPaused ? 'Retomar sincronização automática' : 'Pausar sincronização automática'}
-                  >
-                    {isPaused ? <Play className="w-3.5 h-3.5 text-amber-400" /> : <Pause className="w-3.5 h-3.5 text-slate-400" />}
-                    <span>{isPaused ? 'Retomar' : 'Pausar'}</span>
-                  </button>
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
+                isConfigured
+                  ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/60'
+                  : 'bg-amber-950/40 text-amber-300 border-amber-800/60'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${isConfigured ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                {isConfigured ? 'Conectado em Nuvem' : 'Não Configurado'}
+              </span>
 
-                  <button
-                    onClick={() => syncNow(true)}
-                    disabled={isSyncing}
-                    className="btn-secondary py-1.5 px-2.5 text-xs flex items-center gap-1.5 hover:text-sky-300"
-                    title="Sincronizar alterações da nuvem"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-sky-400' : ''}`} />
-                    <span>{isSyncing ? 'Sincronizando…' : 'Sincronizar'}</span>
-                  </button>
-
-                  <button
-                    onClick={async () => {
-                      if (confirm('Atenção: Deseja baixar todos os dados da nuvem e substituir o cache local deste dispositivo?')) {
-                        await overrideLocal()
-                      }
-                    }}
-                    disabled={isSyncing}
-                    className="btn-secondary py-1.5 px-2.5 text-xs flex items-center gap-1.5 hover:text-sky-300 hover:border-sky-700/60"
-                    title="Baixar a base do Supabase e substituir o cache deste dispositivo"
-                  >
-                    <Download className="w-3.5 h-3.5 text-sky-400" />
-                    <span>Baixar da Nuvem</span>
-                  </button>
-
-                  <button
-                    onClick={async () => {
-                      if (confirm('Atenção: Deseja sobrescrever os dados na nuvem com os dados deste dispositivo? Todos os registros na nuvem serão substituídos.')) {
-                        await overrideCloud()
-                      }
-                    }}
-                    disabled={isSyncing}
-                    className="btn-secondary py-1.5 px-2.5 text-xs flex items-center gap-1.5 hover:text-amber-300 hover:border-amber-700/60"
-                    title="Sobrescrever a base do Supabase com os dados locais atuais"
-                  >
-                    <Upload className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Enviar p/ Nuvem</span>
-                  </button>
-                </>
+              {isConfigured && (
+                <button
+                  onClick={() => refetch()}
+                  disabled={isSyncing}
+                  className="btn-secondary py-1.5 px-2.5 text-xs flex items-center gap-1.5 hover:text-sky-300"
+                  title="Recarregar todos os dados do Supabase"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-sky-400' : ''}`} />
+                  <span>{isSyncing ? 'Atualizando…' : 'Recarregar'}</span>
+                </button>
               )}
             </div>
           </div>
-
-          {/* Banner de Sincronização Pausada */}
-          {isPaused && (
-            <div className="p-3.5 rounded-xl bg-amber-950/30 border border-amber-800/50 text-amber-300 text-xs flex items-start gap-3">
-              <PauseCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-400" />
-              <div className="flex-1 space-y-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-amber-200">Sincronização em Nuvem Pausada</span>
-                  <button
-                    onClick={() => resumeSync()}
-                    className="btn-secondary py-1 px-2 text-[11px] text-amber-200 border-amber-700/50 hover:bg-amber-900/40 font-semibold"
-                  >
-                    Retomar agora
-                  </button>
-                </div>
-                <p className="text-slate-400 text-[11px] leading-relaxed">
-                  O envio e o recebimento de alterações com o Supabase estão suspensos. Suas alterações locais continuam salvas no dispositivo e serão enviadas quando você retomar.
-                </p>
-              </div>
-            </div>
-          )}
 
           {/* Feedback de Teste / Erro */}
           {testResult && (

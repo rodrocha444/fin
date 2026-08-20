@@ -1,11 +1,6 @@
-// src/hooks/useDebts.ts
-// ─────────────────────────────────────────────────────────────
-// Hooks reativos para Contas a Receber / Pagar e Cobranças (padrão CUID)
-// ─────────────────────────────────────────────────────────────
-
-import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '@/db/schema'
-import { getDebtSummary, getDebtItemsByAccount } from '@/db/repositories/debts'
+// src/hooks/useDebts.ts — Hooks reativos para Contas a Receber / Pagar e Cobranças (Cloud-Only)
+import { useMemo } from 'react'
+import { useFinancialData } from '@/context/FinancialDataContext'
 import type { DebtAccount, DebtItem, DebtSummary } from '@/types'
 
 export interface DebtAccountWithStats extends DebtAccount {
@@ -17,21 +12,22 @@ export interface DebtAccountWithStats extends DebtAccount {
 }
 
 /** Retorna todas as contas ativas com seus respectivos saldos e contadores */
-export function useDebtAccounts() {
-  return useLiveQuery(async () => {
-    const [accounts, items] = await Promise.all([
-      db.debtAccounts.orderBy('name').filter(a => a.isActive !== false).toArray(),
-      db.debtItems.toArray(),
-    ])
+export function useDebtAccounts(): DebtAccountWithStats[] | undefined {
+  const { debtAccounts, debtItems, isLoading } = useFinancialData()
 
+  return useMemo(() => {
+    if (isLoading && debtAccounts.length === 0) return undefined
+
+    const activeAccounts = debtAccounts.filter(a => a.isActive !== false)
     const itemsByAccount = new Map<string, DebtItem[]>()
-    for (const item of items) {
+
+    for (const item of debtItems) {
       const list = itemsByAccount.get(item.debtAccountId) || []
       list.push(item)
       itemsByAccount.set(item.debtAccountId, list)
     }
 
-    const result: DebtAccountWithStats[] = accounts.map(acc => {
+    return activeAccounts.map(acc => {
       const accItems = itemsByAccount.get(acc.id!) || []
       let receivable = 0
       let payable = 0
@@ -54,49 +50,81 @@ export function useDebtAccounts() {
         totalCount: accItems.length,
       }
     })
-
-    return result
-  }, [])
+  }, [debtAccounts, debtItems, isLoading])
 }
 
 /** Retorna os detalhes de uma conta de cobrança específica e todos os seus itens */
-export function useDebtAccountWithItems(accountId: string | undefined) {
-  return useLiveQuery(
-    async () => {
-      if (accountId === undefined) return null
+export function useDebtAccountWithItems(accountId: string | undefined): {
+  account: DebtAccount
+  items: DebtItem[]
+  receivable: number
+  payable: number
+  balance: number
+  pendingCount: number
+  totalCount: number
+} | null | undefined {
+  const { debtAccounts, debtItems, isLoading } = useFinancialData()
 
-      const account = await db.debtAccounts.get(accountId)
-      if (!account) return null
+  return useMemo(() => {
+    if (isLoading && debtAccounts.length === 0) return undefined
+    if (!accountId) return null
 
-      const items = await getDebtItemsByAccount(accountId)
+    const account = debtAccounts.find(a => a.id === accountId)
+    if (!account) return null
 
-      let receivable = 0
-      let payable = 0
-      let pendingCount = 0
+    const items = debtItems
+      .filter(i => i.debtAccountId === accountId)
+      .sort((a, b) => {
+        if (a.status === 'pending' && b.status !== 'pending') return -1
+        if (a.status !== 'pending' && b.status === 'pending') return 1
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      })
 
-      for (const item of items) {
-        if (item.status === 'pending') {
-          pendingCount++
-          if (item.type === 'receivable') receivable += item.amount
-          else if (item.type === 'payable') payable += item.amount
-        }
+    let receivable = 0
+    let payable = 0
+    let pendingCount = 0
+
+    for (const item of items) {
+      if (item.status === 'pending') {
+        pendingCount++
+        if (item.type === 'receivable') receivable += item.amount
+        else if (item.type === 'payable') payable += item.amount
       }
+    }
 
-      return {
-        account,
-        items,
-        receivable,
-        payable,
-        balance: receivable - payable,
-        pendingCount,
-        totalCount: items.length,
-      }
-    },
-    [accountId]
-  )
+    return {
+      account,
+      items,
+      receivable,
+      payable,
+      balance: receivable - payable,
+      pendingCount,
+      totalCount: items.length,
+    }
+  }, [debtAccounts, debtItems, accountId, isLoading])
 }
 
 /** Resumo geral de todas as pendências ativas */
 export function useDebtsSummary(): DebtSummary | undefined {
-  return useLiveQuery(() => getDebtSummary(), [])
+  const { debtItems, isLoading } = useFinancialData()
+
+  return useMemo(() => {
+    if (isLoading && debtItems.length === 0) return undefined
+    const items = debtItems.filter(i => i.status === 'pending')
+
+    let totalReceivable = 0
+    let totalPayable = 0
+
+    for (const item of items) {
+      if (item.type === 'receivable') totalReceivable += item.amount
+      else if (item.type === 'payable') totalPayable += item.amount
+    }
+
+    return {
+      totalReceivable,
+      totalPayable,
+      netBalance: totalReceivable - totalPayable,
+      pendingCount: items.length,
+    }
+  }, [debtItems, isLoading])
 }

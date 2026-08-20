@@ -1,4 +1,4 @@
-// src/App.tsx
+// src/App.tsx — Aplicação Principal (Cloud-Only via Supabase)
 import { useEffect } from 'react'
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from '@/components/templates/Layout'
@@ -11,38 +11,34 @@ import ScheduledPage from '@/components/pages/ScheduledPage'
 import DebtAccountPage from '@/components/pages/DebtAccountPage'
 import ReportsPage from '@/components/pages/ReportsPage'
 import SettingsPage from '@/components/pages/SettingsPage'
-import { processScheduledTransactions } from '@/db/repositories/scheduled'
-import { clearDefaultIncomeCategories } from '@/db/repositories/categories'
-import { cleanupDuplicateTransferPairs } from '@/db/repositories/transactions'
-import { initSyncEngine } from '@/services/syncEngine'
+import { FinancialDataProvider } from '@/context/FinancialDataContext'
+import { processScheduledTransactions } from '@/services/api/scheduled'
 
 export default function App() {
   useEffect(() => {
-    // Limpar categorias default de renda, ajustar transferências duplicadas legadas e processar transações agendadas
-    clearDefaultIncomeCategories().catch(console.error)
-    cleanupDuplicateTransferPairs().catch(console.error)
     processScheduledTransactions().catch(console.error)
-    initSyncEngine().catch(console.error)
   }, [])
 
   return (
-    <HashRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/budget" replace />} />
-          <Route path="budget" element={<BudgetPage />} />
-          <Route path="accounts" element={<AccountsPage />} />
-          <Route path="accounts/:id" element={<AccountDetailPage />} />
-          <Route path="accounts/:id/invoice" element={<AccountInvoicePage />} />
-          <Route path="accounts/debt/:id" element={<DebtAccountPage />} />
-          <Route path="transactions" element={<TransactionsPage />} />
-          <Route path="debts" element={<Navigate to="/accounts" replace />} />
-          <Route path="debts/:id" element={<DebtAccountPage />} />
-          <Route path="scheduled" element={<ScheduledPage />} />
-          <Route path="reports" element={<ReportsPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-        </Route>
-      </Routes>
-    </HashRouter>
+    <FinancialDataProvider>
+      <HashRouter>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Navigate to="/budget" replace />} />
+            <Route path="budget" element={<BudgetPage />} />
+            <Route path="accounts" element={<AccountsPage />} />
+            <Route path="accounts/:id" element={<AccountDetailPage />} />
+            <Route path="accounts/:id/invoice" element={<AccountInvoicePage />} />
+            <Route path="accounts/debt/:id" element={<DebtAccountPage />} />
+            <Route path="transactions" element={<TransactionsPage />} />
+            <Route path="debts" element={<Navigate to="/accounts" replace />} />
+            <Route path="debts/:id" element={<DebtAccountPage />} />
+            <Route path="scheduled" element={<ScheduledPage />} />
+            <Route path="reports" element={<ReportsPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
+        </Routes>
+      </HashRouter>
+    </FinancialDataProvider>
   )
 }
