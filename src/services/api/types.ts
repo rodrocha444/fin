@@ -196,7 +196,6 @@ export function transactionToRow(item: Partial<Transaction>): Record<string, unk
     installment_group_id: item.installmentGroupId || null,
     installment_number: item.installmentNumber ?? null,
     installment_total: item.installmentTotal ?? null,
-    split_group_id: item.splitGroupId || null,
     is_scheduled_projection: item.isScheduledProjection ?? false,
     scheduled_id: item.scheduledId || null,
     created_at: toIso(item.createdAt) || now,

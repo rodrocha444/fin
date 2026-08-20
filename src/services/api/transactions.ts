@@ -364,19 +364,7 @@ export async function createSplitTransaction(data: {
     })
   })
 
-  let { error } = await client.from('transactions').insert(rows)
-
-  // Se o banco ainda não tiver a coluna split_group_id, faz fallback removendo o campo para não travar a gravação
-  if (error && error.message.includes('split_group_id')) {
-    const fallbackRows = rows.map(r => {
-      const copy = { ...r }
-      delete (copy as any).split_group_id
-      return copy
-    })
-    const res = await client.from('transactions').insert(fallbackRows)
-    error = res.error
-  }
-
+  const { error } = await client.from('transactions').insert(rows)
   if (error) throw new Error(`Erro ao criar transação dividida: ${error.message}`)
 
   notifyDataChanged('transactions', 'insert')
@@ -398,13 +386,8 @@ export async function updateSplitTransaction(
   const client = getClient()
   const now = new Date()
 
-  // Remove os registros antigos do grupo de rateio por split_group_id ou tag em notes
-  const res1 = await client.from('transactions').delete().eq('split_group_id', splitGroupId)
-  if (res1.error && res1.error.message.includes('split_group_id')) {
-    await client.from('transactions').delete().ilike('notes', `%[split:${splitGroupId}]%`)
-  } else {
-    await client.from('transactions').delete().ilike('notes', `%[split:${splitGroupId}]%`)
-  }
+  // Remove os registros antigos do grupo de rateio por tag em notes
+  await client.from('transactions').delete().ilike('notes', `%[split:${splitGroupId}]%`)
 
   const validSplits = data.splits.filter(s => s.amount > 0)
   if (validSplits.length === 0) {
@@ -429,18 +412,7 @@ export async function updateSplitTransaction(
     })
   })
 
-  let { error } = await client.from('transactions').insert(rows)
-
-  if (error && error.message.includes('split_group_id')) {
-    const fallbackRows = rows.map(r => {
-      const copy = { ...r }
-      delete (copy as any).split_group_id
-      return copy
-    })
-    const res = await client.from('transactions').insert(fallbackRows)
-    error = res.error
-  }
-
+  const { error } = await client.from('transactions').insert(rows)
   if (error) throw new Error(`Erro ao atualizar transação dividida: ${error.message}`)
 
   notifyDataChanged('transactions', 'update')
@@ -448,13 +420,7 @@ export async function updateSplitTransaction(
 
 export async function deleteSplitTransaction(splitGroupId: string): Promise<void> {
   const client = getClient()
-  let { error } = await client.from('transactions').delete().eq('split_group_id', splitGroupId)
-  if (error && error.message.includes('split_group_id')) {
-    const res = await client.from('transactions').delete().ilike('notes', `%[split:${splitGroupId}]%`)
-    error = res.error
-  } else {
-    await client.from('transactions').delete().ilike('notes', `%[split:${splitGroupId}]%`)
-  }
+  const { error } = await client.from('transactions').delete().ilike('notes', `%[split:${splitGroupId}]%`)
   if (error) throw new Error(`Erro ao excluir transação dividida: ${error.message}`)
   notifyDataChanged('transactions', 'delete')
 }
