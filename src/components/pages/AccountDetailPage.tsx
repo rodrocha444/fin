@@ -19,7 +19,7 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { format } from 'date-fns'
-import { useAccount, useAccountBalance } from '@/hooks/useAccounts'
+import { useAccount, useAccounts, useAccountBalance } from '@/hooks/useAccounts'
 import {
   useAccountTransactions,
   useAccountTransactionsWithScheduled,
@@ -59,6 +59,9 @@ export default function AccountDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const accountId = id
+
+  const accounts = useAccounts()
+  const accountMap = new Map(accounts?.map(a => [a.id!, a]) ?? [])
 
   const account = useAccount(accountId)
   const balance = useAccountBalance(accountId) ?? 0
@@ -585,7 +588,9 @@ export default function AccountDetailPage() {
                   <TransactionItem
                     key={tx.id}
                     tx={tx}
-                    accountName={account.name}
+                    accountName={accountMap.get(tx.accountId)?.name ?? account.name}
+                    transferAccountName={tx.transferAccountId ? accountMap.get(tx.transferAccountId)?.name : undefined}
+                    currentAccountId={account.id}
                     categoryName={tx.categoryId ? categoryMap.get(tx.categoryId)?.name : undefined}
                     onEdit={() => setEditingTx(tx)}
                     onDelete={() => handleDeleteTx(tx)}

@@ -89,13 +89,9 @@ export async function calculateAccountBalance(accountId: string): Promise<number
   for (const tx of transactions) {
     if (tx.type === 'income') {
       balance += tx.amount
-    } else if (tx.type === 'expense') {
+    } else if (tx.type === 'expense' || tx.type === 'transfer') {
+      // Transferência saindo desta conta (origem)
       balance -= tx.amount
-    } else if (tx.type === 'transfer') {
-      // Transferência saindo desta conta (ex: pagar cartão)
-      if (tx.accountId === accountId) {
-        balance -= tx.amount
-      }
     }
   }
 

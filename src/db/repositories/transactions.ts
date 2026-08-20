@@ -109,21 +109,6 @@ export async function updateTransaction(id: string, data: Partial<CreateTransact
     return
   }
 
-  // Para transferências, sincroniza a contraparte se houver
-  if (tx.type === 'transfer' && tx.transferTransactionId) {
-    await db.transaction('rw', db.transactions, async () => {
-      await db.transactions.update(id, data)
-      const counterpartUpdates: Partial<Transaction> = {}
-      if (data.date) counterpartUpdates.date = data.date
-      if (data.amount !== undefined) counterpartUpdates.amount = data.amount
-      if (data.notes !== undefined) counterpartUpdates.notes = data.notes
-      if (data.payee !== undefined) counterpartUpdates.payee = data.payee
-      if (data.transferAccountId !== undefined) counterpartUpdates.accountId = data.transferAccountId
-      await db.transactions.update(tx.transferTransactionId!, counterpartUpdates)
-    })
-    return
-  }
-
   await db.transactions.update(id, data)
 }
 
@@ -145,11 +130,6 @@ export async function deleteTransaction(id: string): Promise<void> {
     return
   }
 
-  // Para transferências, remover o par também
-  if (tx.type === 'transfer' && tx.transferTransactionId) {
-    await db.transactions.delete(tx.transferTransactionId)
-  }
-
   await db.transactions.delete(id)
 }
 
@@ -159,10 +139,19 @@ export async function deleteInstallmentGroup(installmentGroupId: string): Promis
 }
 
 export async function getTransactionsByAccount(accountId: string): Promise<Transaction[]> {
-  const txs = await db.transactions
-    .where('accountId')
-    .equals(accountId)
-    .toArray()
+  const [directTxs, incomingTransfers] = await Promise.all([
+    db.transactions
+      .where('accountId')
+      .equals(accountId)
+      .toArray(),
+    db.transactions
+      .where('transferAccountId')
+      .equals(accountId)
+      .filter(tx => tx.type === 'transfer')
+      .toArray(),
+  ])
+
+  const txs = [...directTxs, ...incomingTransfers]
 
   return txs.sort((a, b) => {
     const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
@@ -331,43 +320,52 @@ export async function updateInstallmentPurchase(groupId: string, input: CreateIn
 
 // ── Transferência / Pagamento de Fatura ──────────────────────
 
-export async function createTransfer(input: CreateTransferInput): Promise<void> {
-  await db.transaction('rw', db.transactions, async () => {
-    const payee = input.payee ?? 'Transferência'
-    const now = new Date()
-    const outId = createId()
-    const inId = createId()
-
-    await db.transactions.add({
-      id: outId,
-      accountId: input.fromAccountId,
-      date: input.date,
-      amount: input.amount,
-      payee,
-      categoryId: undefined,
-      notes: input.notes,
-      cleared: false,
-      type: 'transfer',
-      transferAccountId: input.toAccountId,
-      transferTransactionId: inId,
-      createdAt: now,
-    })
-
-    await db.transactions.add({
-      id: inId,
-      accountId: input.toAccountId,
-      date: input.date,
-      amount: input.amount,
-      payee,
-      categoryId: undefined,
-      notes: input.notes,
-      cleared: false,
-      type: 'transfer',
-      transferAccountId: input.fromAccountId,
-      transferTransactionId: outId,
-      createdAt: now,
-    })
+export async function createTransfer(input: CreateTransferInput): Promise<string> {
+  const id = createId()
+  await db.transactions.add({
+    id,
+    accountId: input.fromAccountId,
+    transferAccountId: input.toAccountId,
+    amount: input.amount,
+    date: input.date,
+    payee: input.payee ?? 'Transferência',
+    categoryId: undefined,
+    notes: input.notes,
+    cleared: false,
+    type: 'transfer',
+    createdAt: new Date(),
   })
+  return id
+}
+
+/**
+ * Limpeza preventiva de transferências legadas cadastradas em pares (versões anteriores)
+ */
+export async function cleanupDuplicateTransferPairs(): Promise<void> {
+  try {
+    const transferTxs = await db.transactions
+      .filter(t => t.type === 'transfer' && !!t.transferTransactionId)
+      .toArray()
+
+    const visited = new Set<string>()
+
+    for (const tx of transferTxs) {
+      if (!tx.id || visited.has(tx.id)) continue
+      const counterpartId = tx.transferTransactionId
+      if (!counterpartId) continue
+
+      const counterpart = await db.transactions.get(counterpartId)
+      if (counterpart && counterpart.transferTransactionId === tx.id) {
+        visited.add(tx.id)
+        visited.add(counterpart.id!)
+        // Mantém a transação de origem (tx), remove a duplicata de destino e limpa a referência pareada
+        await db.transactions.delete(counterpart.id!)
+        await db.transactions.update(tx.id, { transferTransactionId: undefined })
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao limpar transferências duplicadas:', err)
+  }
 }
 
 // ── Consultas especiais ──────────────────────────────────────

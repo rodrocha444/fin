@@ -7,6 +7,8 @@ import type { Transaction } from '@/types'
 interface TransactionItemProps {
   tx: Transaction
   accountName: string
+  transferAccountName?: string
+  currentAccountId?: string
   categoryName?: string
   installmentGroup?: { totalAmount: number; installmentCount: number; installmentAmount: number }
   onEdit?: () => void
@@ -17,15 +19,50 @@ interface TransactionItemProps {
 export default function TransactionItem({
   tx,
   accountName,
+  transferAccountName,
+  currentAccountId,
   categoryName,
   installmentGroup,
   onEdit,
   onDelete,
   onConfirmScheduled,
 }: TransactionItemProps) {
-  const amtColor =
-    tx.type === 'income' ? 'text-emerald-400' : tx.type === 'transfer' ? 'text-sky-400' : 'text-rose-400'
-  const prefix = tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''
+  const isTransfer = tx.type === 'transfer'
+  const isOutgoingTransfer = isTransfer && currentAccountId ? tx.accountId === currentAccountId : false
+  const isIncomingTransfer = isTransfer && currentAccountId ? tx.transferAccountId === currentAccountId : false
+
+  let amtColor = 'text-rose-400'
+  let prefix = '-'
+
+  if (tx.type === 'income' || isIncomingTransfer) {
+    amtColor = 'text-emerald-400'
+    prefix = '+'
+  } else if (isOutgoingTransfer) {
+    amtColor = 'text-rose-400'
+    prefix = '-'
+  } else if (isTransfer) {
+    amtColor = 'text-sky-400'
+    prefix = ''
+  } else if (tx.type === 'expense') {
+    amtColor = 'text-rose-400'
+    prefix = '-'
+  }
+
+  let transferDetail = 'Transferência'
+  if (isTransfer) {
+    if (currentAccountId) {
+      if (isOutgoingTransfer) {
+        transferDetail = `Transferência ➔ ${transferAccountName || 'Destino'}`
+      } else if (isIncomingTransfer) {
+        transferDetail = `Transferência de ${accountName || 'Origem'}`
+      }
+    } else if (transferAccountName) {
+      transferDetail = `Transferência · ${accountName} ➔ ${transferAccountName}`
+    } else {
+      transferDetail = `Transferência · ${accountName}`
+    }
+  }
+
   const totalAmount =
     installmentGroup?.totalAmount ?? (tx.installmentTotal ? tx.installmentTotal * tx.amount : undefined)
 
@@ -60,10 +97,18 @@ export default function TransactionItem({
             {timeStr && !tx.isScheduledProjection ? ` às ${timeStr}` : ''}
           </span>
           <span className="text-[10px] text-slate-600">·</span>
-          <span className="text-[10px] text-slate-500 truncate">
-            {tx.type === 'transfer' ? 'Transferência' : categoryName ?? <span className="italic">Sem categoria</span>}
-          </span>
-          <span className="text-[10px] text-slate-600">· {accountName}</span>
+          {isTransfer ? (
+            <span className="text-[10px] text-sky-400/90 font-medium truncate">
+              {transferDetail}
+            </span>
+          ) : (
+            <>
+              <span className="text-[10px] text-slate-500 truncate">
+                {categoryName ?? <span className="italic">Sem categoria</span>}
+              </span>
+              <span className="text-[10px] text-slate-600">· {accountName}</span>
+            </>
+          )}
           {tx.installmentGroupId && totalAmount && (
             <>
               <span className="text-[10px] text-slate-600">·</span>

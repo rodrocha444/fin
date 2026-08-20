@@ -132,7 +132,7 @@ const SYNC_TABLES: TableSyncDef[] = [
       icon: item.icon || 'bank',
       is_active: item.isActive ?? true,
       created_at: toIso(item.createdAt) || now,
-      updated_at: toIso(item.updatedAt) || now,
+      updated_at: toIso(item.updatedAt) || toIso(item.createdAt) || now,
       deleted_at: toIso(item.deletedAt) || null,
     }),
     toDexie: (row) => ({
@@ -147,6 +147,7 @@ const SYNC_TABLES: TableSyncDef[] = [
       icon: row.icon,
       isActive: Boolean(row.is_active),
       createdAt: toDate(row.created_at) || new Date(),
+      updatedAt: toDate(row.updated_at) || toDate(row.created_at) || new Date(),
     }),
   },
 
@@ -162,7 +163,7 @@ const SYNC_TABLES: TableSyncDef[] = [
       is_hidden: item.isHidden ?? false,
       is_system: item.isSystem ?? false,
       created_at: toIso(item.createdAt) || now,
-      updated_at: toIso(item.updatedAt) || now,
+      updated_at: toIso(item.updatedAt) || toIso(item.createdAt) || now,
       deleted_at: toIso(item.deletedAt) || null,
     }),
     toDexie: (row) => ({
@@ -172,6 +173,8 @@ const SYNC_TABLES: TableSyncDef[] = [
       sortOrder: Number(row.sort_order ?? 0),
       isHidden: Boolean(row.is_hidden),
       isSystem: Boolean(row.is_system),
+      createdAt: toDate(row.created_at) || new Date(),
+      updatedAt: toDate(row.updated_at) || toDate(row.created_at) || new Date(),
     }),
   },
 
@@ -186,7 +189,7 @@ const SYNC_TABLES: TableSyncDef[] = [
       sort_order: item.sortOrder ?? 0,
       is_hidden: item.isHidden ?? false,
       created_at: toIso(item.createdAt) || now,
-      updated_at: toIso(item.updatedAt) || now,
+      updated_at: toIso(item.updatedAt) || toIso(item.createdAt) || now,
       deleted_at: toIso(item.deletedAt) || null,
     }),
     toDexie: (row) => ({
@@ -195,6 +198,8 @@ const SYNC_TABLES: TableSyncDef[] = [
       name: row.name,
       sortOrder: Number(row.sort_order ?? 0),
       isHidden: Boolean(row.is_hidden),
+      createdAt: toDate(row.created_at) || new Date(),
+      updatedAt: toDate(row.updated_at) || toDate(row.created_at) || new Date(),
     }),
   },
 
@@ -210,7 +215,7 @@ const SYNC_TABLES: TableSyncDef[] = [
       activity: item.activity ?? 0,
       available: item.available ?? 0,
       created_at: toIso(item.createdAt) || now,
-      updated_at: toIso(item.updatedAt) || now,
+      updated_at: toIso(item.updatedAt) || toIso(item.createdAt) || now,
       deleted_at: toIso(item.deletedAt) || null,
     }),
     toDexie: (row) => ({
@@ -220,6 +225,8 @@ const SYNC_TABLES: TableSyncDef[] = [
       budgeted: Number(row.budgeted ?? 0),
       activity: Number(row.activity ?? 0),
       available: Number(row.available ?? 0),
+      createdAt: toDate(row.created_at) || new Date(),
+      updatedAt: toDate(row.updated_at) || toDate(row.created_at) || new Date(),
     }),
   },
 
@@ -245,7 +252,7 @@ const SYNC_TABLES: TableSyncDef[] = [
       is_scheduled_projection: item.isScheduledProjection ?? false,
       scheduled_id: item.scheduledId || null,
       created_at: toIso(item.createdAt) || now,
-      updated_at: toIso(item.updatedAt) || now,
+      updated_at: toIso(item.updatedAt) || toIso(item.createdAt) || now,
       deleted_at: toIso(item.deletedAt) || null,
     }),
     toDexie: (row) => ({
@@ -266,6 +273,7 @@ const SYNC_TABLES: TableSyncDef[] = [
       isScheduledProjection: Boolean(row.is_scheduled_projection),
       scheduledId: row.scheduled_id || undefined,
       createdAt: toDate(row.created_at) || new Date(),
+      updatedAt: toDate(row.updated_at) || toDate(row.created_at) || new Date(),
     }),
   },
 
@@ -283,7 +291,7 @@ const SYNC_TABLES: TableSyncDef[] = [
       account_id: item.accountId,
       category_id: item.categoryId || null,
       created_at: toIso(item.createdAt) || now,
-      updated_at: toIso(item.updatedAt) || now,
+      updated_at: toIso(item.updatedAt) || toIso(item.createdAt) || now,
       deleted_at: toIso(item.deletedAt) || null,
     }),
     toDexie: (row) => ({
@@ -296,6 +304,7 @@ const SYNC_TABLES: TableSyncDef[] = [
       accountId: row.account_id,
       categoryId: row.category_id || undefined,
       createdAt: toDate(row.created_at) || new Date(),
+      updatedAt: toDate(row.updated_at) || toDate(row.created_at) || new Date(),
     }),
   },
 
@@ -317,7 +326,7 @@ const SYNC_TABLES: TableSyncDef[] = [
       notes: item.notes || null,
       is_active: item.isActive ?? true,
       created_at: toIso(item.createdAt) || now,
-      updated_at: toIso(item.updatedAt) || now,
+      updated_at: toIso(item.updatedAt) || toIso(item.createdAt) || now,
       deleted_at: toIso(item.deletedAt) || null,
     }),
     toDexie: (row) => ({
@@ -334,6 +343,7 @@ const SYNC_TABLES: TableSyncDef[] = [
       notes: row.notes || undefined,
       isActive: Boolean(row.is_active),
       createdAt: toDate(row.created_at) || new Date(),
+      updatedAt: toDate(row.updated_at) || toDate(row.created_at) || new Date(),
     }),
   },
 
@@ -346,13 +356,15 @@ const SYNC_TABLES: TableSyncDef[] = [
       name: item.name,
       default_category_id: item.defaultCategoryId || null,
       created_at: toIso(item.createdAt) || now,
-      updated_at: toIso(item.updatedAt) || now,
+      updated_at: toIso(item.updatedAt) || toIso(item.createdAt) || now,
       deleted_at: toIso(item.deletedAt) || null,
     }),
     toDexie: (row) => ({
       id: row.id,
       name: row.name,
       defaultCategoryId: row.default_category_id || undefined,
+      createdAt: toDate(row.created_at) || new Date(),
+      updatedAt: toDate(row.updated_at) || toDate(row.created_at) || new Date(),
     }),
   },
 
@@ -368,7 +380,7 @@ const SYNC_TABLES: TableSyncDef[] = [
       color: item.color || '#6366f1',
       is_active: item.isActive ?? true,
       created_at: toIso(item.createdAt) || now,
-      updated_at: toIso(item.updatedAt) || now,
+      updated_at: toIso(item.updatedAt) || toIso(item.createdAt) || now,
       deleted_at: toIso(item.deletedAt) || null,
     }),
     toDexie: (row) => ({
@@ -379,6 +391,7 @@ const SYNC_TABLES: TableSyncDef[] = [
       color: row.color,
       isActive: Boolean(row.is_active),
       createdAt: toDate(row.created_at) || new Date(),
+      updatedAt: toDate(row.updated_at) || toDate(row.created_at) || new Date(),
     }),
   },
 
@@ -401,7 +414,7 @@ const SYNC_TABLES: TableSyncDef[] = [
       installment_total: item.installmentTotal ?? null,
       total_amount: item.totalAmount != null ? item.totalAmount : null,
       created_at: toIso(item.createdAt) || now,
-      updated_at: toIso(item.updatedAt) || now,
+      updated_at: toIso(item.updatedAt) || toIso(item.createdAt) || now,
       deleted_at: toIso(item.deletedAt) || null,
     }),
     toDexie: (row) => ({
@@ -419,6 +432,7 @@ const SYNC_TABLES: TableSyncDef[] = [
       installmentTotal: row.installment_total ?? undefined,
       totalAmount: row.total_amount != null ? Number(row.total_amount) : undefined,
       createdAt: toDate(row.created_at) || new Date(),
+      updatedAt: toDate(row.updated_at) || toDate(row.created_at) || new Date(),
     }),
   },
 ]
@@ -470,55 +484,16 @@ export async function executeSync(options: { forceAll?: boolean; forceSync?: boo
   try {
     const nowIso = new Date().toISOString()
 
-    // 1. Obter timestamp da última sincronização
+    // 1. Obter timestamp da última sincronização bem-sucedida
     const metaRecord = await db.syncMeta.get('lastSyncAt')
     const lastSyncIso = options.forceAll ? '1970-01-01T00:00:00.000Z' : (metaRecord?.value || '1970-01-01T00:00:00.000Z')
+    const isFirstSync = lastSyncIso === '1970-01-01T00:00:00.000Z' || !metaRecord?.value
 
-    // ── ETAPA 1: PUSH DE DELEÇÕES LOCAIS ─────────────────────
-    const pendingDeletions = await db.syncDeletedRecords.toArray()
-    if (pendingDeletions.length > 0) {
-      for (const del of pendingDeletions) {
-        const tableDef = SYNC_TABLES.find(t => t.dexieName === del.tableName)
-        if (tableDef) {
-          await client
-            .from(tableDef.supabaseName)
-            .update({ deleted_at: del.deletedAt, updated_at: del.deletedAt })
-            .eq('id', del.recordId)
-        }
-      }
-      await db.syncDeletedRecords.clear()
-    }
-
-    // ── ETAPA 2: PUSH DE REGISTROS LOCAIS PARA O SUPABASE ────
-    for (const def of SYNC_TABLES) {
-      const table = (db as any)[def.dexieName]
-      if (!table) continue
-
-      const localItems = await table.toArray()
-      if (localItems.length === 0) continue
-
-      // Filtra itens alterados após o último sync ou envia tudo se for forceAll / primeiro sync
-      const toPush = options.forceAll || lastSyncIso === '1970-01-01T00:00:00.000Z'
-        ? localItems
-        : localItems.filter((item: any) => {
-            const itemDate = toIso(item.updatedAt || item.createdAt)
-            return !itemDate || itemDate > lastSyncIso
-          })
-
-      if (toPush.length > 0) {
-        const rows = toPush.map((item: any) => def.toSupabase(item, nowIso))
-        // Divide em lotes de 200 itens para não estourar o limite de payload
-        for (let i = 0; i < rows.length; i += 200) {
-          const chunk = rows.slice(i, i + 200)
-          const { error } = await client.from(def.supabaseName).upsert(chunk, { onConflict: 'id' })
-          if (error) {
-            throw new Error(`Erro ao enviar dados para ${def.supabaseName}: ${error.message}`)
-          }
-        }
-      }
-    }
-
-    // ── ETAPA 3: PULL DE REGISTROS DO SUPABASE PARA O DEXIE ──
+    // ══════════════════════════════════════════════════════════
+    // ETAPA 1: PULL DO SUPABASE PARA O DEXIE (PULL FIRST!)
+    // Busca dados atualizados da nuvem ANTES de enviar alterações locais.
+    // Garante que uma instância com dados antigos não sobrescreva a nuvem.
+    // ══════════════════════════════════════════════════════════
     isApplyingRemoteSync = true
     try {
       for (const def of SYNC_TABLES) {
@@ -526,7 +501,7 @@ export async function executeSync(options: { forceAll?: boolean; forceSync?: boo
         if (!table) continue
 
         let query = client.from(def.supabaseName).select('*')
-        if (!options.forceAll && lastSyncIso !== '1970-01-01T00:00:00.000Z') {
+        if (!isFirstSync && !options.forceAll) {
           query = query.gt('updated_at', lastSyncIso)
         }
 
@@ -543,7 +518,18 @@ export async function executeSync(options: { forceAll?: boolean; forceSync?: boo
             if (row.deleted_at) {
               toDeleteIds.push(row.id)
             } else {
-              toPutItems.push(def.toDexie(row))
+              // Resolução de Conflito: Last-Write-Wins
+              // Se o registro já existir localmente, compara os timestamps.
+              const localItem = await table.get(row.id)
+              if (!localItem) {
+                toPutItems.push(def.toDexie(row))
+              } else {
+                const remoteTime = new Date(row.updated_at || row.created_at || 0).getTime()
+                const localTime = new Date(localItem.updatedAt || localItem.createdAt || 0).getTime()
+                if (remoteTime >= localTime) {
+                  toPutItems.push(def.toDexie(row))
+                }
+              }
             }
           }
 
@@ -559,7 +545,73 @@ export async function executeSync(options: { forceAll?: boolean; forceSync?: boo
       isApplyingRemoteSync = false
     }
 
-    // ── FINALIZAÇÃO ──────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════
+    // ETAPA 2: PUSH DE DELEÇÕES LOCAIS PARA O SUPABASE
+    // ══════════════════════════════════════════════════════════
+    const pendingDeletions = await db.syncDeletedRecords.toArray()
+    if (pendingDeletions.length > 0) {
+      for (const del of pendingDeletions) {
+        const tableDef = SYNC_TABLES.find(t => t.dexieName === del.tableName)
+        if (tableDef) {
+          await client
+            .from(tableDef.supabaseName)
+            .update({ deleted_at: del.deletedAt, updated_at: del.deletedAt })
+            .eq('id', del.recordId)
+        }
+      }
+      await db.syncDeletedRecords.clear()
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // ETAPA 3: PUSH DE REGISTROS LOCAIS MODIFICADOS / NOVOS
+    // Envia apenas o que foi legitimamente criado ou editado localmente
+    // ══════════════════════════════════════════════════════════
+    for (const def of SYNC_TABLES) {
+      const table = (db as any)[def.dexieName]
+      if (!table) continue
+
+      const localItems = await table.toArray()
+      if (localItems.length === 0) continue
+
+      let toPush: any[] = []
+
+      if (isFirstSync) {
+        // No primeiro sync, consulta os IDs existentes na nuvem para não sobrescrever dados existentes com versões locais antigas
+        const { data: existingRemote } = await client.from(def.supabaseName).select('id, updated_at')
+        const remoteMap = new Map((existingRemote || []).map((r: any) => [r.id, new Date(r.updated_at || 0).getTime()]))
+
+        toPush = localItems.filter((item: any) => {
+          const remoteTime = remoteMap.get(item.id)
+          if (remoteTime === undefined) {
+            return true // Não existe na nuvem -> Envia
+          }
+          const localTime = new Date(item.updatedAt || item.createdAt || 0).getTime()
+          return localTime > remoteTime // Só envia se local for estritamente mais recente
+        })
+      } else if (options.forceAll) {
+        toPush = localItems
+      } else {
+        toPush = localItems.filter((item: any) => {
+          const itemDate = toIso(item.updatedAt || item.createdAt)
+          return !!itemDate && itemDate > lastSyncIso
+        })
+      }
+
+      if (toPush.length > 0) {
+        const rows = toPush.map((item: any) => def.toSupabase(item, nowIso))
+        for (let i = 0; i < rows.length; i += 200) {
+          const chunk = rows.slice(i, i + 200)
+          const { error } = await client.from(def.supabaseName).upsert(chunk, { onConflict: 'id' })
+          if (error) {
+            throw new Error(`Erro ao enviar dados para ${def.supabaseName}: ${error.message}`)
+          }
+        }
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // ETAPA 4: ATUALIZAÇÃO DO TIMESTAMP DE ÚLTIMO SYNC
+    // ══════════════════════════════════════════════════════════
     await db.syncMeta.put({ key: 'lastSyncAt', value: nowIso })
     const lastSyncDate = new Date(nowIso)
 
@@ -619,7 +671,13 @@ export async function overrideCloudWithLocalDatabase(): Promise<{ success: boole
 
       const localItems = await table.toArray()
       if (localItems.length > 0) {
-        const rows = localItems.map((item: any) => def.toSupabase(item, nowIso))
+        const updatedLocalItems = localItems.map((item: any) => ({
+          ...item,
+          updatedAt: new Date(nowIso),
+        }))
+        await table.bulkPut(updatedLocalItems)
+
+        const rows = updatedLocalItems.map((item: any) => def.toSupabase(item, nowIso))
         for (let i = 0; i < rows.length; i += 200) {
           const chunk = rows.slice(i, i + 200)
           const { error } = await client.from(def.supabaseName).upsert(chunk, { onConflict: 'id' })

@@ -13,12 +13,14 @@ import ReportsPage from '@/components/pages/ReportsPage'
 import SettingsPage from '@/components/pages/SettingsPage'
 import { processScheduledTransactions } from '@/db/repositories/scheduled'
 import { clearDefaultIncomeCategories } from '@/db/repositories/categories'
+import { cleanupDuplicateTransferPairs } from '@/db/repositories/transactions'
 import { initSyncEngine } from '@/services/syncEngine'
 
 export default function App() {
   useEffect(() => {
-    // Limpar categorias default de renda e processar transações agendadas
+    // Limpar categorias default de renda, ajustar transferências duplicadas legadas e processar transações agendadas
     clearDefaultIncomeCategories().catch(console.error)
+    cleanupDuplicateTransferPairs().catch(console.error)
     processScheduledTransactions().catch(console.error)
     initSyncEngine().catch(console.error)
   }, [])

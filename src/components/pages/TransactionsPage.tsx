@@ -186,6 +186,8 @@ export default function TransactionsPage() {
                 key={tx.id}
                 tx={tx}
                 accountName={accountMap.get(tx.accountId)?.name ?? '—'}
+                transferAccountName={tx.transferAccountId ? accountMap.get(tx.transferAccountId)?.name : undefined}
+                currentAccountId={selectedAccountId}
                 categoryName={tx.categoryId ? categoryMap.get(tx.categoryId)?.name : undefined}
                 installmentGroup={tx.installmentGroupId ? groupMap.get(tx.installmentGroupId) : undefined}
                 onEdit={() => setEditingTx(tx)}
