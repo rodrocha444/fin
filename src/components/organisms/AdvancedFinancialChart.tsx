@@ -1,5 +1,4 @@
-// src/components/organisms/AdvancedFinancialChart.tsx — Gráfico Financeiro Avançado Estilo Plataforma de Corretora
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import {
   subMonths,
   subDays,
@@ -15,14 +14,25 @@ import {
   Layers,
   BarChart2,
   LineChart,
+  Filter,
 } from 'lucide-react'
 import { useNetWorthHistory, type Granularity, type NetWorthPoint } from '@/hooks/useNetWorthHistory'
-import { useTransactionsQuery } from '@/hooks/queries'
+import { useTransactionsQuery, useAccountsQuery, useDebtAccountsQuery } from '@/hooks/queries'
 import { isDateBeforeAccountingStart, getAccountingStartDate } from '@/utils/accountingPeriod'
 import { formatCurrency, formatDate } from '@/utils/format'
 
 type RangePreset = '1m' | '3m' | '6m' | '1y' | 'ytd' | 'all' | 'custom'
 type ViewMode = 'area' | 'assets_liabilities' | 'monthly_flow'
+
+export type ChartScopeType =
+  | 'all'
+  | 'macro_on_budget'
+  | 'macro_off_budget'
+  | 'type_checking'
+  | 'type_credit_card'
+  | 'type_debt_receivable'
+  | 'type_debt_payable'
+  | 'account'
 
 export default function AdvancedFinancialChart() {
   const [preset, setPreset] = useState<RangePreset>('6m')
@@ -31,6 +41,10 @@ export default function AdvancedFinancialChart() {
   const [showSMA, setShowSMA] = useState(true)
   const [showExtremes, setShowExtremes] = useState(true)
   const [activePointIndex, setActivePointIndex] = useState<number | null>(null)
+
+  // Escopo de visualização (Geral, Macros, Tipos ou Conta Específica)
+  const [scopeType, setScopeType] = useState<ChartScopeType>('all')
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('')
 
   const containerRef = useRef<HTMLDivElement>(null)
   const today = useMemo(() => new Date(), [])
@@ -57,14 +71,75 @@ export default function AdvancedFinancialChart() {
     }
   }, [preset, customStart, customEnd, today])
 
-  // Dados de histórico patrimonial
+  // Contas bancárias e dívidas cadastradas
+  const { data: accounts = [] } = useAccountsQuery()
+  const { data: debtAccounts = [] } = useDebtAccountsQuery()
+
+  const activeAccounts = useMemo(() => accounts.filter(a => a.isActive !== false), [accounts])
+  const activeDebtAccounts = useMemo(() => debtAccounts.filter(d => d.isActive !== false), [debtAccounts])
+
+  // Dados de histórico patrimonial multi-conta
   const rawPoints = useNetWorthHistory(startDate, endDate, granularity)
   const points = useMemo(() => rawPoints ?? [], [rawPoints])
 
   // Transações brutas para cálculo de fluxo (Inflow vs Outflow)
   const { data: allTransactions = [] } = useTransactionsQuery()
 
-  // Fluxo mensal agregado
+  // Informações da conta selecionada (caso scopeType === 'account')
+  const selectedAccount = useMemo(() => {
+    if (scopeType !== 'account' || !selectedAccountId) return null
+    const regular = activeAccounts.find(a => a.id === selectedAccountId)
+    if (regular) return { id: regular.id!, name: regular.name, color: regular.color || '#6366f1', type: regular.type }
+    const debt = activeDebtAccounts.find(d => d.id === selectedAccountId)
+    if (debt) return { id: debt.id!, name: debt.name, color: debt.color || '#10b981', type: 'debt' }
+    return null
+  }, [scopeType, selectedAccountId, activeAccounts, activeDebtAccounts])
+
+  // Configurações de exibição e cores do escopo atual
+  const scopeConfig = useMemo(() => {
+    if (scopeType === 'account' && selectedAccount) {
+      return {
+        label: selectedAccount.name,
+        badge: selectedAccount.type === 'credit_card' ? 'Cartão' : selectedAccount.type === 'checking' ? 'Corrente' : selectedAccount.type === 'debt' ? 'Cobrança' : 'Conta',
+        color: selectedAccount.color,
+      }
+    }
+    if (scopeType === 'macro_on_budget') {
+      return { label: 'Dentro do Orçamento', badge: 'Macro', color: '#6366f1' }
+    }
+    if (scopeType === 'macro_off_budget') {
+      return { label: 'Fora do Orçamento', badge: 'Macro', color: '#06b6d4' }
+    }
+    if (scopeType === 'type_checking') {
+      return { label: 'Contas Correntes & Caixa', badge: 'Tipo', color: '#3b82f6' }
+    }
+    if (scopeType === 'type_credit_card') {
+      return { label: 'Faturas de Cartão de Crédito', badge: 'Tipo', color: '#f43f5e' }
+    }
+    if (scopeType === 'type_debt_receivable') {
+      return { label: 'Contas a Receber (Cobranças)', badge: 'Tipo', color: '#10b981' }
+    }
+    if (scopeType === 'type_debt_payable') {
+      return { label: 'Contas a Pagar (Dívidas)', badge: 'Tipo', color: '#f59e0b' }
+    }
+    return { label: 'Patrimônio Líquido Total', badge: 'Geral', color: '#818cf8' }
+  }, [scopeType, selectedAccount])
+
+  // Função para extrair o valor contábil de cada ponto conforme o escopo selecionado
+  const getPointValue = useCallback((p: NetWorthPoint): number => {
+    if (scopeType === 'macro_on_budget') return p.onBudgetTotal
+    if (scopeType === 'macro_off_budget') return p.offBudgetTotal
+    if (scopeType === 'type_checking') return p.checkingTotal
+    if (scopeType === 'type_credit_card') return p.creditCardTotal
+    if (scopeType === 'type_debt_receivable') return p.debtReceivableTotal
+    if (scopeType === 'type_debt_payable') return -p.debtPayableTotal
+    if (scopeType === 'account' && selectedAccountId) {
+      return p.accounts[selectedAccountId] ?? 0
+    }
+    return p.netWorth
+  }, [scopeType, selectedAccountId])
+
+  // Fluxo mensal agregado filtrado pelo escopo
   const monthlyFlowData = useMemo(() => {
     const map = new Map<string, { income: number; expense: number; net: number; date: Date }>()
 
@@ -72,6 +147,11 @@ export default function AdvancedFinancialChart() {
       if (isDateBeforeAccountingStart(tx.date)) continue
       const txDate = new Date(tx.date)
       if (isBefore(txDate, startDate) || isBefore(endDate, txDate)) continue
+
+      // Se filtrou por conta específica
+      if (scopeType === 'account' && selectedAccountId && tx.accountId !== selectedAccountId && tx.transferAccountId !== selectedAccountId) {
+        continue
+      }
 
       const mKey = format(txDate, 'yyyy-MM')
       const current = map.get(mKey) || { income: 0, expense: 0, net: 0, date: txDate }
@@ -90,9 +170,9 @@ export default function AdvancedFinancialChart() {
         label: format(new Date(mKey + '-01T12:00:00'), 'MMM/yy', { locale: ptBR }),
         ...val,
       }))
-  }, [allTransactions, startDate, endDate])
+  }, [allTransactions, startDate, endDate, scopeType, selectedAccountId])
 
-  // Cálculo da Média Móvel Simples (SMA)
+  // Cálculo da Média Móvel Simples (SMA) no escopo ativo
   const smaPoints = useMemo(() => {
     if (points.length === 0) return []
     const period = granularity === 'daily' ? 7 : granularity === 'weekly' ? 4 : 3
@@ -101,18 +181,18 @@ export default function AdvancedFinancialChart() {
     for (let i = 0; i < points.length; i++) {
       if (i < period - 1) {
         const sub = points.slice(0, i + 1)
-        const avg = sub.reduce((s, p) => s + p.netWorth, 0) / sub.length
+        const avg = sub.reduce((s, p) => s + getPointValue(p), 0) / sub.length
         sma.push(avg)
       } else {
         const sub = points.slice(i - period + 1, i + 1)
-        const avg = sub.reduce((s, p) => s + p.netWorth, 0) / period
+        const avg = sub.reduce((s, p) => s + getPointValue(p), 0) / period
         sma.push(avg)
       }
     }
     return sma
-  }, [points, granularity])
+  }, [points, granularity, getPointValue])
 
-  // Estatísticas principais da faixa selecionada
+  // Estatísticas principais no escopo ativo
   const stats = useMemo(() => {
     if (points.length === 0) {
       return {
@@ -126,26 +206,28 @@ export default function AdvancedFinancialChart() {
         currentSMA: 0,
       }
     }
-    const start = points[0].netWorth
-    const current = points[points.length - 1].netWorth
+    const start = getPointValue(points[0])
+    const current = getPointValue(points[points.length - 1])
     const diff = current - start
     const pct = start !== 0 ? (diff / Math.abs(start)) * 100 : 0
-    const values = points.map(p => p.netWorth)
+    const values = points.map(p => getPointValue(p))
     const min = Math.min(...values)
     const max = Math.max(...values)
     const avg = values.reduce((s, v) => s + v, 0) / values.length
     const currentSMA = smaPoints.length > 0 ? smaPoints[smaPoints.length - 1] : current
 
     return { current, start, diff, pct, min, max, avg, currentSMA }
-  }, [points, smaPoints])
+  }, [points, smaPoints, getPointValue])
 
-  // Ponto ativo sob inspeção (ou último ponto por padrão)
+  // Ponto ativo sob inspeção
   const activePoint: NetWorthPoint | null =
     activePointIndex !== null && points[activePointIndex]
       ? points[activePointIndex]
       : points.length > 0
       ? points[points.length - 1]
       : null
+
+  const activePointVal = activePoint ? getPointValue(activePoint) : stats.current
 
   const activeSMA =
     activePointIndex !== null && smaPoints[activePointIndex] !== undefined
@@ -183,12 +265,17 @@ export default function AdvancedFinancialChart() {
       }
     }
 
-    const netValues = points.map(p => p.netWorth)
+    const currentScopeValues = points.map(p => getPointValue(p))
     const assetValues = points.map(p => p.assets)
     const liabilityValues = points.map(p => p.liabilities)
 
-    let minVal = Math.min(...netValues, ...liabilityValues.map(v => -v))
-    let maxVal = Math.max(...netValues, ...assetValues)
+    let minVal = viewMode === 'assets_liabilities'
+      ? Math.min(...currentScopeValues, ...liabilityValues.map(v => -v))
+      : Math.min(...currentScopeValues)
+
+    let maxVal = viewMode === 'assets_liabilities'
+      ? Math.max(...currentScopeValues, ...assetValues)
+      : Math.max(...currentScopeValues)
 
     if (minVal === maxVal) {
       minVal -= 1000
@@ -206,7 +293,8 @@ export default function AdvancedFinancialChart() {
 
     const pointCoords = points.map((p, i) => ({
       x: getX(i),
-      y: getY(p.netWorth),
+      y: getY(getPointValue(p)),
+      value: getPointValue(p),
       point: p,
       index: i,
     }))
@@ -226,7 +314,7 @@ export default function AdvancedFinancialChart() {
       y: getY(val),
     }))
 
-    // Path de Área do Patrimônio Líquido
+    // Path de Área do Patrimônio Líquido / Escopo
     const pathD = pointCoords.reduce((acc, pt, i) => `${acc} ${i === 0 ? 'M' : 'L'} ${pt.x} ${pt.y}`, '')
     const zeroY = getY(0)
     const clampedZeroY = Math.max(padTop, Math.min(padTop + chartH, zeroY))
@@ -267,7 +355,7 @@ export default function AdvancedFinancialChart() {
       yTicks,
       zeroY,
     }
-  }, [points, smaPoints, chartW, chartH, padTop, padLeft])
+  }, [points, smaPoints, chartW, chartH, padTop, padLeft, viewMode, getPointValue])
 
   // Manipulador de movimento do mouse para o Crosshair HUD
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -299,17 +387,28 @@ export default function AdvancedFinancialChart() {
   return (
     <div className="card p-4 sm:p-6 bg-slate-900 border border-slate-800 space-y-4">
       
-      {/* ── 1. Ticker Bar Superior (Estilo Terminal / Corretora) ─────────────── */}
+      {/* ── 1. Ticker Bar Superior com Seletor de Escopo / Conta ─────────────── */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-800">
         
         {/* Bloco Principal de Cotação / Patrimônio */}
-        <div className="space-y-1">
+        <div className="space-y-1.5 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Patrimônio Líquido
+            <span
+              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+              style={{ backgroundColor: scopeConfig.color, boxShadow: `0 0 8px ${scopeConfig.color}66` }}
+            />
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300 truncate">
+              {scopeConfig.label}
             </span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-              LIVE
+            <span
+              className="px-2 py-0.5 rounded-full text-[10px] font-bold border"
+              style={{
+                backgroundColor: `${scopeConfig.color}20`,
+                borderColor: `${scopeConfig.color}40`,
+                color: scopeConfig.color,
+              }}
+            >
+              {scopeConfig.badge}
             </span>
             {activePoint && (
               <span className="text-[11px] font-mono text-slate-500">
@@ -320,7 +419,7 @@ export default function AdvancedFinancialChart() {
 
           <div className="flex items-baseline gap-3 flex-wrap">
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-100 tabular-nums tracking-tight">
-              {formatCurrency(activePoint ? activePoint.netWorth : stats.current)}
+              {formatCurrency(activePointVal)}
             </h2>
 
             <div
@@ -360,7 +459,159 @@ export default function AdvancedFinancialChart() {
         </div>
       </div>
 
-      {/* ── 2. Toolbar: Modos de Exibição, Timeframes e Overlays ────────────── */}
+      {/* ── 2. Seletor de Escopo / Conta e Segmentos ────────────────────────── */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-2 bg-slate-950/50 rounded-2xl border border-slate-800/80">
+        
+        {/* Botões Rápidos de Escopo Macro e Tipos */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 pr-1 select-none">
+          <button
+            type="button"
+            onClick={() => {
+              setScopeType('all')
+              setSelectedAccountId('')
+            }}
+            className={`px-2.5 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+              scopeType === 'all'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            🌐 Geral
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setScopeType('macro_on_budget')
+              setSelectedAccountId('')
+            }}
+            className={`px-2.5 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+              scopeType === 'macro_on_budget'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            🏦 No Orçamento
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setScopeType('macro_off_budget')
+              setSelectedAccountId('')
+            }}
+            className={`px-2.5 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+              scopeType === 'macro_off_budget'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            💼 Fora do Orçamento
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setScopeType('type_checking')
+              setSelectedAccountId('')
+            }}
+            className={`px-2.5 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+              scopeType === 'type_checking'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            💰 Corrente
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setScopeType('type_credit_card')
+              setSelectedAccountId('')
+            }}
+            className={`px-2.5 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+              scopeType === 'type_credit_card'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            💳 Cartões
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setScopeType('type_debt_receivable')
+              setSelectedAccountId('')
+            }}
+            className={`px-2.5 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+              scopeType === 'type_debt_receivable'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            📥 A Receber
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setScopeType('type_debt_payable')
+              setSelectedAccountId('')
+            }}
+            className={`px-2.5 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+              scopeType === 'type_debt_payable'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            📤 A Pagar
+          </button>
+        </div>
+
+        {/* Dropdown de Seleção de Conta Individual */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Filter className="w-3.5 h-3.5 text-slate-500 hidden sm:inline" />
+          <select
+            value={scopeType === 'account' ? selectedAccountId : ''}
+            onChange={e => {
+              const val = e.target.value
+              if (!val) {
+                setScopeType('all')
+                setSelectedAccountId('')
+              } else {
+                setScopeType('account')
+                setSelectedAccountId(val)
+              }
+            }}
+            className="w-full sm:w-auto bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+          >
+            <option value="">🎯 Filtrar por conta individual...</option>
+            
+            <optgroup label="Contas Bancárias & Cartões">
+              {activeAccounts.map(acc => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.type === 'credit_card' ? '💳' : acc.type === 'checking' ? '🏦' : '💼'} {acc.name}
+                </option>
+              ))}
+            </optgroup>
+
+            {activeDebtAccounts.length > 0 && (
+              <optgroup label="Cobranças & Dívidas">
+                {activeDebtAccounts.map(d => (
+                  <option key={d.id} value={d.id}>
+                    📄 {d.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+        </div>
+
+      </div>
+
+      {/* ── 3. Toolbar: Modos de Visão, Timeframes e Overlays ───────────────── */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
         
         {/* Modos de Visão (Área, Ativos/Passivos, Fluxo) */}
@@ -373,25 +624,27 @@ export default function AdvancedFinancialChart() {
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
-            title="Patrimônio Líquido Contínuo"
+            title="Evolução Contínua"
           >
             <LineChart className="w-3.5 h-3.5" />
-            <span>Patrimônio</span>
+            <span>Curva de Evolução</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setViewMode('assets_liabilities')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              viewMode === 'assets_liabilities'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-            title="Ativos vs Passivos"
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>Ativos / Dívidas</span>
-          </button>
+          {scopeType === 'all' && (
+            <button
+              type="button"
+              onClick={() => setViewMode('assets_liabilities')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                viewMode === 'assets_liabilities'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Ativos vs Passivos"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Ativos / Dívidas</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -517,7 +770,7 @@ export default function AdvancedFinancialChart() {
         </div>
       )}
 
-      {/* ── 3. Canvas SVG Interativo com Crosshair HUD ──────────────────────── */}
+      {/* ── 4. Canvas SVG Interativo com Crosshair HUD ──────────────────────── */}
       <div ref={containerRef} className="relative w-full overflow-hidden select-none">
         
         {viewMode === 'monthly_flow' ? (
@@ -592,11 +845,11 @@ export default function AdvancedFinancialChart() {
                 
                 {/* HUD de Ponto Flutuante Ativo */}
                 {activePoint && (
-                  <div className="absolute top-2 left-16 z-10 flex items-center gap-3 bg-slate-950/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700/80 text-xs shadow-xl animate-in fade-in duration-100">
+                  <div className="absolute top-2 left-16 z-10 flex items-center gap-3 bg-slate-950/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700/80 text-xs shadow-xl animate-in fade-in duration-100 flex-wrap">
                     <span className="font-bold text-slate-300">{formatDate(activePoint.date)}</span>
                     <span className="text-slate-600">|</span>
-                    <span className="font-extrabold text-indigo-400 tabular-nums">
-                      {formatCurrency(activePoint.netWorth)}
+                    <span className="font-extrabold tabular-nums" style={{ color: scopeConfig.color }}>
+                      {formatCurrency(activePointVal)}
                     </span>
                     {viewMode === 'assets_liabilities' && (
                       <>
@@ -623,11 +876,11 @@ export default function AdvancedFinancialChart() {
                   onMouseLeave={handleMouseLeave}
                 >
                   <defs>
-                    {/* Gradiente do Patrimônio Líquido */}
-                    <linearGradient id="netWorthGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#6366f1" stopOpacity="0.45" />
-                      <stop offset="60%" stopColor="#6366f1" stopOpacity="0.1" />
-                      <stop offset="100%" stopColor="#6366f1" stopOpacity="0.0" />
+                    {/* Gradiente Dinâmico baseado no Escopo / Conta */}
+                    <linearGradient id="scopeGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={scopeConfig.color} stopOpacity="0.45" />
+                      <stop offset="60%" stopColor={scopeConfig.color} stopOpacity="0.1" />
+                      <stop offset="100%" stopColor={scopeConfig.color} stopOpacity="0.0" />
                     </linearGradient>
 
                     {/* Gradiente de Ativos */}
@@ -684,17 +937,19 @@ export default function AdvancedFinancialChart() {
                   {viewMode === 'area' ? (
                     <>
                       {/* Área Preenchida com Gradiente */}
-                      <path d={chartScale.areaD} fill="url(#netWorthGrad)" />
+                      <path d={chartScale.areaD} fill="url(#scopeGrad)" />
 
-                      {/* Curva Principal de Patrimônio Líquido */}
+                      {/* Curva Principal Dinâmica */}
                       <path
                         d={chartScale.pathD}
                         fill="none"
-                        stroke="#818cf8"
+                        stroke={scopeConfig.color}
                         strokeWidth="2.5"
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        className="filter drop-shadow-[0_4px_12px_rgba(99,102,241,0.5)]"
+                        style={{
+                          filter: `drop-shadow(0 4px 12px ${scopeConfig.color}66)`,
+                        }}
                       />
                     </>
                   ) : (
@@ -741,7 +996,7 @@ export default function AdvancedFinancialChart() {
                       {/* Linha de ATH (Máxima) */}
                       <g>
                         {(() => {
-                          const maxCoord = chartScale.pointCoords.find(pt => pt.point.netWorth === stats.max)
+                          const maxCoord = chartScale.pointCoords.find(pt => pt.value === stats.max)
                           if (!maxCoord) return null
                           return (
                             <>
@@ -773,7 +1028,7 @@ export default function AdvancedFinancialChart() {
                       {/* Linha de ATL (Mínima) */}
                       <g>
                         {(() => {
-                          const minCoord = chartScale.pointCoords.find(pt => pt.point.netWorth === stats.min)
+                          const minCoord = chartScale.pointCoords.find(pt => pt.value === stats.min)
                           if (!minCoord) return null
                           return (
                             <>
@@ -854,15 +1109,18 @@ export default function AdvancedFinancialChart() {
                         opacity="0.5"
                       />
 
-                      {/* Ponto de Destaque Pulsante */}
+                      {/* Ponto de Destaque Pulsante com Cor do Escopo */}
                       <circle
                         cx={chartScale.pointCoords[activePointIndex].x}
                         cy={chartScale.pointCoords[activePointIndex].y}
                         r="6"
-                        fill="#6366f1"
+                        fill={scopeConfig.color}
                         stroke="#ffffff"
                         strokeWidth="2.5"
-                        className="animate-pulse drop-shadow-[0_0_8px_rgba(99,102,241,0.8)]"
+                        className="animate-pulse"
+                        style={{
+                          filter: `drop-shadow(0 0 8px ${scopeConfig.color})`,
+                        }}
                       />
                     </g>
                   )}

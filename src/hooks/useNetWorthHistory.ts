@@ -1,9 +1,13 @@
-// src/hooks/useNetWorthHistory.ts — Histórico de Patrimônio Líquido com TanStack Query v5
+// src/hooks/useNetWorthHistory.ts — Histórico de Patrimônio Líquido Multi-Conta com TanStack Query v5
 import { useMemo } from 'react'
-import { useAccountsQuery, useTransactionsQuery } from '@/hooks/queries'
+import {
+  useAccountsQuery,
+  useTransactionsQuery,
+  useDebtAccountsQuery,
+  useDebtItemsQuery,
+} from '@/hooks/queries'
 import { format, addDays, addWeeks, addMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-
 import { isDateBeforeAccountingStart, getAccountingStartDate } from '@/utils/accountingPeriod'
 
 export type Granularity = 'daily' | 'weekly' | 'monthly'
@@ -15,6 +19,17 @@ export interface NetWorthPoint {
   assets: number
   liabilities: number
   isFuture: boolean
+  // Breakdown por Macro (Dentro vs Fora do Orçamento)
+  onBudgetTotal: number
+  offBudgetTotal: number
+  // Breakdown por Tipo de Conta
+  checkingTotal: number
+  creditCardTotal: number
+  offBudgetAccountsTotal: number
+  debtReceivableTotal: number
+  debtPayableTotal: number
+  // Saldos individuais de cada conta (ID -> Saldo)
+  accounts: Record<string, number>
 }
 
 export function useNetWorthHistory(
@@ -24,12 +39,16 @@ export function useNetWorthHistory(
 ): NetWorthPoint[] | undefined {
   const { data: accounts = [], isLoading: l1 } = useAccountsQuery()
   const { data: transactions = [], isLoading: l2 } = useTransactionsQuery()
-  const isLoading = l1 || l2
+  const { data: debtAccounts = [], isLoading: l3 } = useDebtAccountsQuery()
+  const { data: debtItems = [], isLoading: l4 } = useDebtItemsQuery()
+  const isLoading = l1 || l2 || l3 || l4
 
   return useMemo(() => {
     if (isLoading && accounts.length === 0) return undefined
     const activeAccounts = accounts.filter(a => a.isActive !== false)
-    if (activeAccounts.length === 0) return []
+    const activeDebtAccounts = debtAccounts.filter(d => d.isActive !== false)
+
+    if (activeAccounts.length === 0 && activeDebtAccounts.length === 0) return []
 
     const today = new Date()
     today.setHours(23, 59, 59, 999)
@@ -64,11 +83,23 @@ export function useNetWorthHistory(
       let totalAssets = 0
       let totalLiabilities = 0
 
+      let onBudgetTotal = 0
+      let offBudgetTotal = 0
+
+      let checkingTotal = 0
+      let creditCardTotal = 0
+      let offBudgetAccountsTotal = 0
+      let debtReceivableTotal = 0
+      let debtPayableTotal = 0
+
+      const accountBalances: Record<string, number> = {}
+
+      // 1. Contas Bancárias e Cartões
       for (const acc of activeAccounts) {
         if (!acc.id) continue
         let bal = acc.type === 'credit_card' ? 0 : (acc.initialBalance || 0)
 
-        // Transações reais até a data do ponto (ignorando anteriores ao período contábil)
+        // Transações reais até a data do ponto (ignorando anteriores ao início contábil)
         for (const tx of transactions) {
           if (isDateBeforeAccountingStart(tx.date)) continue
           const txDate = new Date(tx.date)
@@ -84,9 +115,57 @@ export function useNetWorthHistory(
           }
         }
 
+        accountBalances[acc.id] = bal
         totalNetWorth += bal
+
         if (bal >= 0) totalAssets += bal
         else totalLiabilities += Math.abs(bal)
+
+        if (acc.type === 'checking') {
+          checkingTotal += bal
+          onBudgetTotal += bal
+        } else if (acc.type === 'credit_card') {
+          creditCardTotal += bal
+          onBudgetTotal += bal
+        } else if (acc.type === 'off_budget') {
+          offBudgetAccountsTotal += bal
+          offBudgetTotal += bal
+        }
+      }
+
+      // 2. Contas de Cobrança / Dívidas (Receivables & Payables)
+      for (const dAcc of activeDebtAccounts) {
+        if (!dAcc.id) continue
+        const items = debtItems.filter(i => i.debtAccountId === dAcc.id)
+        let dBal = 0
+
+        for (const item of items) {
+          if (isDateBeforeAccountingStart(item.createdAt)) continue
+          const itemCreatedAt = new Date(item.createdAt)
+          if (itemCreatedAt > pDate) continue
+
+          // Verifica se o item ainda estava pendente ou se já havia sido liquidado na data pDate
+          const isSettledAtDate =
+            item.status === 'settled' && item.settledDate && new Date(item.settledDate) <= pDate
+
+          if (!isSettledAtDate && item.status !== 'cancelled') {
+            if (item.type === 'receivable') {
+              dBal += item.amount
+              debtReceivableTotal += item.amount
+              totalAssets += item.amount
+              totalNetWorth += item.amount
+              offBudgetTotal += item.amount
+            } else if (item.type === 'payable') {
+              dBal -= item.amount
+              debtPayableTotal += item.amount
+              totalLiabilities += item.amount
+              totalNetWorth -= item.amount
+              offBudgetTotal -= item.amount
+            }
+          }
+        }
+
+        accountBalances[dAcc.id] = dBal
       }
 
       let dateLabel = ''
@@ -105,6 +184,14 @@ export function useNetWorthHistory(
         assets: totalAssets,
         liabilities: totalLiabilities,
         isFuture,
+        onBudgetTotal,
+        offBudgetTotal,
+        checkingTotal,
+        creditCardTotal,
+        offBudgetAccountsTotal,
+        debtReceivableTotal,
+        debtPayableTotal,
+        accounts: accountBalances,
       })
 
       if (granularity === 'daily') {
@@ -117,5 +204,5 @@ export function useNetWorthHistory(
     }
 
     return points
-  }, [accounts, transactions, startDate, endDate, granularity, isLoading])
+  }, [accounts, transactions, debtAccounts, debtItems, startDate, endDate, granularity, isLoading])
 }
