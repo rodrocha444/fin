@@ -440,13 +440,36 @@ const SYNC_TABLES: TableSyncDef[] = [
 // ─── Registro de Deleção Local para Propagação ──────────────
 
 async function recordLocalDeletion(tableName: string, recordId: string): Promise<void> {
+  const deletedAt = new Date().toISOString()
   try {
-    await db.syncDeletedRecords.add({
+    const entryId = await db.syncDeletedRecords.add({
       tableName,
       recordId,
-      deletedAt: new Date().toISOString(),
+      deletedAt,
     })
-    // Agenda sync logo após a deleção
+
+    // Tenta soft-delete imediato no Supabase em segundo plano se estiver online
+    const client = getSupabaseClient()
+    if (client && navigator.onLine && !syncState.isPaused) {
+      const tableDef = SYNC_TABLES.find(t => t.dexieName === tableName)
+      if (tableDef) {
+        ;(async () => {
+          try {
+            const { error } = await client
+              .from(tableDef.supabaseName)
+              .update({ deleted_at: deletedAt, updated_at: deletedAt })
+              .eq('id', recordId)
+            if (!error && entryId !== undefined) {
+              await db.syncDeletedRecords.delete(entryId as any)
+            }
+          } catch {
+            // Se falhar o envio imediato, o executeSync cuidará do envio em lote
+          }
+        })()
+      }
+    }
+
+    // Agenda sync para garantir persistência e conciliação
     scheduleSync(1000)
   } catch (e) {
     console.error('Erro ao registrar deleção local para sync:', e)
@@ -490,9 +513,29 @@ export async function executeSync(options: { forceAll?: boolean; forceSync?: boo
     const isFirstSync = lastSyncIso === '1970-01-01T00:00:00.000Z' || !metaRecord?.value
 
     // ══════════════════════════════════════════════════════════
-    // ETAPA 1: PULL DO SUPABASE PARA O DEXIE (PULL FIRST!)
-    // Busca dados atualizados da nuvem ANTES de enviar alterações locais.
-    // Garante que uma instância com dados antigos não sobrescreva a nuvem.
+    // ETAPA 1: PUSH DE DELEÇÕES LOCAIS PARA O SUPABASE (PRIMEIRO!)
+    // Envia exclusões antes de fazer o pull para garantir que registros deletados
+    // não sejam rebaixados ou ressuscitados da nuvem.
+    // ══════════════════════════════════════════════════════════
+    const pendingDeletions = await db.syncDeletedRecords.toArray()
+    const pendingDeletionKeys = new Set(pendingDeletions.map(d => `${d.tableName}:${d.recordId}`))
+
+    if (pendingDeletions.length > 0) {
+      for (const del of pendingDeletions) {
+        const tableDef = SYNC_TABLES.find(t => t.dexieName === del.tableName)
+        if (tableDef) {
+          await client
+            .from(tableDef.supabaseName)
+            .update({ deleted_at: del.deletedAt, updated_at: del.deletedAt })
+            .eq('id', del.recordId)
+        }
+      }
+      await db.syncDeletedRecords.clear()
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // ETAPA 2: PULL DO SUPABASE PARA O DEXIE
+    // Busca dados atualizados da nuvem.
     // ══════════════════════════════════════════════════════════
     isApplyingRemoteSync = true
     try {
@@ -515,11 +558,10 @@ export async function executeSync(options: { forceAll?: boolean; forceSync?: boo
           const toPutItems: any[] = []
 
           for (const row of remoteRows) {
-            if (row.deleted_at) {
+            if (row.deleted_at || pendingDeletionKeys.has(`${def.dexieName}:${row.id}`)) {
               toDeleteIds.push(row.id)
             } else {
               // Resolução de Conflito: Last-Write-Wins
-              // Se o registro já existir localmente, compara os timestamps.
               const localItem = await table.get(row.id)
               if (!localItem) {
                 toPutItems.push(def.toDexie(row))
@@ -546,23 +588,6 @@ export async function executeSync(options: { forceAll?: boolean; forceSync?: boo
     }
 
     // ══════════════════════════════════════════════════════════
-    // ETAPA 2: PUSH DE DELEÇÕES LOCAIS PARA O SUPABASE
-    // ══════════════════════════════════════════════════════════
-    const pendingDeletions = await db.syncDeletedRecords.toArray()
-    if (pendingDeletions.length > 0) {
-      for (const del of pendingDeletions) {
-        const tableDef = SYNC_TABLES.find(t => t.dexieName === del.tableName)
-        if (tableDef) {
-          await client
-            .from(tableDef.supabaseName)
-            .update({ deleted_at: del.deletedAt, updated_at: del.deletedAt })
-            .eq('id', del.recordId)
-        }
-      }
-      await db.syncDeletedRecords.clear()
-    }
-
-    // ══════════════════════════════════════════════════════════
     // ETAPA 3: PUSH DE REGISTROS LOCAIS MODIFICADOS / NOVOS
     // Envia apenas o que foi legitimamente criado ou editado localmente
     // ══════════════════════════════════════════════════════════
@@ -576,17 +601,23 @@ export async function executeSync(options: { forceAll?: boolean; forceSync?: boo
       let toPush: any[] = []
 
       if (isFirstSync) {
-        // No primeiro sync, consulta os IDs existentes na nuvem para não sobrescrever dados existentes com versões locais antigas
-        const { data: existingRemote } = await client.from(def.supabaseName).select('id, updated_at')
-        const remoteMap = new Map((existingRemote || []).map((r: any) => [r.id, new Date(r.updated_at || 0).getTime()]))
+        // No primeiro sync, consulta os IDs existentes na nuvem
+        const { data: existingRemote } = await client.from(def.supabaseName).select('id, updated_at, deleted_at')
+        const remoteMap = new Map((existingRemote || []).map((r: any) => [
+          r.id,
+          { time: new Date(r.updated_at || 0).getTime(), deleted: !!r.deleted_at }
+        ]))
 
         toPush = localItems.filter((item: any) => {
-          const remoteTime = remoteMap.get(item.id)
-          if (remoteTime === undefined) {
+          const remote = remoteMap.get(item.id)
+          if (!remote) {
             return true // Não existe na nuvem -> Envia
           }
+          if (remote.deleted) {
+            return false // Deletado na nuvem -> Não envia!
+          }
           const localTime = new Date(item.updatedAt || item.createdAt || 0).getTime()
-          return localTime > remoteTime // Só envia se local for estritamente mais recente
+          return localTime > remote.time
         })
       } else if (options.forceAll) {
         toPush = localItems
