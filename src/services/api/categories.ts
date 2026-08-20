@@ -1,7 +1,13 @@
 // src/services/api/categories.ts — Operações de categorias via Supabase API
 import { getClient } from './client'
-import { rowToCategoryGroup, categoryGroupToRow, rowToCategory, categoryToRow } from './types'
+import {
+  rowToCategoryGroup,
+  categoryGroupToRow,
+  rowToCategory,
+  categoryToRow,
+} from './types'
 import { createId } from '@/utils/id'
+import { notifyDataChanged } from './events'
 import type { CategoryGroup, Category } from '@/types'
 
 export async function getCategoryGroups(): Promise<CategoryGroup[]> {
@@ -64,6 +70,7 @@ export async function createGroup(
 
   const { error } = await client.from('category_groups').insert(row)
   if (error) throw new Error(`Erro ao criar grupo: ${error.message}`)
+  notifyDataChanged('category_groups', 'insert', id)
   return id
 }
 
@@ -74,6 +81,7 @@ export async function updateGroup(id: string, changes: Partial<CategoryGroup>): 
 
   const { error } = await client.from('category_groups').update(row).eq('id', id)
   if (error) throw new Error(`Erro ao atualizar grupo: ${error.message}`)
+  notifyDataChanged('category_groups', 'update', id)
 }
 
 export async function deleteGroup(id: string): Promise<void> {
@@ -91,6 +99,8 @@ export async function deleteGroup(id: string): Promise<void> {
 
   const { error } = await client.from('category_groups').delete().eq('id', id)
   if (error) throw new Error(`Erro ao excluir grupo: ${error.message}`)
+  notifyDataChanged('category_groups', 'delete', id)
+  notifyDataChanged('categories', 'delete')
 }
 
 export async function createCategory(
@@ -117,6 +127,7 @@ export async function createCategory(
 
   const { error } = await client.from('categories').insert(row)
   if (error) throw new Error(`Erro ao criar categoria: ${error.message}`)
+  notifyDataChanged('categories', 'insert', id)
   return id
 }
 
@@ -127,6 +138,7 @@ export async function updateCategory(id: string, changes: Partial<Category>): Pr
 
   const { error } = await client.from('categories').update(row).eq('id', id)
   if (error) throw new Error(`Erro ao atualizar categoria: ${error.message}`)
+  notifyDataChanged('categories', 'update', id)
 }
 
 export async function deleteCategory(id: string): Promise<void> {
@@ -136,6 +148,7 @@ export async function deleteCategory(id: string): Promise<void> {
 
   const { error } = await client.from('categories').delete().eq('id', id)
   if (error) throw new Error(`Erro ao excluir categoria: ${error.message}`)
+  notifyDataChanged('categories', 'delete', id)
 }
 
 export async function toggleGroupVisibility(id: string): Promise<void> {
@@ -143,6 +156,7 @@ export async function toggleGroupVisibility(id: string): Promise<void> {
   const { data } = await client.from('category_groups').select('is_hidden').eq('id', id).single()
   if (!data) return
   await client.from('category_groups').update({ is_hidden: !data.is_hidden }).eq('id', id)
+  notifyDataChanged('category_groups', 'update', id)
 }
 
 export async function toggleCategoryVisibility(id: string): Promise<void> {
@@ -150,6 +164,7 @@ export async function toggleCategoryVisibility(id: string): Promise<void> {
   const { data } = await client.from('categories').select('is_hidden').eq('id', id).single()
   if (!data) return
   await client.from('categories').update({ is_hidden: !data.is_hidden }).eq('id', id)
+  notifyDataChanged('categories', 'update', id)
 }
 
 export async function seedDefaultCategories(): Promise<void> {

@@ -202,4 +202,25 @@ BEGIN
   END LOOP;
 END
 $$;
+
+-- ── Habilitar Realtime para atualização instantânea entre abas e dispositivos ──
+DO $$
+DECLARE
+  t TEXT;
+BEGIN
+  FOR t IN SELECT unnest(ARRAY[
+    'accounts', 'category_groups', 'categories', 'budget_months',
+    'transactions', 'installment_groups', 'scheduled_transactions',
+    'payees', 'debt_accounts', 'debt_items'
+  ])
+  LOOP
+    BEGIN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I;', t);
+    EXCEPTION WHEN OTHERS THEN
+      NULL;
+    END;
+  END LOOP;
+END
+$$;
 `
+

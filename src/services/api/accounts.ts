@@ -1,7 +1,7 @@
-// src/services/api/accounts.ts — Operações de contas via Supabase API
 import { getClient } from './client'
 import { rowToAccount, accountToRow } from './types'
 import { createId } from '@/utils/id'
+import { notifyDataChanged } from './events'
 import type { Account, AccountType } from '@/types'
 
 export async function getAccounts(): Promise<Account[]> {
@@ -49,6 +49,7 @@ export async function createAccount(data: {
 
   const { error } = await client.from('accounts').insert(row)
   if (error) throw new Error(`Erro ao criar conta: ${error.message}`)
+  notifyDataChanged('accounts', 'insert', id)
   return id
 }
 
@@ -60,6 +61,7 @@ export async function updateAccount(id: string, changes: Partial<Account>): Prom
 
   const { error } = await client.from('accounts').update(row).eq('id', id)
   if (error) throw new Error(`Erro ao atualizar conta: ${error.message}`)
+  notifyDataChanged('accounts', 'update', id)
 }
 
 export async function deleteAccount(id: string): Promise<void> {
@@ -71,6 +73,8 @@ export async function deleteAccount(id: string): Promise<void> {
 
   const { error } = await client.from('accounts').delete().eq('id', id)
   if (error) throw new Error(`Erro ao excluir conta: ${error.message}`)
+  notifyDataChanged('accounts', 'delete', id)
+  notifyDataChanged('transactions', 'delete')
 }
 
 /**

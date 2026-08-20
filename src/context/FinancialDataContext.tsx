@@ -294,10 +294,28 @@ export const FinancialDataProvider: React.FC<{ children: React.ReactNode }> = ({
       )
       .subscribe()
 
+    // 2. Barramento de eventos local (para respostas imediatas em mutações locais)
+    const handleLocalDataChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<{ table: string; action?: string; id?: string }>
+      const table = customEvent.detail?.table
+      if (!table || table === 'all') {
+        fetchAll()
+      } else {
+        fetchTable(table)
+        if (table === 'transactions' || table === 'installment_groups') {
+          fetchTable('accounts')
+          fetchTable('budget_months')
+        }
+      }
+    }
+
+    window.addEventListener('finplan_data_changed', handleLocalDataChanged)
+
     return () => {
       client.removeChannel(channel)
+      window.removeEventListener('finplan_data_changed', handleLocalDataChanged)
     }
-  }, [fetchAll])
+  }, [fetchAll, fetchTable])
 
   const refetch = useCallback(async (tableName?: string) => {
     if (tableName) {

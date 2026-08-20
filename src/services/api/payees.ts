@@ -1,7 +1,7 @@
-// src/services/api/payees.ts — Operações de beneficiários via Supabase API
 import { getClient } from './client'
 import { rowToPayee, payeeToRow } from './types'
 import { createId } from '@/utils/id'
+import { notifyDataChanged } from './events'
 import type { Payee } from '@/types'
 
 export async function getPayees(): Promise<Payee[]> {
@@ -20,6 +20,7 @@ export async function getOrCreatePayee(name: string, defaultCategoryId?: string)
     const payee = rowToPayee(data)
     if (defaultCategoryId && defaultCategoryId !== payee.defaultCategoryId) {
       await client.from('payees').update({ default_category_id: defaultCategoryId }).eq('id', payee.id)
+      notifyDataChanged('payees', 'update', payee.id)
     }
     return payee
   }
@@ -32,5 +33,6 @@ export async function getOrCreatePayee(name: string, defaultCategoryId?: string)
   })
 
   await client.from('payees').insert(row)
+  notifyDataChanged('payees', 'insert', id)
   return { id, name: trimmed, defaultCategoryId }
 }

@@ -1,4 +1,3 @@
-// src/services/api/scheduled.ts — Operações de transações agendadas via Supabase API
 import { getClient } from './client'
 import { rowToScheduledTransaction, scheduledTransactionToRow, transactionToRow } from './types'
 import { createId } from '@/utils/id'
@@ -11,6 +10,7 @@ import {
   isAfter,
   startOfDay,
 } from 'date-fns'
+import { notifyDataChanged } from './events'
 import type { ScheduledTransaction, TransactionType } from '@/types'
 
 export interface ProjectedScheduledOccurrence {
@@ -48,6 +48,7 @@ export async function createScheduled(data: Omit<ScheduledTransaction, 'id' | 'c
 
   const { error } = await client.from('scheduled_transactions').insert(row)
   if (error) throw new Error(`Erro ao criar agendamento: ${error.message}`)
+  notifyDataChanged('scheduled_transactions', 'insert', id)
   return id
 }
 
@@ -58,12 +59,14 @@ export async function updateScheduled(id: string, data: Partial<Omit<ScheduledTr
 
   const { error } = await client.from('scheduled_transactions').update(row).eq('id', id)
   if (error) throw new Error(`Erro ao atualizar agendamento: ${error.message}`)
+  notifyDataChanged('scheduled_transactions', 'update', id)
 }
 
 export async function deleteScheduled(id: string): Promise<void> {
   const client = getClient()
   const { error } = await client.from('scheduled_transactions').delete().eq('id', id)
   if (error) throw new Error(`Erro ao excluir agendamento: ${error.message}`)
+  notifyDataChanged('scheduled_transactions', 'delete', id)
 }
 
 export async function confirmScheduledOccurrence(
@@ -96,6 +99,7 @@ export async function confirmScheduledOccurrence(
 
     const { error } = await client.from('transactions').insert(txRow)
     if (error) throw new Error(`Erro ao confirmar agendamento: ${error.message}`)
+    notifyDataChanged('transactions', 'insert', txId)
     return txId
   }
 
@@ -117,6 +121,7 @@ export async function confirmScheduledOccurrence(
   })
   const { error } = await client.from('transactions').insert(txRow)
   if (error) throw new Error(`Erro ao confirmar agendamento: ${error.message}`)
+  notifyDataChanged('transactions', 'insert', txId)
   return txId
 }
 

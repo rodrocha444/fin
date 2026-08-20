@@ -1,10 +1,10 @@
-// src/services/api/budget.ts — Lógica e operações de orçamento via Supabase API
 import { getClient } from './client'
 import { createId } from '@/utils/id'
 import { format, subMonths } from 'date-fns'
 import { isInitialSetupCategory } from '@/utils/format'
 import { getInvoiceForBudgetMonth } from '@/utils/invoices'
 import { getProjectedScheduledUpToMonth } from './scheduled'
+import { notifyDataChanged } from './events'
 import type {
   Account,
   CategoryGroup,
@@ -54,6 +54,7 @@ export async function setBudget(month: string, categoryId: string, budgeted: num
     })
     if (error) throw new Error(`Erro ao criar orçamento: ${error.message}`)
   }
+  notifyDataChanged('budget_months', 'upsert')
 }
 
 export async function copyFromPreviousMonth(targetMonth: string): Promise<void> {
@@ -68,11 +69,13 @@ export async function copyFromPreviousMonth(targetMonth: string): Promise<void> 
   for (const prev of prevBudgets) {
     await setBudget(targetMonth, prev.category_id, Number(prev.budgeted || 0))
   }
+  notifyDataChanged('budget_months', 'upsert')
 }
 
 export async function clearMonthBudgets(month: string): Promise<void> {
   const client = getClient()
   await client.from('budget_months').update({ budgeted: 0, updated_at: new Date().toISOString() }).eq('month', month)
+  notifyDataChanged('budget_months', 'update')
 }
 
 /**

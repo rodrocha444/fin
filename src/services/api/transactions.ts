@@ -9,6 +9,7 @@ import {
 } from './types'
 import { createId } from '@/utils/id'
 import { format, addMonths } from 'date-fns'
+import { notifyDataChanged } from './events'
 import type { Transaction, TransactionType } from '@/types'
 
 export async function getTransactions(): Promise<Transaction[]> {
@@ -141,6 +142,7 @@ export async function createTransaction(data: {
 
   const { error } = await client.from('transactions').insert(row)
   if (error) throw new Error(`Erro ao criar transação: ${error.message}`)
+  notifyDataChanged('transactions', 'insert', id)
   return id
 }
 
@@ -170,6 +172,7 @@ export async function createTransfer(data: {
 
   const { error } = await client.from('transactions').insert(row)
   if (error) throw new Error(`Erro ao criar transferência: ${error.message}`)
+  notifyDataChanged('transactions', 'insert', id)
   return id
 }
 
@@ -227,6 +230,8 @@ export async function createInstallmentPurchase(data: {
   const { error: txErr } = await client.from('transactions').insert(rows)
   if (txErr) throw new Error(`Erro ao criar parcelas: ${txErr.message}`)
 
+  notifyDataChanged('installment_groups', 'insert', groupId)
+  notifyDataChanged('transactions', 'insert')
   return groupId
 }
 
@@ -277,6 +282,9 @@ export async function updateInstallmentPurchase(
       }).eq('id', tx.id)
     }
   }
+
+  notifyDataChanged('installment_groups', 'update', groupId)
+  notifyDataChanged('transactions', 'update')
 }
 
 export async function updateTransaction(id: string, changes: Partial<Transaction>): Promise<void> {
@@ -286,6 +294,7 @@ export async function updateTransaction(id: string, changes: Partial<Transaction
 
   const { error } = await client.from('transactions').update(row).eq('id', id)
   if (error) throw new Error(`Erro ao atualizar transação: ${error.message}`)
+  notifyDataChanged('transactions', 'update', id)
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
@@ -297,22 +306,28 @@ export async function deleteTransaction(id: string): Promise<void> {
     const { count } = await client.from('transactions').select('*', { count: 'exact', head: true }).eq('installment_group_id', tx.installment_group_id)
     if (count === 0) {
       await client.from('installment_groups').delete().eq('id', tx.installment_group_id)
+      notifyDataChanged('installment_groups', 'delete', tx.installment_group_id)
     }
+    notifyDataChanged('transactions', 'delete', id)
     return
   }
 
   const { error } = await client.from('transactions').delete().eq('id', id)
   if (error) throw new Error(`Erro ao excluir transação: ${error.message}`)
+  notifyDataChanged('transactions', 'delete', id)
 }
 
 export async function deleteInstallmentGroup(installmentGroupId: string): Promise<void> {
   const client = getClient()
   await client.from('transactions').delete().eq('installment_group_id', installmentGroupId)
   await client.from('installment_groups').delete().eq('id', installmentGroupId)
+  notifyDataChanged('installment_groups', 'delete', installmentGroupId)
+  notifyDataChanged('transactions', 'delete')
 }
 
 export async function clearTransaction(id: string, cleared: boolean): Promise<void> {
   const client = getClient()
   const { error } = await client.from('transactions').update({ cleared, updated_at: new Date().toISOString() }).eq('id', id)
   if (error) throw new Error(`Erro ao atualizar status compensado: ${error.message}`)
+  notifyDataChanged('transactions', 'update', id)
 }

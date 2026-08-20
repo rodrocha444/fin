@@ -3,6 +3,7 @@ import { getClient } from './client'
 import { rowToDebtAccount, debtAccountToRow, rowToDebtItem, debtItemToRow, toIso } from './types'
 import { createId } from '@/utils/id'
 import { addMonths } from 'date-fns'
+import { notifyDataChanged } from './events'
 import type { DebtAccount, DebtItem, DebtSummary, DebtStatus, DebtType } from '@/types'
 
 export interface CreateDebtInstallmentsInput {
@@ -40,6 +41,7 @@ export async function createDebtAccount(data: Omit<DebtAccount, 'id' | 'createdA
 
   const { error } = await client.from('debt_accounts').insert(row)
   if (error) throw new Error(`Erro ao criar contato de cobrança: ${error.message}`)
+  notifyDataChanged('debt_accounts', 'insert', id)
   return id
 }
 
@@ -50,6 +52,7 @@ export async function updateDebtAccount(id: string, data: Partial<Omit<DebtAccou
 
   const { error } = await client.from('debt_accounts').update(row).eq('id', id)
   if (error) throw new Error(`Erro ao atualizar contato de cobrança: ${error.message}`)
+  notifyDataChanged('debt_accounts', 'update', id)
 }
 
 export async function deleteDebtAccount(id: string): Promise<void> {
@@ -57,6 +60,8 @@ export async function deleteDebtAccount(id: string): Promise<void> {
   await client.from('debt_items').delete().eq('debt_account_id', id)
   const { error } = await client.from('debt_accounts').delete().eq('id', id)
   if (error) throw new Error(`Erro ao excluir contato de cobrança: ${error.message}`)
+  notifyDataChanged('debt_accounts', 'delete', id)
+  notifyDataChanged('debt_items', 'delete')
 }
 
 export async function getDebtItemsByAccount(debtAccountId: string): Promise<DebtItem[]> {
@@ -89,6 +94,7 @@ export async function createDebtItem(data: Omit<DebtItem, 'id' | 'createdAt'>): 
 
   const { error } = await client.from('debt_items').insert(row)
   if (error) throw new Error(`Erro ao criar item de cobrança: ${error.message}`)
+  notifyDataChanged('debt_items', 'insert', id)
   return id
 }
 
@@ -144,6 +150,7 @@ export async function createDebtInstallments(input: CreateDebtInstallmentsInput)
 
   const { error } = await client.from('debt_items').insert(rows)
   if (error) throw new Error(`Erro ao criar parcelas de cobrança: ${error.message}`)
+  notifyDataChanged('debt_items', 'insert')
 }
 
 export async function updateDebtItem(id: string, data: Partial<Omit<DebtItem, 'id' | 'createdAt'>>): Promise<void> {
@@ -153,12 +160,14 @@ export async function updateDebtItem(id: string, data: Partial<Omit<DebtItem, 'i
 
   const { error } = await client.from('debt_items').update(row).eq('id', id)
   if (error) throw new Error(`Erro ao atualizar item de cobrança: ${error.message}`)
+  notifyDataChanged('debt_items', 'update', id)
 }
 
 export async function deleteDebtItem(id: string): Promise<void> {
   const client = getClient()
   const { error } = await client.from('debt_items').delete().eq('id', id)
   if (error) throw new Error(`Erro ao excluir item de cobrança: ${error.message}`)
+  notifyDataChanged('debt_items', 'delete', id)
 }
 
 export async function setDebtItemStatus(id: string, status: DebtStatus): Promise<void> {
@@ -173,6 +182,7 @@ export async function setDebtItemStatus(id: string, status: DebtStatus): Promise
     .eq('id', id)
 
   if (error) throw new Error(`Erro ao atualizar status do item: ${error.message}`)
+  notifyDataChanged('debt_items', 'update', id)
 }
 
 export async function getDebtSummary(): Promise<DebtSummary> {
