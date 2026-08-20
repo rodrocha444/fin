@@ -85,6 +85,11 @@ export default function TransactionItem({
               {tx.installmentNumber}/{tx.installmentTotal}x
             </Badge>
           )}
+          {tx.splitGroupId && (
+            <Badge variant="info">
+              Divisão
+            </Badge>
+          )}
           {tx.isScheduledProjection && (
             <Badge variant="info">
               Agendado

@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS public.transactions (
   installment_group_id TEXT,
   installment_number INTEGER,
   installment_total INTEGER,
+  split_group_id TEXT,
   is_scheduled_projection BOOLEAN NOT NULL DEFAULT false,
   scheduled_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

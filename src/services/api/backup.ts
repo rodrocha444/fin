@@ -103,6 +103,7 @@ function normalizeRecordForTable(tableName: string, r: any): any {
         installmentGroupId: r.installmentGroupId || r.installment_group_id || undefined,
         installmentNumber: r.installmentNumber ?? r.installment_number ?? undefined,
         installmentTotal: r.installmentTotal ?? r.installment_total ?? undefined,
+        splitGroupId: r.splitGroupId || r.split_group_id || undefined,
         isScheduledProjection: Boolean(r.isScheduledProjection ?? r.is_scheduled_projection),
         scheduledId: r.scheduledId || r.scheduled_id || undefined,
         createdAt: r.createdAt || r.created_at,

@@ -3,8 +3,7 @@ import { useState } from 'react'
 import { X, Plus, Receipt, AlertCircle } from 'lucide-react'
 import { useFinancialData } from '@/context/FinancialDataContext'
 import { useCategoryMonthTransactions } from '@/hooks/useTransactions'
-import { useAccounts } from '@/hooks/useAccounts'
-import { deleteTransaction } from '@/db/repositories/transactions'
+import { deleteTransaction, deleteSplitTransaction } from '@/db/repositories/transactions'
 import { formatCurrency, formatMonthLabel } from '@/utils/format'
 import TransactionItem from '@/components/molecules/TransactionItem'
 import TransactionForm from '@/components/organisms/TransactionForm'
@@ -29,9 +28,8 @@ export default function CategoryTransactionsModal({
   isIncome = false,
   onClose,
 }: CategoryTransactionsModalProps) {
-  const { installmentGroups } = useFinancialData()
+  const { accounts, installmentGroups } = useFinancialData()
   const transactions = useCategoryMonthTransactions(category.id, month) ?? []
-  const accounts = useAccounts() ?? []
 
   const accountMap = new Map(accounts.map(a => [a.id!, a]))
   const groupMap = new Map(installmentGroups?.map(g => [g.id!, g]) ?? [])
@@ -40,6 +38,11 @@ export default function CategoryTransactionsModal({
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
 
   const handleDelete = async (tx: Transaction) => {
+    if (tx.splitGroupId) {
+      if (!confirm(`Esta transação faz parte de uma divisão de categorias (${tx.payee}). Deseja excluir todas as partes deste rateio?`)) return
+      await deleteSplitTransaction(tx.splitGroupId)
+      return
+    }
     if (!tx.id) return
     if (!confirm(tx.installmentGroupId ? 'Excluir esta parcela?' : 'Excluir esta transação?')) return
     await deleteTransaction(tx.id)

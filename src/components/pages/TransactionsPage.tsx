@@ -6,7 +6,7 @@ import { useFinancialData } from '@/context/FinancialDataContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useMonthTransactions } from '@/hooks/useTransactions'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
-import { deleteTransaction } from '@/db/repositories/transactions'
+import { deleteTransaction, deleteSplitTransaction } from '@/db/repositories/transactions'
 import { formatCurrency, currentMonth } from '@/utils/format'
 import MonthNavigator from '@/components/atoms/MonthNavigator'
 import SearchBar from '@/components/atoms/SearchBar'
@@ -74,6 +74,11 @@ export default function TransactionsPage() {
     })
 
   const handleDelete = async (tx: Transaction) => {
+    if (tx.splitGroupId) {
+      if (!confirm(`Esta transação faz parte de uma divisão de categorias (${tx.payee}). Deseja excluir todas as partes deste rateio?`)) return
+      await deleteSplitTransaction(tx.splitGroupId)
+      return
+    }
     if (!tx.id) return
     if (!confirm(tx.installmentGroupId ? 'Excluir esta parcela?' : 'Excluir esta transação?')) return
     await deleteTransaction(tx.id)

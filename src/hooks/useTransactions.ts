@@ -10,6 +10,7 @@ export interface CreditCardPurchase {
   id: string
   groupId?: string
   transactionId?: string
+  splitGroupId?: string
   payee: string
   date: Date
   createdAt?: Date
@@ -282,6 +283,7 @@ export function useCreditCardPurchases(accountId: string | undefined): CreditCar
         purchases.push({
           id: `tx-${tx.id}`,
           transactionId: tx.id,
+          splitGroupId: tx.splitGroupId,
           payee: tx.payee,
           date: tx.date,
           createdAt: tx.createdAt,

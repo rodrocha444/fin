@@ -81,6 +81,8 @@ export interface Transaction {
   installmentGroupId?: string
   installmentNumber?: number
   installmentTotal?: number
+  /** Se essa transação faz parte de uma divisão de categorias (split) */
+  splitGroupId?: string
   /** Se essa transação é uma projeção de agendamento futuro */
   isScheduledProjection?: boolean
   scheduledId?: string

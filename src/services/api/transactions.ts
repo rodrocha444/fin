@@ -325,6 +325,98 @@ export async function deleteInstallmentGroup(installmentGroupId: string): Promis
   notifyDataChanged('transactions', 'delete')
 }
 
+export interface SplitItemInput {
+  categoryId?: string
+  amount: number
+  notes?: string
+}
+
+export async function createSplitTransaction(data: {
+  accountId: string
+  date: Date
+  payee: string
+  type: TransactionType
+  notes?: string
+  splits: SplitItemInput[]
+  cleared?: boolean
+}): Promise<string> {
+  const client = getClient()
+  const splitGroupId = createId()
+  const now = new Date()
+
+  const rows = data.splits.map(s => {
+    const id = createId()
+    return transactionToRow({
+      id,
+      accountId: data.accountId,
+      date: data.date,
+      amount: s.amount,
+      payee: data.payee,
+      categoryId: s.categoryId,
+      notes: s.notes || data.notes,
+      cleared: data.cleared ?? false,
+      type: data.type,
+      splitGroupId,
+      createdAt: now,
+    })
+  })
+
+  const { error } = await client.from('transactions').insert(rows)
+  if (error) throw new Error(`Erro ao criar transação dividida: ${error.message}`)
+
+  notifyDataChanged('transactions', 'insert')
+  return splitGroupId
+}
+
+export async function updateSplitTransaction(
+  splitGroupId: string,
+  data: {
+    accountId: string
+    date: Date
+    payee: string
+    type: TransactionType
+    notes?: string
+    splits: SplitItemInput[]
+    cleared?: boolean
+  }
+): Promise<void> {
+  const client = getClient()
+  const now = new Date()
+
+  // Remove os registros antigos do grupo de rateio
+  await client.from('transactions').delete().eq('split_group_id', splitGroupId)
+
+  // Insere as novas partes do rateio mantendo o mesmo splitGroupId
+  const rows = data.splits.map(s => {
+    const id = createId()
+    return transactionToRow({
+      id,
+      accountId: data.accountId,
+      date: data.date,
+      amount: s.amount,
+      payee: data.payee,
+      categoryId: s.categoryId,
+      notes: s.notes || data.notes,
+      cleared: data.cleared ?? false,
+      type: data.type,
+      splitGroupId,
+      createdAt: now,
+    })
+  })
+
+  const { error } = await client.from('transactions').insert(rows)
+  if (error) throw new Error(`Erro ao atualizar transação dividida: ${error.message}`)
+
+  notifyDataChanged('transactions', 'update')
+}
+
+export async function deleteSplitTransaction(splitGroupId: string): Promise<void> {
+  const client = getClient()
+  const { error } = await client.from('transactions').delete().eq('split_group_id', splitGroupId)
+  if (error) throw new Error(`Erro ao excluir transação dividida: ${error.message}`)
+  notifyDataChanged('transactions', 'delete')
+}
+
 export async function clearTransaction(id: string, cleared: boolean): Promise<void> {
   const client = getClient()
   const { error } = await client.from('transactions').update({ cleared, updated_at: new Date().toISOString() }).eq('id', id)

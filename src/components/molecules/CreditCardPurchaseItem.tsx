@@ -37,6 +37,11 @@ export default function CreditCardPurchaseItem({
               {purchase.installmentAmount ? `de ${formatCurrency(purchase.installmentAmount)}` : ''}
             </Badge>
           )}
+          {purchase.splitGroupId && (
+            <Badge variant="info">
+              Divisão
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
           <span>

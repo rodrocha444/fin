@@ -28,7 +28,7 @@ import {
 } from '@/hooks/useTransactions'
 import { usePaidInvoices, useClosedUnpaidInvoices } from '@/hooks/useInvoices'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
-import { deleteTransaction, deleteInstallmentGroup } from '@/db/repositories/transactions'
+import { deleteTransaction, deleteInstallmentGroup, deleteSplitTransaction } from '@/db/repositories/transactions'
 import { deleteAccount } from '@/db/repositories/accounts'
 import { deleteScheduled, confirmScheduledOccurrence } from '@/db/repositories/scheduled'
 import { formatCurrency, formatDate, formatMonthLabel, currentMonth, accountTypeLabel } from '@/utils/format'
@@ -161,6 +161,11 @@ export default function AccountDetailPage() {
       await deleteScheduled(tx.scheduledId)
       return
     }
+    if (tx.splitGroupId) {
+      if (!confirm(`Esta transação faz parte de uma divisão de categorias (${tx.payee}). Deseja excluir todas as partes deste rateio?`)) return
+      await deleteSplitTransaction(tx.splitGroupId)
+      return
+    }
     if (!tx.id) return
     if (!confirm(tx.installmentGroupId ? 'Excluir esta parcela?' : 'Excluir esta transação?')) return
     await deleteTransaction(tx.id)
@@ -179,6 +184,9 @@ export default function AccountDetailPage() {
     if (p.isInstallment && p.groupId) {
       if (!confirm(`Excluir a compra parcelada "${p.payee}" (${p.installmentCount} parcelas)? Todas as parcelas serão removidas.`)) return
       await deleteInstallmentGroup(p.groupId)
+    } else if (p.splitGroupId) {
+      if (!confirm(`Esta transação faz parte de uma divisão de categorias (${p.payee}). Deseja excluir todas as partes deste rateio?`)) return
+      await deleteSplitTransaction(p.splitGroupId)
     } else if (p.transactionId) {
       if (!confirm(`Excluir a transação "${p.payee}"?`)) return
       await deleteTransaction(p.transactionId)
