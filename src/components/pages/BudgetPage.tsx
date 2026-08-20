@@ -1,6 +1,17 @@
 import { useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Copy, Trash2, MoreHorizontal, ArrowDownLeft, CreditCard, Layers, Receipt, History } from 'lucide-react'
+import {
+  Copy,
+  Trash2,
+  MoreHorizontal,
+  ArrowDownLeft,
+  CreditCard,
+  Layers,
+  Receipt,
+  History,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react'
 import { useBudgetRows, useIncomeBudgetRows, useInvoiceBudgetRows, useBudgetSummary } from '@/hooks/useBudget'
 import { setBudget, copyFromPreviousMonth, clearMonthBudgets } from '@/services/api/budget'
 import { formatCurrency, currentMonth } from '@/utils/format'
@@ -26,6 +37,20 @@ export interface CategoryModalData {
   activity?: number
   available?: number
   isIncome?: boolean
+}
+
+const BUDGET_SUMMARY_EXPANDED_KEY = 'fin_budget_summary_expanded'
+
+function getInitialSummaryExpanded(): boolean {
+  try {
+    const saved = localStorage.getItem(BUDGET_SUMMARY_EXPANDED_KEY)
+    if (saved !== null) {
+      return saved === 'true'
+    }
+  } catch {
+    // ignore
+  }
+  return true
 }
 
 // ── Célula editável inline ────────────────────────────────────
@@ -358,6 +383,20 @@ export default function BudgetPage() {
   const incomeRows = useIncomeBudgetRows(month)
   const summary = useBudgetSummary(month)
 
+  const [isSummaryExpanded, setIsSummaryExpanded] = useState<boolean>(getInitialSummaryExpanded)
+
+  const toggleSummaryExpanded = useCallback(() => {
+    setIsSummaryExpanded(prev => {
+      const next = !prev
+      try {
+        localStorage.setItem(BUDGET_SUMMARY_EXPANDED_KEY, String(next))
+      } catch {
+        // ignore
+      }
+      return next
+    })
+  }, [])
+
   const totalSpent = (rows?.reduce((s, r) => s + r.totalActivity, 0) ?? 0) + (invoiceRows?.reduce((s, r) => s + r.totalActivity, 0) ?? 0)
 
   const confirm = useConfirm()
@@ -438,100 +477,137 @@ export default function BudgetPage() {
         </div>
       </div>
 
-      {/* ── Resumo dos valores que influenciam o orçamento do mês atual (Fixo) ── */}
+      {/* ── Resumo dos valores que influenciam o orçamento do mês atual (Colapsável) ── */}
       {summary && (
-        <div className="bg-slate-900/60 border-b border-slate-800/80 p-3 sm:px-6 sm:py-3 flex-shrink-0 select-none">
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5">
-            {/* Sobra Mês Anterior */}
-            <div
-              className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm col-span-2 sm:col-span-1"
-              title="Recursos não orçados ou sobras acumuladas de meses anteriores (+ soma ao orçamento)"
-            >
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                summary.previousMonthSurplus >= 0
-                  ? 'bg-emerald-950/70 border border-emerald-800/60 text-emerald-400'
-                  : 'bg-rose-950/70 border border-rose-800/60 text-rose-400'
-              }`}>
-                <History className="w-4 h-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] text-slate-500 font-medium truncate">Sobra Anterior</p>
-                <p className={`text-xs sm:text-sm font-bold tabular-nums truncate ${
-                  summary.previousMonthSurplus > 0
-                    ? 'text-emerald-400'
-                    : summary.previousMonthSurplus < 0
-                    ? 'text-rose-400'
-                    : 'text-slate-500'
-                }`}>
-                  {summary.previousMonthSurplus > 0 ? '+' : ''}{formatCurrency(summary.previousMonthSurplus)}
-                </p>
-              </div>
+        <div className="bg-slate-900/60 border-b border-slate-800/80 flex-shrink-0 select-none transition-all">
+          {/* Barra de controle / Header colapsável */}
+          <div
+            onClick={toggleSummaryExpanded}
+            className="flex items-center justify-between px-3 sm:px-6 py-1.5 cursor-pointer hover:bg-slate-800/40 active:bg-slate-800/60 transition-colors group"
+            title={isSummaryExpanded ? 'Clique para recolher o resumo financeiro' : 'Clique para expandir o resumo financeiro'}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider group-hover:text-slate-300 transition-colors">
+                Resumo do Mês
+              </span>
+              {!isSummaryExpanded && (
+                <div className="hidden sm:flex items-center gap-3 text-xs text-slate-400 truncate">
+                  <span className="text-slate-600">•</span>
+                  <span>Receitas: <strong className="text-emerald-400 font-medium">+{formatCurrency(summary.totalIncome)}</strong></span>
+                  <span className="text-slate-600">•</span>
+                  <span>Orçado: <strong className="text-indigo-300 font-medium">-{formatCurrency(summary.totalBudgeted)}</strong></span>
+                  <span className="text-slate-600">•</span>
+                  <span>Gastos: <strong className="text-amber-400 font-medium">{formatCurrency(totalSpent)}</strong></span>
+                </div>
+              )}
             </div>
 
-            {/* Receitas do Mês */}
-            <div
-              className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
-              title="Entradas e rendas registradas no mês (+ soma ao orçamento)"
+            <button
+              type="button"
+              className="flex items-center gap-1 text-[11px] text-slate-400 group-hover:text-indigo-300 transition-colors px-1.5 py-0.5 rounded-md hover:bg-slate-800/60"
+              aria-expanded={isSummaryExpanded}
             >
-              <div className="w-8 h-8 rounded-lg bg-emerald-950/70 border border-emerald-800/60 flex items-center justify-center text-emerald-400 flex-shrink-0">
-                <ArrowDownLeft className="w-4 h-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] text-slate-500 font-medium truncate">Receitas Mês</p>
-                <p className="text-xs sm:text-sm font-bold text-emerald-400 tabular-nums truncate">
-                  +{formatCurrency(summary.totalIncome)}
-                </p>
-              </div>
-            </div>
-
-            {/* Faturas do Mês */}
-            <div
-              className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
-              title="Faturas de cartão de crédito com vencimento neste mês (- deduz do orçamento)"
-            >
-              <div className="w-8 h-8 rounded-lg bg-rose-950/70 border border-rose-800/60 flex items-center justify-center text-rose-400 flex-shrink-0">
-                <CreditCard className="w-4 h-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] text-slate-500 font-medium truncate">Faturas a Vencer</p>
-                <p className="text-xs sm:text-sm font-bold text-rose-400 tabular-nums truncate">
-                  {(summary.currentInvoicesDue ?? 0) > 0 ? `-${formatCurrency(summary.currentInvoicesDue ?? 0)}` : <span className="text-slate-600">—</span>}
-                </p>
-              </div>
-            </div>
-
-            {/* Orçado em Categorias */}
-            <div
-              className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
-              title="Total alocado em envelopes/categorias de despesa no mês (- deduz do orçamento)"
-            >
-              <div className="w-8 h-8 rounded-lg bg-indigo-950/70 border border-indigo-800/60 flex items-center justify-center text-indigo-400 flex-shrink-0">
-                <Layers className="w-4 h-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] text-slate-500 font-medium truncate">Orçado Mês</p>
-                <p className="text-xs sm:text-sm font-bold text-indigo-300 tabular-nums truncate">
-                  {summary.totalBudgeted > 0 ? `-${formatCurrency(summary.totalBudgeted)}` : <span className="text-slate-600">—</span>}
-                </p>
-              </div>
-            </div>
-
-            {/* Gastos Realizados */}
-            <div
-              className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
-              title="Total de despesas efetivamente realizadas no mês"
-            >
-              <div className="w-8 h-8 rounded-lg bg-amber-950/70 border border-amber-800/60 flex items-center justify-center text-amber-400 flex-shrink-0">
-                <Receipt className="w-4 h-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] text-slate-500 font-medium truncate">Gastos Reais</p>
-                <p className="text-xs sm:text-sm font-bold text-amber-400/90 tabular-nums truncate">
-                  {totalSpent > 0 ? formatCurrency(totalSpent) : <span className="text-slate-600">—</span>}
-                </p>
-              </div>
-            </div>
+              <span className="hidden sm:inline">{isSummaryExpanded ? 'Recolher resumo' : 'Ver resumo completo'}</span>
+              {isSummaryExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
           </div>
+
+          {/* Grid detalhado de 5 cards (quando expandido) */}
+          {isSummaryExpanded && (
+            <div className="px-3 pb-3 sm:px-6 sm:pb-3 pt-1 animate-in fade-in duration-200">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5">
+                {/* Sobra Mês Anterior */}
+                <div
+                  className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm col-span-2 sm:col-span-1"
+                  title="Recursos não orçados ou sobras acumuladas de meses anteriores (+ soma ao orçamento)"
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    summary.previousMonthSurplus >= 0
+                      ? 'bg-emerald-950/70 border border-emerald-800/60 text-emerald-400'
+                      : 'bg-rose-950/70 border border-rose-800/60 text-rose-400'
+                  }`}>
+                    <History className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] text-slate-500 font-medium truncate">Sobra Anterior</p>
+                    <p className={`text-xs sm:text-sm font-bold tabular-nums truncate ${
+                      summary.previousMonthSurplus > 0
+                        ? 'text-emerald-400'
+                        : summary.previousMonthSurplus < 0
+                        ? 'text-rose-400'
+                        : 'text-slate-500'
+                    }`}>
+                      {summary.previousMonthSurplus > 0 ? '+' : ''}{formatCurrency(summary.previousMonthSurplus)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Receitas do Mês */}
+                <div
+                  className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
+                  title="Entradas e rendas registradas no mês (+ soma ao orçamento)"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-emerald-950/70 border border-emerald-800/60 flex items-center justify-center text-emerald-400 flex-shrink-0">
+                    <ArrowDownLeft className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] text-slate-500 font-medium truncate">Receitas Mês</p>
+                    <p className="text-xs sm:text-sm font-bold text-emerald-400 tabular-nums truncate">
+                      +{formatCurrency(summary.totalIncome)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Faturas do Mês */}
+                <div
+                  className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
+                  title="Faturas de cartão de crédito com vencimento neste mês (- deduz do orçamento)"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-rose-950/70 border border-rose-800/60 flex items-center justify-center text-rose-400 flex-shrink-0">
+                    <CreditCard className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] text-slate-500 font-medium truncate">Faturas a Vencer</p>
+                    <p className="text-xs sm:text-sm font-bold text-rose-400 tabular-nums truncate">
+                      {(summary.currentInvoicesDue ?? 0) > 0 ? `-${formatCurrency(summary.currentInvoicesDue ?? 0)}` : <span className="text-slate-600">—</span>}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Orçado em Categorias */}
+                <div
+                  className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
+                  title="Total alocado em envelopes/categorias de despesa no mês (- deduz do orçamento)"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-indigo-950/70 border border-indigo-800/60 flex items-center justify-center text-indigo-400 flex-shrink-0">
+                    <Layers className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] text-slate-500 font-medium truncate">Orçado Mês</p>
+                    <p className="text-xs sm:text-sm font-bold text-indigo-300 tabular-nums truncate">
+                      {summary.totalBudgeted > 0 ? `-${formatCurrency(summary.totalBudgeted)}` : <span className="text-slate-600">—</span>}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Gastos Realizados */}
+                <div
+                  className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
+                  title="Total de despesas efetivamente realizadas no mês"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-amber-950/70 border border-amber-800/60 flex items-center justify-center text-amber-400 flex-shrink-0">
+                    <Receipt className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] text-slate-500 font-medium truncate">Gastos Reais</p>
+                    <p className="text-xs sm:text-sm font-bold text-amber-400/90 tabular-nums truncate">
+                      {totalSpent > 0 ? formatCurrency(totalSpent) : <span className="text-slate-600">—</span>}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
