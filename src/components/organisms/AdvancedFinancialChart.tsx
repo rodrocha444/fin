@@ -1,4 +1,4 @@
-// src/components/organisms/AdvancedFinancialChart.tsx — Gráfico Financeiro Avançado Estilo Plataforma de Corretora com Filtros por Conta, Tipos e Projeção Futura
+// src/components/organisms/AdvancedFinancialChart.tsx — Gráfico Financeiro Avançado com Otimização Mobile de Alta Precisão
 import { useState, useMemo, useRef, useCallback } from 'react'
 import {
   subMonths,
@@ -32,7 +32,6 @@ type RangePreset =
   | '1y'
   | 'proj_3m'
   | 'proj_6m'
-  | 'proj_1y'
   | 'ytd'
   | 'all'
   | 'custom'
@@ -48,6 +47,20 @@ export type ChartScopeType =
   | 'type_debt_receivable'
   | 'type_debt_payable'
   | 'account'
+
+/** Formata valores do Eixo Y de forma compacta para não espremer telas mobile */
+function formatCompactValue(val: number): string {
+  if (Math.abs(val) >= 1_000_000) {
+    return `R$ ${(val / 1_000_000).toFixed(1).replace('.', ',')}M`
+  }
+  if (Math.abs(val) >= 10_000) {
+    return `R$ ${(val / 1_000).toFixed(0)}k`
+  }
+  if (Math.abs(val) >= 1_000) {
+    return `R$ ${(val / 1_000).toFixed(1).replace('.0', '').replace('.', ',')}k`
+  }
+  return formatCurrency(val)
+}
 
 export default function AdvancedFinancialChart() {
   const [preset, setPreset] = useState<RangePreset>('6m')
@@ -99,7 +112,6 @@ export default function AdvancedFinancialChart() {
     // Projeções puramente futuras
     if (preset === 'proj_3m') return { startDate: today, endDate: addMonths(today, 3) }
     if (preset === 'proj_6m') return { startDate: today, endDate: addMonths(today, 6) }
-    if (preset === 'proj_1y') return { startDate: today, endDate: addMonths(today, 12) }
 
     // Presets históricos (com ou sem extensão futura ativada)
     const futureExtension = includeFuture ? addMonths(today, 6) : today
@@ -150,18 +162,18 @@ export default function AdvancedFinancialChart() {
       return { label: 'Fora do Orçamento', badge: 'Macro', color: '#06b6d4' }
     }
     if (scopeType === 'type_checking') {
-      return { label: 'Contas Correntes & Caixa', badge: 'Tipo', color: '#3b82f6' }
+      return { label: 'Contas Correntes', badge: 'Tipo', color: '#3b82f6' }
     }
     if (scopeType === 'type_credit_card') {
-      return { label: 'Faturas de Cartão de Crédito', badge: 'Tipo', color: '#f43f5e' }
+      return { label: 'Faturas de Cartão', badge: 'Tipo', color: '#f43f5e' }
     }
     if (scopeType === 'type_debt_receivable') {
-      return { label: 'Contas a Receber (Cobranças)', badge: 'Tipo', color: '#10b981' }
+      return { label: 'Contas a Receber', badge: 'Tipo', color: '#10b981' }
     }
     if (scopeType === 'type_debt_payable') {
-      return { label: 'Contas a Pagar (Dívidas)', badge: 'Tipo', color: '#f59e0b' }
+      return { label: 'Contas a Pagar', badge: 'Tipo', color: '#f59e0b' }
     }
-    return { label: 'Patrimônio Líquido Total', badge: 'Geral', color: '#818cf8' }
+    return { label: 'Patrimônio Líquido', badge: 'Geral', color: '#818cf8' }
   }, [scopeType, selectedAccount])
 
   // Função para extrair o valor contábil de cada ponto conforme o escopo selecionado
@@ -272,13 +284,13 @@ export default function AdvancedFinancialChart() {
       ? smaPoints[activePointIndex]
       : stats.currentSMA
 
-  // ── Geometria e Escalas SVG ────────────────────────────────────────────────
+  // ── Geometria e Escalas SVG Adaptativas ─────────────────────────────────────
   const svgWidth = 800
-  const svgHeight = 280
-  const padTop = 25
+  const svgHeight = 310
+  const padTop = 30
   const padBottom = 35
-  const padLeft = 60
-  const padRight = 20
+  const padLeft = 52
+  const padRight = 16
 
   const chartW = svgWidth - padLeft - padRight
   const chartH = svgHeight - padTop - padBottom
@@ -321,7 +333,7 @@ export default function AdvancedFinancialChart() {
       maxVal += 1000
     }
 
-    // Adiciona margem de respiro de 8% no topo e base
+    // Margem de respiro de 8% no topo e base
     const rawRange = maxVal - minVal
     minVal -= rawRange * 0.08
     maxVal += rawRange * 0.08
@@ -400,18 +412,17 @@ export default function AdvancedFinancialChart() {
     }
   }, [points, smaPoints, chartW, chartH, padTop, padLeft, viewMode, getPointValue])
 
-  // Manipulador de movimento do mouse para o Crosshair HUD
-  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (!containerRef.current || chartScale.pointCoords.length === 0) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    const mouseX = ((e.clientX - rect.left) / rect.width) * svgWidth
+  // Manipulador de movimento do mouse e toque para o Crosshair HUD
+  const handleInspectCoord = useCallback((clientX: number, target: SVGSVGElement) => {
+    if (chartScale.pointCoords.length === 0) return
+    const rect = target.getBoundingClientRect()
+    const coordX = ((clientX - rect.left) / rect.width) * svgWidth
 
-    // Encontra o ponto mais próximo
     let closestIdx = 0
     let minDiff = Infinity
 
     chartScale.pointCoords.forEach((pt, i) => {
-      const diff = Math.abs(pt.x - mouseX)
+      const diff = Math.abs(pt.x - coordX)
       if (diff < minDiff) {
         minDiff = diff
         closestIdx = i
@@ -419,6 +430,16 @@ export default function AdvancedFinancialChart() {
     })
 
     setActivePointIndex(closestIdx)
+  }, [chartScale.pointCoords, svgWidth])
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    handleInspectCoord(e.clientX, e.currentTarget)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent<SVGSVGElement>) => {
+    if (e.touches.length > 0) {
+      handleInspectCoord(e.touches[0].clientX, e.currentTarget)
+    }
   }
 
   const handleMouseLeave = () => {
@@ -428,100 +449,97 @@ export default function AdvancedFinancialChart() {
   const isPositive = stats.diff >= 0
 
   return (
-    <div className="card p-4 sm:p-6 bg-slate-900 border border-slate-800 space-y-4">
+    <div className="card !p-3 sm:!p-6 bg-slate-900 border border-slate-800 space-y-3 sm:space-y-4 overflow-hidden">
       
-      {/* ── 1. Ticker Bar Superior com Seletor de Escopo / Conta ─────────────── */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+      {/* ── 1. Ticker Bar Superior (Responsivo Mobile-First) ───────────────── */}
+      <div className="flex flex-col gap-3 pb-3 border-b border-slate-800">
         
-        {/* Bloco Principal de Cotação / Patrimônio */}
-        <div className="space-y-1.5 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span
-              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-              style={{ backgroundColor: scopeConfig.color, boxShadow: `0 0 8px ${scopeConfig.color}66` }}
-            />
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-300 truncate">
-              {scopeConfig.label}
-            </span>
-            <span
-              className="px-2 py-0.5 rounded-full text-[10px] font-bold border"
-              style={{
-                backgroundColor: `${scopeConfig.color}20`,
-                borderColor: `${scopeConfig.color}40`,
-                color: scopeConfig.color,
-              }}
-            >
-              {scopeConfig.badge}
-            </span>
-            {activePoint && (
-              <span className="text-[11px] font-mono text-slate-500">
-                · {formatDate(activePoint.date)}
+        {/* Bloco Principal de Cotação */}
+        <div className="flex items-start justify-between gap-2 flex-wrap">
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: scopeConfig.color, boxShadow: `0 0 8px ${scopeConfig.color}66` }}
+              />
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-300 truncate max-w-[170px] sm:max-w-none">
+                {scopeConfig.label}
               </span>
-            )}
-            {activePoint?.isFuture && (
-              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 animate-pulse">
-                PROJEÇÃO
+              <span
+                className="px-1.5 py-0.2 text-[10px] font-bold rounded-md border"
+                style={{
+                  backgroundColor: `${scopeConfig.color}20`,
+                  borderColor: `${scopeConfig.color}40`,
+                  color: scopeConfig.color,
+                }}
+              >
+                {scopeConfig.badge}
               </span>
-            )}
-          </div>
+              {activePoint && (
+                <span className="text-[11px] font-mono text-slate-400">
+                  · {formatDate(activePoint.date)}
+                </span>
+              )}
+            </div>
 
-          <div className="flex items-baseline gap-3 flex-wrap">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-100 tabular-nums tracking-tight">
-              {formatCurrency(activePointVal)}
-            </h2>
+            <div className="flex items-baseline gap-2.5 flex-wrap">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-100 tabular-nums tracking-tight">
+                {formatCurrency(activePointVal)}
+              </h2>
 
-            <div
-              className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg border tabular-nums ${
-                isPositive
-                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
-                  : 'bg-rose-500/10 text-rose-400 border-rose-500/25'
-              }`}
-            >
-              {isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-              <span>
-                {isPositive ? '+' : ''}
-                {formatCurrency(stats.diff)} ({isPositive ? '+' : ''}{stats.pct.toFixed(2)}%)
-              </span>
+              <div
+                className={`flex items-center gap-1 text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-lg border tabular-nums ${
+                  isPositive
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
+                    : 'bg-rose-500/10 text-rose-400 border-rose-500/25'
+                }`}
+              >
+                {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                <span>
+                  {isPositive ? '+' : ''}
+                  {formatCurrency(stats.diff)} ({isPositive ? '+' : ''}{stats.pct.toFixed(1)}%)
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Métricas Rápidas (ATH, ATL, SMA, Médias) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-left sm:text-right bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-          <div className="px-2">
-            <p className="text-[10px] uppercase font-semibold text-slate-500">Máxima (ATH)</p>
-            <p className="text-xs font-bold text-emerald-400 tabular-nums">{formatCurrency(stats.max)}</p>
+        {/* Métricas Rápidas (Scroll Horizontal no Mobile para economizar altura) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-slate-950/60 p-2 rounded-xl border border-slate-800/80">
+          <div className="px-1.5 py-0.5">
+            <p className="text-[9px] sm:text-[10px] uppercase font-semibold text-slate-500">Máxima</p>
+            <p className="text-xs font-bold text-emerald-400 tabular-nums truncate">{formatCurrency(stats.max)}</p>
           </div>
-          <div className="px-2">
-            <p className="text-[10px] uppercase font-semibold text-slate-500">Mínima (ATL)</p>
-            <p className="text-xs font-bold text-rose-400 tabular-nums">{formatCurrency(stats.min)}</p>
+          <div className="px-1.5 py-0.5">
+            <p className="text-[9px] sm:text-[10px] uppercase font-semibold text-slate-500">Mínima</p>
+            <p className="text-xs font-bold text-rose-400 tabular-nums truncate">{formatCurrency(stats.min)}</p>
           </div>
-          <div className="px-2">
-            <p className="text-[10px] uppercase font-semibold text-slate-500">Média Móvel</p>
-            <p className="text-xs font-bold text-amber-400 tabular-nums">{formatCurrency(activeSMA)}</p>
+          <div className="px-1.5 py-0.5">
+            <p className="text-[9px] sm:text-[10px] uppercase font-semibold text-slate-500">Média Móvel</p>
+            <p className="text-xs font-bold text-amber-400 tabular-nums truncate">{formatCurrency(activeSMA)}</p>
           </div>
-          <div className="px-2">
-            <p className="text-[10px] uppercase font-semibold text-slate-500">Média Geral</p>
-            <p className="text-xs font-bold text-slate-300 tabular-nums">{formatCurrency(stats.avg)}</p>
+          <div className="px-1.5 py-0.5">
+            <p className="text-[9px] sm:text-[10px] uppercase font-semibold text-slate-500">Média Geral</p>
+            <p className="text-xs font-bold text-slate-300 tabular-nums truncate">{formatCurrency(stats.avg)}</p>
           </div>
         </div>
       </div>
 
       {/* ── 2. Seletor de Escopo / Conta e Segmentos ────────────────────────── */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-2 bg-slate-950/50 rounded-2xl border border-slate-800/80">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 p-1.5 sm:p-2 bg-slate-950/60 rounded-xl border border-slate-800/80">
         
-        {/* Botões Rápidos de Escopo Macro e Tipos */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 pr-1 select-none">
+        {/* Pílulas de Escopo com Scroll Suave no Mobile */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 select-none scrollbar-none">
           <button
             type="button"
             onClick={() => {
               setScopeType('all')
               setSelectedAccountId('')
             }}
-            className={`px-2.5 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            className={`px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
               scopeType === 'all'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             🌐 Geral
@@ -533,10 +551,10 @@ export default function AdvancedFinancialChart() {
               setScopeType('macro_on_budget')
               setSelectedAccountId('')
             }}
-            className={`px-2.5 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            className={`px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
               scopeType === 'macro_on_budget'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             🏦 No Orçamento
@@ -548,13 +566,13 @@ export default function AdvancedFinancialChart() {
               setScopeType('macro_off_budget')
               setSelectedAccountId('')
             }}
-            className={`px-2.5 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            className={`px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
               scopeType === 'macro_off_budget'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            💼 Fora do Orçamento
+            💼 Fora Orçamento
           </button>
 
           <button
@@ -563,10 +581,10 @@ export default function AdvancedFinancialChart() {
               setScopeType('type_checking')
               setSelectedAccountId('')
             }}
-            className={`px-2.5 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            className={`px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
               scopeType === 'type_checking'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             💰 Corrente
@@ -578,10 +596,10 @@ export default function AdvancedFinancialChart() {
               setScopeType('type_credit_card')
               setSelectedAccountId('')
             }}
-            className={`px-2.5 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            className={`px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
               scopeType === 'type_credit_card'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             💳 Cartões
@@ -593,10 +611,10 @@ export default function AdvancedFinancialChart() {
               setScopeType('type_debt_receivable')
               setSelectedAccountId('')
             }}
-            className={`px-2.5 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            className={`px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
               scopeType === 'type_debt_receivable'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             📥 A Receber
@@ -608,18 +626,18 @@ export default function AdvancedFinancialChart() {
               setScopeType('type_debt_payable')
               setSelectedAccountId('')
             }}
-            className={`px-2.5 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            className={`px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
               scopeType === 'type_debt_payable'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             📤 A Pagar
           </button>
         </div>
 
-        {/* Dropdown de Seleção de Conta Individual */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        {/* Dropdown de Conta Individual */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           <Filter className="w-3.5 h-3.5 text-slate-500 hidden sm:inline" />
           <select
             value={scopeType === 'account' ? selectedAccountId : ''}
@@ -633,9 +651,9 @@ export default function AdvancedFinancialChart() {
                 setSelectedAccountId(val)
               }
             }}
-            className="w-full sm:w-auto bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+            className="w-full sm:w-auto bg-slate-900 border border-slate-700/80 rounded-xl px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
           >
-            <option value="">🎯 Filtrar por conta individual...</option>
+            <option value="">🎯 Filtrar por conta...</option>
             
             <optgroup label="Contas Bancárias & Cartões">
               {activeAccounts.map(acc => (
@@ -659,17 +677,17 @@ export default function AdvancedFinancialChart() {
 
       </div>
 
-      {/* ── 3. Toolbar: Modos de Visão, Timeframes e Overlays ───────────────── */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+      {/* ── 3. Toolbar Compacta: Modos, Timeframes e Overlays ───────────────── */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-0.5">
         
-        {/* Modos de Visão (Área, Ativos/Passivos, Fluxo) */}
-        <div className="flex items-center gap-1 bg-slate-950/60 p-1 rounded-xl border border-slate-800">
+        {/* Modos de Visão */}
+        <div className="flex items-center gap-1 bg-slate-950/60 p-0.5 rounded-xl border border-slate-800">
           <button
             type="button"
             onClick={() => setViewMode('area')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
               viewMode === 'area'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                ? 'bg-indigo-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
             title="Evolução Contínua"
@@ -682,46 +700,46 @@ export default function AdvancedFinancialChart() {
             <button
               type="button"
               onClick={() => setViewMode('assets_liabilities')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
                 viewMode === 'assets_liabilities'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  ? 'bg-indigo-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
               title="Ativos vs Passivos"
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>Ativos / Dívidas</span>
+              <span>Ativos/Dívidas</span>
             </button>
           )}
 
           <button
             type="button"
             onClick={() => setViewMode('monthly_flow')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
               viewMode === 'monthly_flow'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                ? 'bg-indigo-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
-            title="Fluxo de Caixa Mensal (Receitas vs Despesas)"
+            title="Fluxo Mensal"
           >
             <BarChart2 className="w-3.5 h-3.5" />
-            <span>Fluxo Mensal</span>
+            <span>Fluxo</span>
           </button>
         </div>
 
-        {/* Controles de Timeframe e Indicadores */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Timeframes e Indicadores */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 select-none scrollbar-none">
           
           {/* Toggle de Projeção Futura */}
           <button
             type="button"
             onClick={() => setIncludeFuture(!includeFuture)}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold border transition-all ${
+            className={`flex items-center gap-1 px-2 py-1 rounded-xl text-[11px] font-bold border transition-all whitespace-nowrap ${
               includeFuture
-                ? 'bg-indigo-500/25 text-indigo-300 border-indigo-500/50 shadow-sm shadow-indigo-500/20'
+                ? 'bg-indigo-500/25 text-indigo-300 border-indigo-500/50 shadow-sm'
                 : 'bg-slate-950/40 text-slate-500 border-slate-800 hover:text-slate-300'
             }`}
-            title="Estender o gráfico para incluir parcelas e faturas futuras"
+            title="Incluir projeção futura"
           >
             <Sparkles className="w-3 h-3" />
             <span>+Futuro</span>
@@ -729,13 +747,13 @@ export default function AdvancedFinancialChart() {
 
           {/* Toggles de Indicadores */}
           {viewMode !== 'monthly_flow' && (
-            <div className="flex items-center gap-1 mr-1">
+            <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => setShowSMA(!showSMA)}
-                className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
+                className={`px-1.5 py-1 rounded-lg text-[10px] font-bold border transition-colors ${
                   showSMA
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                     : 'bg-slate-950/40 text-slate-500 border-slate-800 hover:text-slate-300'
                 }`}
                 title="Média Móvel Simples"
@@ -746,20 +764,20 @@ export default function AdvancedFinancialChart() {
               <button
                 type="button"
                 onClick={() => setShowExtremes(!showExtremes)}
-                className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
+                className={`px-1.5 py-1 rounded-lg text-[10px] font-bold border transition-colors ${
                   showExtremes
-                    ? 'bg-sky-500/20 text-sky-300 border-sky-500/40 shadow-sm'
+                    ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
                     : 'bg-slate-950/40 text-slate-500 border-slate-800 hover:text-slate-300'
                 }`}
-                title="Linhas de Máxima e Mínima"
+                title="Máxima e Mínima"
               >
-                MÁX/MÍN
+                MÁX
               </button>
             </div>
           )}
 
-          {/* Presets de Período (Passado, Projeção Futura e Panorâmica) */}
-          <div className="flex items-center gap-0.5 bg-slate-950/80 p-0.5 rounded-xl border border-slate-800 overflow-x-auto">
+          {/* Presets de Período */}
+          <div className="flex items-center gap-0.5 bg-slate-950/80 p-0.5 rounded-xl border border-slate-800">
             {([
               { id: '1m', label: '1M' },
               { id: '3m', label: '3M' },
@@ -779,30 +797,29 @@ export default function AdvancedFinancialChart() {
                   if (p.id === 'custom') setShowCustomPicker(true)
                   else setShowCustomPicker(false)
                 }}
-                className={`px-2 py-1 rounded-lg text-[11px] font-bold uppercase transition-all whitespace-nowrap ${
+                className={`px-2 py-0.5 rounded-lg text-[10px] sm:text-[11px] font-bold uppercase transition-all whitespace-nowrap ${
                   preset === p.id
                     ? 'bg-indigo-600 text-white shadow-sm'
                     : p.id.startsWith('proj_')
                     ? 'text-indigo-400/80 hover:text-indigo-200'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
-                title={p.id.startsWith('proj_') ? `Projeção futura de ${p.label}` : p.label}
               >
                 {p.label}
               </button>
             ))}
           </div>
 
-          {/* Granularidade (Diário/Semanal/Mensal) */}
+          {/* Granularidade */}
           {viewMode !== 'monthly_flow' && (
             <select
               value={granularity}
               onChange={e => setGranularity(e.target.value as Granularity)}
-              className="bg-slate-950/80 border border-slate-800 rounded-xl px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 font-medium"
+              className="bg-slate-950/80 border border-slate-800 rounded-xl px-2 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500 font-medium"
             >
-              <option value="daily">Diário</option>
-              <option value="weekly">Semanal</option>
-              <option value="monthly">Mensal</option>
+              <option value="daily">D</option>
+              <option value="weekly">S</option>
+              <option value="monthly">M</option>
             </select>
           )}
         </div>
@@ -810,43 +827,43 @@ export default function AdvancedFinancialChart() {
 
       {/* Seletor de Datas Personalizadas quando preset 'custom' está ativo */}
       {preset === 'custom' && showCustomPicker && (
-        <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl flex items-center justify-between gap-3 flex-wrap animate-in fade-in duration-150">
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-slate-400 font-medium">De:</label>
+        <div className="p-2.5 bg-slate-950/70 border border-slate-800 rounded-xl flex items-center justify-between gap-2 flex-wrap animate-in fade-in duration-150 text-xs">
+          <div className="flex items-center gap-1.5">
+            <label className="text-slate-400 font-medium">De:</label>
             <input
               type="date"
               value={customStart}
               onChange={e => setCustomStart(e.target.value)}
-              className="bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs text-slate-200 font-mono"
+              className="bg-slate-900 border border-slate-700/80 rounded-lg px-2 py-1 text-slate-200 font-mono text-[11px]"
               style={{ colorScheme: 'dark' }}
             />
           </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-slate-400 font-medium">Até (incluindo futuro):</label>
+          <div className="flex items-center gap-1.5">
+            <label className="text-slate-400 font-medium">Até:</label>
             <input
               type="date"
               value={customEnd}
               onChange={e => setCustomEnd(e.target.value)}
-              className="bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs text-slate-200 font-mono"
+              className="bg-slate-900 border border-slate-700/80 rounded-lg px-2 py-1 text-slate-200 font-mono text-[11px]"
               style={{ colorScheme: 'dark' }}
             />
           </div>
         </div>
       )}
 
-      {/* ── 4. Canvas SVG Interativo com Crosshair HUD e Indicador HOJE ────── */}
+      {/* ── 4. Canvas SVG com Touch Tracking Otimizado e Crosshair HUD ─────── */}
       <div ref={containerRef} className="relative w-full overflow-hidden select-none">
         
         {viewMode === 'monthly_flow' ? (
-          /* Modo Fluxo Mensal: Barras Comparativas Inflow vs Outflow */
-          <div className="space-y-4 pt-2">
+          /* Modo Fluxo Mensal */
+          <div className="space-y-3 pt-2">
             {monthlyFlowData.length === 0 ? (
-              <div className="py-20 flex flex-col items-center justify-center text-slate-500 text-xs">
-                <BarChart2 className="w-10 h-10 text-slate-700 mb-2" />
-                <p>Nenhuma movimentação registrada no período selecionado</p>
+              <div className="py-16 flex flex-col items-center justify-center text-slate-500 text-xs">
+                <BarChart2 className="w-8 h-8 text-slate-700 mb-2" />
+                <p>Nenhuma movimentação registrada no período</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {monthlyFlowData.map(item => {
                   const maxVal = Math.max(
                     ...monthlyFlowData.map(d => Math.max(d.income, d.expense))
@@ -855,10 +872,10 @@ export default function AdvancedFinancialChart() {
                   const expPct = maxVal > 0 ? (item.expense / maxVal) * 100 : 0
 
                   return (
-                    <div key={item.monthKey} className="p-3 bg-slate-950/40 rounded-xl border border-slate-800/80 space-y-2">
-                      <div className="flex items-center justify-between text-xs">
+                    <div key={item.monthKey} className="p-2.5 bg-slate-950/40 rounded-xl border border-slate-800/80 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] sm:text-xs">
                         <span className="font-bold text-slate-200 capitalize">{item.label}</span>
-                        <div className="flex items-center gap-3 tabular-nums">
+                        <div className="flex items-center gap-2.5 tabular-nums">
                           <span className="text-emerald-400 font-semibold">+{formatCurrency(item.income)}</span>
                           <span className="text-rose-400 font-semibold">-{formatCurrency(item.expense)}</span>
                           <span
@@ -866,28 +883,23 @@ export default function AdvancedFinancialChart() {
                               item.net >= 0 ? 'text-emerald-300' : 'text-rose-300'
                             }`}
                           >
-                            Líquido: {formatCurrency(item.net)}
+                            Líq: {formatCurrency(item.net)}
                           </span>
                         </div>
                       </div>
 
-                      {/* Barras duplas comparativas */}
                       <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <div className="w-full bg-slate-800/60 rounded-full h-2 overflow-hidden flex justify-end">
-                            <div
-                              className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-                              style={{ width: `${incPct}%` }}
-                            />
-                          </div>
+                        <div className="w-full bg-slate-800/60 rounded-full h-1.5 overflow-hidden flex justify-end">
+                          <div
+                            className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                            style={{ width: `${incPct}%` }}
+                          />
                         </div>
-                        <div className="space-y-1">
-                          <div className="w-full bg-slate-800/60 rounded-full h-2 overflow-hidden">
-                            <div
-                              className="bg-rose-500 h-full rounded-full transition-all duration-500"
-                              style={{ width: `${expPct}%` }}
-                            />
-                          </div>
+                        <div className="w-full bg-slate-800/60 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="bg-rose-500 h-full rounded-full transition-all duration-500"
+                            style={{ width: `${expPct}%` }}
+                          />
                         </div>
                       </div>
                     </div>
@@ -897,52 +909,58 @@ export default function AdvancedFinancialChart() {
             )}
           </div>
         ) : (
-          /* Modo Área / Linha com SVG de Alta Precisão */
+          /* Modo Área / Linha SVG com Suporte Touch Total */
           <div className="relative">
             {points.length < 2 ? (
-              <div className="py-24 flex flex-col items-center justify-center text-slate-500 text-xs">
-                <Activity className="w-10 h-10 text-slate-700 mb-2 animate-pulse" />
-                <p>Carregando dados do período selecionado...</p>
+              <div className="py-20 flex flex-col items-center justify-center text-slate-500 text-xs">
+                <Activity className="w-8 h-8 text-slate-700 mb-2 animate-pulse" />
+                <p>Carregando dados...</p>
               </div>
             ) : (
               <div className="relative">
                 
-                {/* HUD de Ponto Flutuante Ativo */}
+                {/* HUD de Ponto Ativo (Ancorado no Topo de Forma Limpa) */}
                 {activePoint && (
-                  <div className="absolute top-2 left-16 z-10 flex items-center gap-3 bg-slate-950/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700/80 text-xs shadow-xl animate-in fade-in duration-100 flex-wrap">
-                    <span className="font-bold text-slate-300">{formatDate(activePoint.date)}</span>
-                    {activePoint.isFuture && (
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/25 text-indigo-300 border border-indigo-500/40">
-                        PROJEÇÃO FUTURA
-                      </span>
-                    )}
-                    <span className="text-slate-600">|</span>
-                    <span className="font-extrabold tabular-nums" style={{ color: scopeConfig.color }}>
-                      {formatCurrency(activePointVal)}
-                    </span>
-                    {viewMode === 'assets_liabilities' && (
-                      <>
-                        <span className="text-emerald-400 font-semibold tabular-nums">
-                          Ativos: {formatCurrency(activePoint.assets)}
+                  <div className="flex items-center gap-2 bg-slate-950/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700/80 text-[11px] sm:text-xs shadow-xl animate-in fade-in duration-100 flex-wrap justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-200">{formatDate(activePoint.date)}</span>
+                      {activePoint.isFuture && (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-500/25 text-indigo-300 border border-indigo-500/40">
+                          PROJEÇÃO
                         </span>
-                        <span className="text-rose-400 font-semibold tabular-nums">
-                          Dívidas: {formatCurrency(activePoint.liabilities)}
-                        </span>
-                      </>
-                    )}
-                    {showSMA && activeSMA && (
-                      <span className="text-amber-400 font-semibold tabular-nums">
-                        SMA: {formatCurrency(activeSMA)}
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                      <span className="font-extrabold tabular-nums" style={{ color: scopeConfig.color }}>
+                        {formatCurrency(activePointVal)}
                       </span>
-                    )}
+                      {viewMode === 'assets_liabilities' && (
+                        <>
+                          <span className="text-emerald-400 font-semibold tabular-nums hidden sm:inline">
+                            Ativos: {formatCurrency(activePoint.assets)}
+                          </span>
+                          <span className="text-rose-400 font-semibold tabular-nums hidden sm:inline">
+                            Dívidas: {formatCurrency(activePoint.liabilities)}
+                          </span>
+                        </>
+                      )}
+                      {showSMA && activeSMA && (
+                        <span className="text-amber-400 font-semibold tabular-nums">
+                          SMA: {formatCurrency(activeSMA)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
 
                 <svg
                   viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-                  className="w-full h-auto overflow-visible cursor-crosshair"
+                  className="w-full h-auto overflow-visible cursor-crosshair touch-none select-none"
                   onMouseMove={handleMouseMove}
                   onMouseLeave={handleMouseLeave}
+                  onTouchStart={handleTouchMove}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleMouseLeave}
                 >
                   <defs>
                     {/* Gradiente Dinâmico baseado no Escopo / Conta */}
@@ -965,7 +983,7 @@ export default function AdvancedFinancialChart() {
                     </linearGradient>
                   </defs>
 
-                  {/* Grid Lines Horizontais e Eixo Y */}
+                  {/* Grid Lines Horizontais e Eixo Y com Formatação Compacta */}
                   {chartScale.yTicks.map((tick, idx) => (
                     <g key={idx}>
                       <line
@@ -977,15 +995,15 @@ export default function AdvancedFinancialChart() {
                         strokeDasharray="4 4"
                       />
                       <text
-                        x={padLeft - 8}
-                        y={tick.y + 3}
+                        x={padLeft - 6}
+                        y={tick.y + 3.5}
                         fill="#64748b"
-                        fontSize="9"
+                        fontSize="9.5"
                         fontWeight="600"
                         textAnchor="end"
                         className="font-mono"
                       >
-                        {formatCurrency(tick.val)}
+                        {formatCompactValue(tick.val)}
                       </text>
                     </g>
                   ))}
@@ -1013,16 +1031,16 @@ export default function AdvancedFinancialChart() {
                         stroke="#6366f1"
                         strokeWidth="1.5"
                         strokeDasharray="4 3"
-                        opacity="0.6"
+                        opacity="0.65"
                       />
                       <rect
-                        x={chartScale.pointCoords[chartScale.todayIndex].x - 18}
+                        x={chartScale.pointCoords[chartScale.todayIndex].x - 16}
                         y={padTop - 12}
-                        width="36"
+                        width="32"
                         height="12"
                         rx="3"
                         fill="#4f46e5"
-                        opacity="0.9"
+                        opacity="0.95"
                       />
                       <text
                         x={chartScale.pointCoords[chartScale.todayIndex].x}
@@ -1122,7 +1140,7 @@ export default function AdvancedFinancialChart() {
                                 fontWeight="bold"
                                 textAnchor="end"
                               >
-                                MÁX {formatCurrency(stats.max)}
+                                MÁX {formatCompactValue(stats.max)}
                               </text>
                             </>
                           )
@@ -1154,7 +1172,7 @@ export default function AdvancedFinancialChart() {
                                 fontWeight="bold"
                                 textAnchor="end"
                               >
-                                MÍN {formatCurrency(stats.min)}
+                                MÍN {formatCompactValue(stats.min)}
                               </text>
                             </>
                           )
@@ -1163,21 +1181,21 @@ export default function AdvancedFinancialChart() {
                     </>
                   )}
 
-                  {/* Eixo X com Labels de Datas */}
+                  {/* Eixo X com Labels de Datas Adaptativos */}
                   {chartScale.pointCoords
                     .filter((_, idx) => {
                       const total = chartScale.pointCoords.length
-                      if (total <= 6) return true
-                      const step = Math.ceil(total / 6)
+                      if (total <= 5) return true
+                      const step = Math.ceil(total / 5)
                       return idx % step === 0 || idx === total - 1
                     })
                     .map((pt, i) => (
                       <text
                         key={i}
                         x={pt.x}
-                        y={svgHeight - 12}
+                        y={svgHeight - 10}
                         fill={pt.point.isFuture ? '#818cf8' : '#64748b'}
-                        fontSize="9"
+                        fontSize="9.5"
                         fontWeight={pt.point.isFuture ? 'bold' : '600'}
                         textAnchor="middle"
                         className="font-mono"
@@ -1186,7 +1204,7 @@ export default function AdvancedFinancialChart() {
                       </text>
                     ))}
 
-                  {/* Crosshair (Mira) Interativo */}
+                  {/* Crosshair (Mira) Interativo para Mouse e Touch */}
                   {activePointIndex !== null && chartScale.pointCoords[activePointIndex] && (
                     <g className="transition-all duration-75">
                       {/* Linha Vertical da Mira */}
