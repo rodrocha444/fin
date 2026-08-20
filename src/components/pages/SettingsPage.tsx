@@ -28,7 +28,7 @@ export default function SettingsPage() {
   const categories = useLiveQuery(() => db.categories.orderBy('sortOrder').toArray(), [])
 
   // Sincronização Supabase
-  const { status: syncStatus, isSyncing, lastSyncAt, lastError, isPaused, syncNow, togglePause, resumeSync, overrideCloud } = useSync()
+  const { status: syncStatus, isSyncing, lastSyncAt, lastError, isPaused, syncNow, togglePause, resumeSync, overrideCloud, overrideLocal } = useSync()
   const [supabaseUrl, setSupabaseUrl] = useState(() => getSupabaseConfig()?.url || '')
   const [supabaseKey, setSupabaseKey] = useState(() => getSupabaseConfig()?.anonKey || '')
   const [testResult, setTestResult] = useState<{ success?: boolean; message: string } | null>(null)
@@ -467,10 +467,24 @@ export default function SettingsPage() {
                     onClick={() => syncNow(true)}
                     disabled={isSyncing}
                     className="btn-secondary py-1.5 px-2.5 text-xs flex items-center gap-1.5 hover:text-sky-300"
-                    title="Forçar sincronização completa agora (mesclar)"
+                    title="Sincronizar alterações da nuvem"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-sky-400' : ''}`} />
                     <span>{isSyncing ? 'Sincronizando…' : 'Sincronizar'}</span>
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      if (confirm('Atenção: Deseja baixar todos os dados da nuvem e substituir o cache local deste dispositivo?')) {
+                        await overrideLocal()
+                      }
+                    }}
+                    disabled={isSyncing}
+                    className="btn-secondary py-1.5 px-2.5 text-xs flex items-center gap-1.5 hover:text-sky-300 hover:border-sky-700/60"
+                    title="Baixar a base do Supabase e substituir o cache deste dispositivo"
+                  >
+                    <Download className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Baixar da Nuvem</span>
                   </button>
 
                   <button

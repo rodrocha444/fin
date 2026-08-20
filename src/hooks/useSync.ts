@@ -9,6 +9,7 @@ import {
   resumeSync,
   toggleSyncPause,
   overrideCloudWithLocalDatabase,
+  overrideLocalWithCloudDatabase,
   type SyncState,
 } from '@/services/syncEngine'
 
@@ -31,6 +32,10 @@ export function useSync() {
     return await overrideCloudWithLocalDatabase()
   }
 
+  const overrideLocal = async () => {
+    return await overrideLocalWithCloudDatabase()
+  }
+
   return {
     ...state,
     syncNow,
@@ -38,6 +43,7 @@ export function useSync() {
     pauseSync,
     resumeSync,
     overrideCloud,
+    overrideLocal,
     togglePause: toggleSyncPause,
   }
 }

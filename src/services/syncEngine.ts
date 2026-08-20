@@ -714,6 +714,74 @@ export async function overrideCloudWithLocalDatabase(): Promise<{ success: boole
   }
 }
 
+/**
+ * Força o download completo de todos os dados do Supabase, substituindo 100% o cache local do Dexie.
+ * Garante alinhamento imediato com o estado da nuvem.
+ */
+export async function overrideLocalWithCloudDatabase(): Promise<{ success: boolean; error?: string }> {
+  const client = getSupabaseClient()
+  if (!client) return { success: false, error: 'Supabase não configurado.' }
+
+  if (!navigator.onLine) {
+    return { success: false, error: 'Sem conexão com a internet.' }
+  }
+
+  isApplyingRemoteSync = true
+  isSyncRunning = true
+  updateState({ isSyncing: true, status: 'syncing', lastError: null })
+
+  try {
+    const nowIso = new Date().toISOString()
+
+    // Para cada tabela, busca todos os registros ativos da nuvem e substitui o Dexie local
+    for (const def of SYNC_TABLES) {
+      const table = (db as any)[def.dexieName]
+      if (!table) continue
+
+      const { data: remoteRows, error } = await client
+        .from(def.supabaseName)
+        .select('*')
+
+      if (error) {
+        throw new Error(`Erro ao baixar ${def.supabaseName} da nuvem: ${error.message}`)
+      }
+
+      await table.clear()
+
+      if (remoteRows && remoteRows.length > 0) {
+        const activeRows = remoteRows.filter((r: any) => !r.deleted_at)
+        const localItems = activeRows.map((r: any) => def.toDexie(r))
+        if (localItems.length > 0) {
+          await table.bulkAdd(localItems)
+        }
+      }
+    }
+
+    await db.syncDeletedRecords.clear()
+    await db.syncMeta.put({ key: 'lastSyncAt', value: nowIso })
+
+    updateState({
+      status: syncState.isPaused ? 'paused' : 'synced',
+      lastSyncAt: new Date(nowIso),
+      isSyncing: false,
+      lastError: null,
+    })
+
+    return { success: true }
+  } catch (err: any) {
+    console.error('Erro ao restaurar dados da nuvem para o dispositivo:', err)
+    updateState({
+      status: 'error',
+      lastError: err?.message || String(err),
+      isSyncing: false,
+    })
+    return { success: false, error: err?.message || 'Falha ao baixar dados da nuvem.' }
+  } finally {
+    isApplyingRemoteSync = false
+    isSyncRunning = false
+  }
+}
+
 // ─── Agendamento e Debounce de Sincronização ─────────────────
 
 let syncTimeout: any = null
