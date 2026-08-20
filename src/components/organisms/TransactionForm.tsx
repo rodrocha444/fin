@@ -605,35 +605,31 @@ export default function TransactionForm({
             {errors.amount && <p className="text-rose-400 text-xs mt-1">{errors.amount.message}</p>}
           </div>
 
-          {/* Favorecido / Descrição */}
-          {(mode === 'transfer' || isInstallment) && (
-            <div>
-              <label className="label">
-                {isInstallment ? 'Descrição da compra' : 'Descrição da transferência'}
-              </label>
-              <input
-                {...register('payee')}
-                className="input-base"
-                placeholder={mode === 'transfer' ? 'Pagamento fatura…' : 'Ex: Notebook, Smartphone…'}
-                autoComplete="off"
-              />
-              {errors.payee && <p className="text-rose-400 text-xs mt-1">{errors.payee.message}</p>}
-            </div>
-          )}
-
-          {/* Favorecido em despesa/renda à vista */}
-          {mode !== 'transfer' && !isInstallment && (
-            <div>
-              <label className="label">Favorecido / Estabelecimento</label>
-              <input
-                {...register('payee')}
-                className="input-base"
-                placeholder="Ex: Padaria, Supermercado…"
-                autoComplete="off"
-              />
-              {errors.payee && <p className="text-rose-400 text-xs mt-1">{errors.payee.message}</p>}
-            </div>
-          )}
+          {/* Descrição da operação (campo único unificado) */}
+          <div>
+            <label className="label">
+              {mode === 'transfer'
+                ? 'Descrição da transferência'
+                : isInstallment
+                  ? 'Descrição da compra'
+                  : 'Descrição'}
+            </label>
+            <input
+              {...register('payee')}
+              className="input-base"
+              placeholder={
+                mode === 'transfer'
+                  ? 'Ex: Pagamento de fatura, TED, Pix…'
+                  : isInstallment
+                    ? 'Ex: Notebook, Smartphone, Geladeira…'
+                    : mode === 'income'
+                      ? 'Ex: Salário, Freelance, Rendimentos…'
+                      : 'Ex: Supermercado, Restaurante, Combustível…'
+              }
+              autoComplete="off"
+            />
+            {errors.payee && <p className="text-rose-400 text-xs mt-1">{errors.payee.message}</p>}
+          </div>
 
           {/* Conta */}
           <div>
@@ -910,12 +906,6 @@ export default function TransactionForm({
               />
             </div>
           )}
-
-          {/* Notas Gerais */}
-          <div>
-            <label className="label">Notas gerais (opcional)</label>
-            <input {...register('notes')} className="input-base" placeholder="Observações adicionais…" autoComplete="off" />
-          </div>
 
           {/* Actions */}
           <div className="flex gap-2 pt-2">

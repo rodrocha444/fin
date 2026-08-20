@@ -123,7 +123,7 @@ export default function TransactionItem({
             </>
           )}
         </div>
-        {tx.notes && <p className="text-[10px] text-slate-600 truncate mt-0.5">{tx.notes}</p>}
+        {tx.notes && tx.notes !== tx.payee && <p className="text-[10px] text-slate-600 truncate mt-0.5">{tx.notes}</p>}
       </div>
 
       <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>

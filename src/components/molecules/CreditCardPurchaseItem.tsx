@@ -53,7 +53,7 @@ export default function CreditCardPurchaseItem({
             {purchase.type === 'transfer' ? 'Transferência / Pagamento' : categoryName ?? 'Sem categoria'}
           </span>
         </div>
-        {purchase.notes && <p className="text-xs text-slate-600 truncate mt-0.5">{purchase.notes}</p>}
+        {purchase.notes && purchase.notes !== purchase.payee && <p className="text-xs text-slate-600 truncate mt-0.5">{purchase.notes}</p>}
       </div>
 
       <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>

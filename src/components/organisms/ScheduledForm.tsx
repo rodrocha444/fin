@@ -134,21 +134,25 @@ export default function ScheduledForm({
             </div>
           </div>
 
-          {/* Favorecido (apenas para despesa/transferência) */}
-          {type !== 'income' && (
-            <div>
-              <label className="label">
-                {type === 'transfer' ? 'Descrição' : 'Favorecido / Descrição'}
-              </label>
-              <input
-                {...register('payee')}
-                className="input-base"
-                placeholder={type === 'transfer' ? 'Ex: Pagamento fatura…' : 'Ex: Netflix, Aluguel…'}
-                autoComplete="off"
-              />
-              {errors.payee && <p className="text-rose-400 text-xs mt-1">{errors.payee.message}</p>}
-            </div>
-          )}
+          {/* Descrição da operação */}
+          <div>
+            <label className="label">
+              {type === 'transfer' ? 'Descrição da transferência' : 'Descrição'}
+            </label>
+            <input
+              {...register('payee')}
+              className="input-base"
+              placeholder={
+                type === 'transfer'
+                  ? 'Ex: Pagamento de fatura, TED…'
+                  : type === 'income'
+                    ? 'Ex: Salário, Aluguel recebido…'
+                    : 'Ex: Netflix, Aluguel, Academia…'
+              }
+              autoComplete="off"
+            />
+            {errors.payee && <p className="text-rose-400 text-xs mt-1">{errors.payee.message}</p>}
+          </div>
 
           {/* Valor + Conta */}
           <div className="grid grid-cols-2 gap-3">
@@ -260,11 +264,6 @@ export default function ScheduledForm({
           <div>
             <label className="label">Data de fim (opcional)</label>
             <input {...register('endDate')} type="date" className="input-base" />
-          </div>
-
-          <div>
-            <label className="label">Notas</label>
-            <input {...register('notes')} className="input-base" placeholder="Opcional…" />
           </div>
 
           <div className="flex gap-2 pt-1 pb-2">
