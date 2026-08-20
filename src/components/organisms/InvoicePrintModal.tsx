@@ -127,7 +127,7 @@ export default function InvoicePrintModal({
                   Nenhuma compra registrada nesta fatura.
                 </p>
               ) : (
-                <div className="overflow-x-auto rounded-xl border border-slate-800 print:border-slate-300">
+                <div className="overflow-x-auto print:overflow-visible rounded-xl print:rounded-none border border-slate-800 print:border-slate-300">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead className="bg-slate-800/80 print:bg-slate-100 text-slate-400 print:text-slate-700 uppercase font-semibold">
                       <tr>
@@ -189,7 +189,7 @@ export default function InvoicePrintModal({
                   </span>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border border-slate-800 print:border-slate-300">
+                <div className="overflow-x-auto print:overflow-visible rounded-xl print:rounded-none border border-slate-800 print:border-slate-300">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead className="bg-slate-800/80 print:bg-slate-100 text-slate-400 print:text-slate-700 uppercase font-semibold">
                       <tr>

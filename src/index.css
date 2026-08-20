@@ -180,7 +180,7 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 10mm 12mm;
+    margin: 8mm 10mm;
   }
 
   *, *::before, *::after {
@@ -188,7 +188,7 @@
     text-shadow: none !important;
   }
 
-  html, body {
+  html, body, #root {
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
@@ -197,30 +197,71 @@
     overflow: visible !important;
     background: #ffffff !important;
     color: #0f172a !important;
-    font-size: 10pt !important;
+    font-size: 9.5pt !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    position: static !important;
   }
 
-  /* Oculta toda a interface do aplicativo por padrão */
-  body * {
-    visibility: hidden;
+  /* Oculta layout e navegação do app */
+  aside,
+  nav,
+  header,
+  footer,
+  button,
+  .no-print,
+  .print\:hidden {
+    display: none !important;
   }
 
-  /* Exibe exclusivamente o documento imprimível e seus filhos */
-  #printable-invoice-container,
-  #printable-invoice-container *,
-  #printable-debt-container,
-  #printable-debt-container * {
-    visibility: visible !important;
+  /* Desativa restrições de modais na impressão para fluir no documento natural */
+  [role="dialog"] {
+    position: static !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    z-index: auto !important;
   }
 
+  [role="dialog"] > div {
+    position: static !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    transform: none !important;
+    animation: none !important;
+  }
+
+  /* Oculta o header padrão do Modal na impressão */
+  [role="dialog"] > div > div:first-child:not(#printable-debt-container):not(#printable-invoice-container) {
+    display: none !important;
+  }
+
+  /* Containers Imprimíveis de Extrato e Fatura */
   #printable-invoice-container,
   #printable-debt-container {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    position: static !important;
+    display: block !important;
     width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
@@ -228,22 +269,23 @@
     border: none !important;
     box-shadow: none !important;
     border-radius: 0 !important;
-    display: block !important;
+    overflow: visible !important;
   }
 
-  /* Ocultar qualquer elemento de navegação ou ação */
-  aside,
-  nav,
-  header,
-  button,
-  .no-print,
-  .print\:hidden {
-    display: none !important;
-  }
-
-  /* Evitar quebras de página indesejadas dentro de tabelas e blocos */
+  /* Evitar quebras de página indesejadas em linhas e seções */
   tr, .print-avoid-break, table, thead, tbody {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  /* Ajuste de cores para impressão */
+  .bg-rose-100, .bg-emerald-100, .bg-slate-100, .bg-slate-50 {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }

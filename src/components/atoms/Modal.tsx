@@ -179,7 +179,7 @@ export default function Modal({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 animate-in fade-in duration-200 print:static print:p-0 print:m-0 print:bg-transparent print:backdrop-blur-none print:z-auto print:block print:w-full print:h-auto"
       onClick={e => {
         if (closeOnOverlayClick && e.target === e.currentTarget) {
           onClose()
@@ -189,16 +189,16 @@ export default function Modal({
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className={`bg-slate-900 border-t sm:border border-slate-700/80 rounded-t-3xl sm:rounded-2xl w-full ${SIZE_CLASSES[size]} shadow-2xl sheet-up sm:fade-in max-h-[92dvh] flex flex-col overflow-hidden relative outline-none ${className}`}
+        className={`bg-slate-900 border-t sm:border border-slate-700/80 rounded-t-3xl sm:rounded-2xl w-full ${SIZE_CLASSES[size]} shadow-2xl sheet-up sm:fade-in max-h-[92dvh] flex flex-col overflow-hidden relative outline-none print:static print:max-h-none print:max-w-none print:w-full print:h-auto print:overflow-visible print:border-none print:shadow-none print:rounded-none print:bg-white print:p-0 print:m-0 print:block print:transform-none ${className}`}
       >
         {/* Handle tátil no mobile */}
-        <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0 cursor-grab">
+        <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0 cursor-grab print:hidden">
           <div className="w-12 h-1.5 bg-slate-700 rounded-full" />
         </div>
 
         {/* Cabeçalho do Modal (se houver título ou botão fechar) */}
         {(title || !hideCloseButton || headerRight) && (
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/80 flex-shrink-0">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/80 flex-shrink-0 print:hidden">
             <div className="flex items-center gap-2.5 min-w-0 pr-2">
               {icon && <div className="flex-shrink-0">{icon}</div>}
               <div className="min-w-0">
@@ -232,13 +232,13 @@ export default function Modal({
         )}
 
         {/* Conteúdo principal */}
-        <div className={`flex-1 overflow-y-auto ${contentClassName}`}>
+        <div className={`flex-1 overflow-y-auto print:overflow-visible print:h-auto print:p-0 print:m-0 print:block ${contentClassName}`}>
           {children}
         </div>
 
         {/* Rodapé opcional */}
         {footer && (
-          <div className="px-5 py-3.5 border-t border-slate-800/80 bg-slate-950/40 flex-shrink-0">
+          <div className="px-5 py-3.5 border-t border-slate-800/80 bg-slate-950/40 flex-shrink-0 print:hidden">
             {footer}
           </div>
         )}
