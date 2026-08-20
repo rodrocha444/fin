@@ -369,11 +369,13 @@ export default function AccountForm({
             error={errors.color?.message}
           />
 
-          {/* Saldo inicial (Conta Corrente no orçamento OU Conta Fora do Orçamento) */}
-          {(type === 'checking' || type === 'off_budget') && (
+          {/* Saldo inicial (Conta Corrente, Cartão de Crédito OU Conta Fora do Orçamento) */}
+          {(type === 'checking' || type === 'off_budget' || type === 'credit_card') && (
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="label mb-0">Saldo inicial</label>
+                <label className="label mb-0">
+                  {type === 'credit_card' ? 'Saldo Devedor Inicial / Fatura Aberta' : 'Saldo inicial'}
+                </label>
                 {hasTransactions && (
                   <span className="text-[11px] text-amber-400/90 flex items-center gap-1 font-medium">
                     <Lock className="w-3 h-3 text-amber-400" /> Bloqueado para edição
@@ -394,7 +396,11 @@ export default function AccountForm({
                   />
                 )}
               />
-              {type === 'off_budget' ? (
+              {type === 'credit_card' ? (
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Informe a fatura em aberto / dívida de partida do cartão de crédito (opcional).
+                </p>
+              ) : type === 'off_budget' ? (
                 <p className="text-[10px] text-slate-500 mt-1">
                   Valores positivos representam aplicações/investimentos. Valores negativos representam dívidas, financiamentos ou saldos devedores.
                 </p>

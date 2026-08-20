@@ -8,7 +8,7 @@ import {
 } from '@/hooks/queries'
 import { format, addDays, addWeeks, addMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { isDateBeforeAccountingStart, getAccountingStartDate } from '@/utils/accountingPeriod'
+import { getAccountingStartDate } from '@/utils/accountingPeriod'
 
 export type Granularity = 'daily' | 'weekly' | 'monthly'
 
@@ -97,17 +97,25 @@ export function useNetWorthHistory(
       // 1. Contas Bancárias e Cartões
       for (const acc of activeAccounts) {
         if (!acc.id) continue
-        let bal = acc.type === 'credit_card' ? 0 : (acc.initialBalance || 0)
+        let bal = Number(acc.initialBalance || 0)
+        // Se for cartão de crédito e tiver saldo inicial positivo, é saldo devedor inicial
+        if (acc.type === 'credit_card' && bal > 0) {
+          bal = -bal
+        }
 
-        // Transações reais até a data do ponto (ignorando anteriores ao início contábil)
+        // Transações reais até a data do ponto (todas as transações compõem o saldo acumulado)
         for (const tx of transactions) {
-          if (isDateBeforeAccountingStart(tx.date)) continue
           const txDate = new Date(tx.date)
           if (txDate > pDate) continue
 
           if (tx.accountId === acc.id) {
-            if (tx.type === 'income') bal += tx.amount
-            else if (tx.type === 'expense' || tx.type === 'transfer') bal -= tx.amount
+            if (acc.type === 'credit_card') {
+              if (tx.type === 'expense') bal -= tx.amount
+              else if (tx.type === 'income' || tx.type === 'transfer') bal += tx.amount
+            } else {
+              if (tx.type === 'income') bal += tx.amount
+              else if (tx.type === 'expense' || tx.type === 'transfer') bal -= tx.amount
+            }
           }
 
           if (tx.transferAccountId === acc.id && tx.type === 'transfer') {
@@ -140,7 +148,6 @@ export function useNetWorthHistory(
         let dBal = 0
 
         for (const item of items) {
-          if (isDateBeforeAccountingStart(item.createdAt)) continue
           const itemCreatedAt = new Date(item.createdAt)
           if (itemCreatedAt > pDate) continue
 

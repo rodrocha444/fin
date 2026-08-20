@@ -32,6 +32,9 @@ export function useAccountBalance(accountId: string | undefined): number | undef
     if (!account) return 0
 
     let balance = Number(account.initialBalance || 0)
+    if (account.type === 'credit_card' && balance > 0) {
+      balance = -balance
+    }
 
     // 1. Transações diretas
     for (const tx of transactions) {
@@ -77,6 +80,9 @@ export function useAllBalances(): Map<string, number> | undefined {
     for (const acc of accounts) {
       if (!acc.id || acc.isActive === false) continue
       let balance = Number(acc.initialBalance || 0)
+      if (acc.type === 'credit_card' && balance > 0) {
+        balance = -balance
+      }
 
       for (const tx of transactions) {
         if (tx.accountId === acc.id) {
