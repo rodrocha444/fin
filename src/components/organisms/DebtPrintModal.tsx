@@ -1,4 +1,4 @@
-// src/components/organisms/DebtPrintModal.tsx — Visualização e impressão de extrato em PDF de cobranças/pendências
+import { useState } from 'react'
 import { Printer } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/utils/format'
 import Modal from '@/components/atoms/Modal'
@@ -82,6 +82,8 @@ export default function DebtPrintModal({
   balance,
   onClose,
 }: DebtPrintModalProps) {
+  const [includeSettled, setIncludeSettled] = useState(false)
+
   const allEntries = buildPrintEntries(items)
   const pendingEntries = allEntries.filter(e =>
     e.kind === 'single' ? e.item.status === 'pending' : e.pendingCount > 0
@@ -100,18 +102,44 @@ export default function DebtPrintModal({
       title="Extrato / Relatório em PDF"
       description="Visualize e imprima o extrato de pendências"
       headerRight={
-        <button
-          onClick={handlePrint}
-          className="btn-primary py-2 px-3 sm:px-3.5 text-xs font-semibold flex items-center gap-1.5 sm:gap-2 shadow-lg shadow-indigo-600/30 mr-1"
-        >
-          <Printer className="w-4 h-4" />
-          <span className="hidden sm:inline">Imprimir / Salvar PDF</span>
-          <span className="sm:hidden">Imprimir</span>
-        </button>
+        <div className="flex items-center gap-3">
+          {settledEntries.length > 0 && (
+            <label className="hidden sm:flex items-center gap-2 text-xs text-slate-400 cursor-pointer hover:text-slate-200 select-none">
+              <input
+                type="checkbox"
+                checked={includeSettled}
+                onChange={e => setIncludeSettled(e.target.checked)}
+                className="rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer"
+              />
+              <span>Incluir quitados ({settledEntries.length})</span>
+            </label>
+          )}
+          <button
+            onClick={handlePrint}
+            className="btn-primary py-2 px-3 sm:px-3.5 text-xs font-semibold flex items-center gap-1.5 sm:gap-2 shadow-lg shadow-indigo-600/30 mr-1"
+          >
+            <Printer className="w-4 h-4" />
+            <span className="hidden sm:inline">Imprimir / Salvar PDF</span>
+            <span className="sm:hidden">Imprimir</span>
+          </button>
+        </div>
       }
       contentClassName="bg-slate-950 p-4 sm:p-8 print:bg-white print:p-0 print:m-0 print:text-black print:overflow-visible"
     >
       <div id="printable-debt-container" className="bg-slate-900 print:bg-white text-slate-100 print:text-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-800 print:border-none space-y-6 print:space-y-3.5 print:p-0 print:m-0">
+
+            {/* Controle mobile para incluir quitados na tela */}
+            {settledEntries.length > 0 && (
+              <div className="sm:hidden flex items-center justify-between p-3 bg-slate-950/60 rounded-xl border border-slate-800 print:hidden">
+                <span className="text-xs text-slate-400">Incluir histórico de quitados</span>
+                <input
+                  type="checkbox"
+                  checked={includeSettled}
+                  onChange={e => setIncludeSettled(e.target.checked)}
+                  className="rounded border-slate-700 bg-slate-800 text-indigo-600 w-4 h-4"
+                />
+              </div>
+            )}
 
             {/* Cabeçalho do Extrato */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 print:border-slate-300 pb-6 print:pb-3 print-avoid-break">
@@ -268,8 +296,8 @@ export default function DebtPrintModal({
               )}
             </div>
 
-            {/* Histórico de Itens Liquidados */}
-            {settledEntries.length > 0 && (
+            {/* Histórico de Itens Liquidados (Oculto por padrão, ativado sob demanda) */}
+            {includeSettled && settledEntries.length > 0 && (
               <div className="space-y-3 print:space-y-1.5 pt-4 print:pt-2 border-t border-slate-800 print:border-slate-300">
                 <h2 className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-slate-400 print:text-slate-700 print-avoid-break">
                   Histórico de Itens já Quitados ({settledEntries.length})
