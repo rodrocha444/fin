@@ -108,12 +108,14 @@ export function getInvoiceCycle(
 
 /**
  * Filtra as transações de uma conta que pertencem ao ciclo da fatura
+ * (ignora transferências/pagamentos entre contas para não abater indevidamente das compras da fatura seguinte)
  */
 export function getInvoiceData(
   transactions: Transaction[],
   cycle: InvoiceCycle
 ): InvoiceData {
   const invoiceTransactions = transactions.filter(tx => {
+    if (tx.type === 'transfer') return false
     const d = new Date(tx.date)
     return d >= cycle.startDate && d <= cycle.closingDate
   })
@@ -127,24 +129,24 @@ export function getInvoiceData(
   })
 
   let chargesAmount = 0
-  let paymentsAmount = 0
+  let refundsAmount = 0
 
   for (const tx of invoiceTransactions) {
     if (tx.type === 'expense') {
       chargesAmount += tx.amount
-    } else if (tx.type === 'income' || tx.type === 'transfer') {
-      paymentsAmount += tx.amount
+    } else if (tx.type === 'income') {
+      refundsAmount += tx.amount
     }
   }
 
-  const totalAmount = Math.max(0, chargesAmount - paymentsAmount)
+  const totalAmount = Math.max(0, chargesAmount - refundsAmount)
 
   return {
     cycle,
     transactions: invoiceTransactions,
     totalAmount,
     chargesAmount,
-    paymentsAmount,
+    paymentsAmount: refundsAmount,
   }
 }
 
