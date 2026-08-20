@@ -15,6 +15,7 @@ import {
   testSupabaseConnection
 } from '@/services/supabase'
 import { SUPABASE_SCHEMA_SQL } from '@/services/supabaseSchema'
+import { copyToClipboard } from '@/utils/clipboard'
 import { useConfirm, useAlert } from '@/context/ConfirmContext'
 import ResetDatabaseModal from '@/components/organisms/ResetDatabaseModal'
 import Logo from '@/components/atoms/Logo'
@@ -84,10 +85,12 @@ export default function SettingsPage() {
     setTestResult(null)
   }
 
-  const handleCopySql = () => {
-    navigator.clipboard.writeText(SUPABASE_SCHEMA_SQL)
-    setCopiedSql(true)
-    setTimeout(() => setCopiedSql(false), 2500)
+  const handleCopySql = async () => {
+    const success = await copyToClipboard(SUPABASE_SCHEMA_SQL)
+    if (success) {
+      setCopiedSql(true)
+      setTimeout(() => setCopiedSql(false), 2500)
+    }
   }
 
   const toggleGroup = (id: string) =>
@@ -522,14 +525,16 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={async () => {
-                    await navigator.clipboard.writeText(testResult.message)
-                    setCopiedTestResult(true)
-                    setTimeout(() => setCopiedTestResult(false), 2000)
+                    const success = await copyToClipboard(testResult.message)
+                    if (success) {
+                      setCopiedTestResult(true)
+                      setTimeout(() => setCopiedTestResult(false), 2000)
+                    }
                   }}
-                  className="p-1 px-2 rounded-lg bg-rose-900/40 hover:bg-rose-900/60 border border-rose-700/50 text-rose-200 text-[11px] font-medium flex items-center gap-1 flex-shrink-0 transition-colors"
+                  className="p-1.5 px-2.5 rounded-xl bg-rose-900/40 hover:bg-rose-900/60 border border-rose-700/50 text-rose-200 text-[11px] font-medium flex items-center gap-1.5 flex-shrink-0 transition-colors active:scale-95 touch-manipulation"
                   title="Copiar erro para a área de transferência"
                 >
-                  {copiedTestResult ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  {copiedTestResult ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{copiedTestResult ? 'Copiado!' : 'Copiar erro'}</span>
                 </button>
               )}
@@ -670,14 +675,16 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={async () => {
-                    await navigator.clipboard.writeText(backupStatus.message)
-                    setCopiedBackupStatus(true)
-                    setTimeout(() => setCopiedBackupStatus(false), 2000)
+                    const success = await copyToClipboard(backupStatus.message)
+                    if (success) {
+                      setCopiedBackupStatus(true)
+                      setTimeout(() => setCopiedBackupStatus(false), 2000)
+                    }
                   }}
-                  className="p-1 px-2 rounded-lg bg-rose-900/40 hover:bg-rose-900/60 border border-rose-700/50 text-rose-200 text-[11px] font-medium flex items-center gap-1 flex-shrink-0 transition-colors"
+                  className="p-1.5 px-2.5 rounded-xl bg-rose-900/40 hover:bg-rose-900/60 border border-rose-700/50 text-rose-200 text-[11px] font-medium flex items-center gap-1.5 flex-shrink-0 transition-colors active:scale-95 touch-manipulation"
                   title="Copiar erro para a área de transferência"
                 >
-                  {copiedBackupStatus ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  {copiedBackupStatus ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{copiedBackupStatus ? 'Copiado!' : 'Copiar erro'}</span>
                 </button>
               )}

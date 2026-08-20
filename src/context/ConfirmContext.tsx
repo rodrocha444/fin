@@ -1,6 +1,7 @@
 // src/context/ConfirmContext.tsx — Contexto global para Diálogos de Confirmação e Alertas Personalizados
 import React, { createContext, useContext, useState, useCallback } from 'react'
 import { AlertTriangle, Info, CheckCircle2, Trash2, Copy, Check } from 'lucide-react'
+import { copyToClipboard } from '@/utils/clipboard'
 import Modal from '@/components/atoms/Modal'
 
 export type DialogVariant = 'danger' | 'warning' | 'info' | 'success'
@@ -114,12 +115,10 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
 
     if (!textToCopy.trim()) return
 
-    try {
-      await navigator.clipboard.writeText(textToCopy)
+    const success = await copyToClipboard(textToCopy)
+    if (success) {
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
-      console.error('Falha ao copiar texto:', err)
+      setTimeout(() => setCopied(false), 2200)
     }
   }
 
@@ -180,38 +179,44 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
         <div className="p-5 space-y-4">
           {/* Mensagem Principal */}
           <div
-            className={`text-slate-300 text-sm leading-relaxed whitespace-pre-line relative ${
+            className={`text-slate-300 text-sm leading-relaxed whitespace-pre-line select-text relative ${
               isErrorOrWarning
                 ? 'p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 text-slate-200'
                 : ''
             }`}
           >
-            {options.message}
+            <div className="select-text break-words">
+              {options.message}
+            </div>
 
             {options.details && (
-              <div className="mt-2.5 pt-2.5 border-t border-slate-800 text-xs font-mono text-slate-400 bg-slate-900/80 p-2 rounded-lg max-h-36 overflow-y-auto break-all">
+              <div className="mt-2.5 pt-2.5 border-t border-slate-800 text-xs font-mono text-slate-400 bg-slate-900/80 p-2.5 rounded-lg max-h-36 overflow-y-auto break-all select-text">
                 {options.details}
               </div>
             )}
           </div>
 
-          {/* Botão de Copiar Erro / Mensagem para Área de Transferência */}
+          {/* Botão de Copiar Erro / Mensagem para Área de Transferência com suporte total a touch no iOS */}
           {canCopy && (
             <div className="flex justify-end">
               <button
                 type="button"
                 onClick={handleCopyText}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 active:bg-slate-700/80 border border-slate-800 transition-colors"
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all active:scale-95 touch-manipulation ${
+                  copied
+                    ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 shadow-sm shadow-emerald-950/20'
+                    : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700/80 text-slate-300 active:bg-slate-700'
+                }`}
                 title="Copiar mensagem para a área de transferência"
               >
                 {copied ? (
                   <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-emerald-400 font-semibold">Copiado!</span>
+                    <Check className="w-4 h-4 text-emerald-400" />
+                    <span className="text-emerald-300 font-semibold">Copiado para a área de transferência!</span>
                   </>
                 ) : (
                   <>
-                    <Copy className="w-3.5 h-3.5 text-slate-400" />
+                    <Copy className="w-4 h-4 text-slate-400" />
                     <span>{isErrorOrWarning ? 'Copiar descrição de erro' : 'Copiar mensagem'}</span>
                   </>
                 )}
