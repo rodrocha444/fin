@@ -29,6 +29,8 @@ export default function SettingsPage() {
   const [isTestingConnection, setIsTestingConnection] = useState(false)
   const [showSqlGuide, setShowSqlGuide] = useState(false)
   const [copiedSql, setCopiedSql] = useState(false)
+  const [copiedTestResult, setCopiedTestResult] = useState(false)
+  const [copiedBackupStatus, setCopiedBackupStatus] = useState(false)
 
   const [groupTypeTab, setGroupTypeTab] = useState<'expense' | 'income'>('expense')
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
@@ -507,13 +509,30 @@ export default function SettingsPage() {
 
           {/* Feedback de Teste / Erro */}
           {testResult && (
-            <div className={`p-3 rounded-xl text-xs flex items-start gap-2 ${
+            <div className={`p-3 rounded-xl text-xs flex items-start justify-between gap-2 ${
               testResult.success
                 ? 'bg-emerald-950/40 border border-emerald-800/60 text-emerald-300'
                 : 'bg-rose-950/40 border border-rose-800/60 text-rose-300'
             }`}>
-              {testResult.success ? <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />}
-              <span>{testResult.message}</span>
+              <div className="flex items-start gap-2 min-w-0 flex-1">
+                {testResult.success ? <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />}
+                <span className="break-words">{testResult.message}</span>
+              </div>
+              {!testResult.success && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(testResult.message)
+                    setCopiedTestResult(true)
+                    setTimeout(() => setCopiedTestResult(false), 2000)
+                  }}
+                  className="p-1 px-2 rounded-lg bg-rose-900/40 hover:bg-rose-900/60 border border-rose-700/50 text-rose-200 text-[11px] font-medium flex items-center gap-1 flex-shrink-0 transition-colors"
+                  title="Copiar erro para a área de transferência"
+                >
+                  {copiedTestResult ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  <span>{copiedTestResult ? 'Copiado!' : 'Copiar erro'}</span>
+                </button>
+              )}
             </div>
           )}
 
@@ -638,13 +657,30 @@ export default function SettingsPage() {
           </div>
 
           {backupStatus && (
-            <div className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+            <div className={`p-3 rounded-xl text-xs flex items-center justify-between gap-2 ${
               backupStatus.type === 'success'
                 ? 'bg-emerald-950/40 border border-emerald-800/60 text-emerald-300'
                 : 'bg-rose-950/40 border border-rose-800/60 text-rose-300'
             }`}>
-              {backupStatus.type === 'success' && <CheckCircle2 className="w-4 h-4 flex-shrink-0" />}
-              <span>{backupStatus.message}</span>
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                {backupStatus.type === 'success' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
+                <span className="break-words">{backupStatus.message}</span>
+              </div>
+              {backupStatus.type === 'error' && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(backupStatus.message)
+                    setCopiedBackupStatus(true)
+                    setTimeout(() => setCopiedBackupStatus(false), 2000)
+                  }}
+                  className="p-1 px-2 rounded-lg bg-rose-900/40 hover:bg-rose-900/60 border border-rose-700/50 text-rose-200 text-[11px] font-medium flex items-center gap-1 flex-shrink-0 transition-colors"
+                  title="Copiar erro para a área de transferência"
+                >
+                  {copiedBackupStatus ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  <span>{copiedBackupStatus ? 'Copiado!' : 'Copiar erro'}</span>
+                </button>
+              )}
             </div>
           )}
 

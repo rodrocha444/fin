@@ -1,6 +1,6 @@
 // src/context/ConfirmContext.tsx — Contexto global para Diálogos de Confirmação e Alertas Personalizados
 import React, { createContext, useContext, useState, useCallback } from 'react'
-import { AlertTriangle, Info, CheckCircle2, Trash2 } from 'lucide-react'
+import { AlertTriangle, Info, CheckCircle2, Trash2, Copy, Check } from 'lucide-react'
 import Modal from '@/components/atoms/Modal'
 
 export type DialogVariant = 'danger' | 'warning' | 'info' | 'success'
@@ -8,6 +8,7 @@ export type DialogVariant = 'danger' | 'warning' | 'info' | 'success'
 export interface ConfirmOptions {
   title?: string
   message: string | React.ReactNode
+  details?: string
   confirmText?: string
   cancelText?: string
   variant?: DialogVariant
@@ -16,6 +17,7 @@ export interface ConfirmOptions {
 export interface AlertOptions {
   title?: string
   message: string | React.ReactNode
+  details?: string
   buttonText?: string
   variant?: DialogVariant
 }
@@ -30,6 +32,7 @@ const ConfirmContext = createContext<ConfirmContextType | null>(null)
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isAlert, setIsAlert] = useState(false)
+  const [copied, setCopied] = useState(false)
   const [options, setOptions] = useState<ConfirmOptions>({
     title: 'Confirmação',
     message: '',
@@ -53,6 +56,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
           : {
               title: opts.title ?? 'Confirmar Ação',
               message: opts.message,
+              details: opts.details,
               confirmText: opts.confirmText ?? 'Confirmar',
               cancelText: opts.cancelText ?? 'Cancelar',
               variant: opts.variant ?? 'danger',
@@ -60,6 +64,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
 
       setOptions(parsedOpts)
       setIsAlert(false)
+      setCopied(false)
       setResolver(() => resolve)
       setIsOpen(true)
     })
@@ -78,12 +83,14 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
           : {
               title: opts.title ?? 'Aviso',
               message: opts.message,
+              details: opts.details,
               confirmText: opts.buttonText ?? 'OK',
               variant: opts.variant ?? 'info',
             }
 
       setOptions(parsedOpts)
       setIsAlert(true)
+      setCopied(false)
       setResolver(() => () => resolve())
       setIsOpen(true)
     })
@@ -99,7 +106,25 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     resolver?.(false)
   }
 
+  const handleCopyText = async () => {
+    const textToCopy = [
+      typeof options.message === 'string' ? options.message : '',
+      options.details ? `\nDetalhes:\n${options.details}` : '',
+    ].filter(Boolean).join('\n')
+
+    if (!textToCopy.trim()) return
+
+    try {
+      await navigator.clipboard.writeText(textToCopy)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('Falha ao copiar texto:', err)
+    }
+  }
+
   const variant = options.variant ?? 'danger'
+  const isErrorOrWarning = variant === 'danger' || variant === 'warning'
 
   const getVariantStyles = () => {
     switch (variant) {
@@ -132,6 +157,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   }
 
   const styles = getVariantStyles()
+  const canCopy = typeof options.message === 'string' || !!options.details
 
   return (
     <ConfirmContext.Provider value={{ confirm, alert: showAlert }}>
@@ -151,11 +177,49 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
           </div>
         }
       >
-        <div className="p-5 space-y-5">
-          <div className="text-slate-300 text-sm leading-relaxed whitespace-pre-line">
+        <div className="p-5 space-y-4">
+          {/* Mensagem Principal */}
+          <div
+            className={`text-slate-300 text-sm leading-relaxed whitespace-pre-line relative ${
+              isErrorOrWarning
+                ? 'p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 text-slate-200'
+                : ''
+            }`}
+          >
             {options.message}
+
+            {options.details && (
+              <div className="mt-2.5 pt-2.5 border-t border-slate-800 text-xs font-mono text-slate-400 bg-slate-900/80 p-2 rounded-lg max-h-36 overflow-y-auto break-all">
+                {options.details}
+              </div>
+            )}
           </div>
 
+          {/* Botão de Copiar Erro / Mensagem para Área de Transferência */}
+          {canCopy && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={handleCopyText}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 active:bg-slate-700/80 border border-slate-800 transition-colors"
+                title="Copiar mensagem para a área de transferência"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-400 font-semibold">Copiado!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{isErrorOrWarning ? 'Copiar descrição de erro' : 'Copiar mensagem'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Ações */}
           <div className="flex items-center gap-2.5 pt-1">
             {!isAlert && (
               <button
