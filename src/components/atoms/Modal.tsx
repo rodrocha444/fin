@@ -1,5 +1,5 @@
-// src/components/atoms/Modal.tsx — Componente base reutilizável de Modal e Bottom Sheet
-import React, { useEffect, useCallback } from 'react'
+// src/components/atoms/Modal.tsx — Componente base reutilizável de Modal e Bottom Sheet com Focus Trap
+import React, { useEffect, useCallback, useRef } from 'react'
 import { X } from 'lucide-react'
 
 export interface ModalProps {
@@ -17,6 +17,7 @@ export interface ModalProps {
   closeOnEsc?: boolean
   className?: string
   contentClassName?: string
+  initialFocusRef?: React.RefObject<HTMLElement | null>
 }
 
 const SIZE_CLASSES = {
@@ -26,6 +27,29 @@ const SIZE_CLASSES = {
   xl: 'sm:max-w-xl',
   '2xl': 'sm:max-w-2xl',
   full: 'sm:max-w-4xl',
+}
+
+const FOCUSABLE_SELECTORS = [
+  'button:not([disabled])',
+  '[href]',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
+
+function getFocusableElements(container: HTMLElement | null): HTMLElement[] {
+  if (!container) return []
+  const elements = Array.from(
+    container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTORS)
+  )
+  return elements.filter(el => {
+    return (
+      el.offsetParent !== null &&
+      !el.hasAttribute('disabled') &&
+      el.getAttribute('aria-hidden') !== 'true'
+    )
+  })
 }
 
 export default function Modal({
@@ -43,14 +67,96 @@ export default function Modal({
   closeOnEsc = true,
   className = '',
   contentClassName = '',
+  initialFocusRef,
 }: ModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const previousActiveElementRef = useRef<HTMLElement | null>(null)
+
+  // Captura o elemento ativo anterior e define o foco inicial no modal
+  useEffect(() => {
+    if (isOpen) {
+      previousActiveElementRef.current = document.activeElement as HTMLElement | null
+
+      const focusTimer = setTimeout(() => {
+        if (!dialogRef.current) return
+
+        if (initialFocusRef?.current) {
+          initialFocusRef.current.focus()
+          return
+        }
+
+        // Procura elemento com autofocus explícito
+        const autofocusElement = dialogRef.current.querySelector<HTMLElement>(
+          '[autofocus], [data-autofocus]'
+        )
+        if (autofocusElement) {
+          autofocusElement.focus()
+          return
+        }
+
+        // Foca no primeiro elemento interativo do modal
+        const focusables = getFocusableElements(dialogRef.current)
+        if (focusables.length > 0) {
+          focusables[0].focus()
+        } else {
+          dialogRef.current.focus()
+        }
+      }, 50)
+
+      return () => clearTimeout(focusTimer)
+    } else if (previousActiveElementRef.current) {
+      previousActiveElementRef.current.focus?.()
+      previousActiveElementRef.current = null
+    }
+  }, [isOpen, initialFocusRef])
+
+  // Gerenciamento de teclado: Escape e Focus Trap com Tab / Shift+Tab
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      if (!isOpen || !dialogRef.current) return
+
       if (closeOnEsc && e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
         onClose()
+        return
+      }
+
+      if (e.key === 'Tab') {
+        const focusables = getFocusableElements(dialogRef.current)
+        if (focusables.length === 0) {
+          e.preventDefault()
+          dialogRef.current.focus()
+          return
+        }
+
+        const firstElement = focusables[0]
+        const lastElement = focusables[focusables.length - 1]
+        const activeElement = document.activeElement as HTMLElement | null
+
+        // Se o foco de alguma forma escapou para fora do modal, redireciona para dentro
+        if (!dialogRef.current.contains(activeElement)) {
+          e.preventDefault()
+          firstElement.focus()
+          return
+        }
+
+        if (e.shiftKey) {
+          // Shift + Tab: se estiver no primeiro elemento, move para o último
+          if (activeElement === firstElement || activeElement === dialogRef.current) {
+            e.preventDefault()
+            lastElement.focus()
+          }
+        } else {
+          // Tab: se estiver no último elemento, volta para o primeiro
+          if (activeElement === lastElement) {
+            e.preventDefault()
+            firstElement.focus()
+          }
+        }
       }
     },
-    [closeOnEsc, onClose]
+    [isOpen, closeOnEsc, onClose]
   )
 
   useEffect(() => {
@@ -81,7 +187,9 @@ export default function Modal({
       }}
     >
       <div
-        className={`bg-slate-900 border-t sm:border border-slate-700/80 rounded-t-3xl sm:rounded-2xl w-full ${SIZE_CLASSES[size]} shadow-2xl sheet-up sm:fade-in max-h-[92dvh] flex flex-col overflow-hidden relative ${className}`}
+        ref={dialogRef}
+        tabIndex={-1}
+        className={`bg-slate-900 border-t sm:border border-slate-700/80 rounded-t-3xl sm:rounded-2xl w-full ${SIZE_CLASSES[size]} shadow-2xl sheet-up sm:fade-in max-h-[92dvh] flex flex-col overflow-hidden relative outline-none ${className}`}
       >
         {/* Handle tátil no mobile */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0 cursor-grab">
