@@ -71,6 +71,10 @@ export function useNetWorthHistory(
     const limit = new Date(endDate)
     limit.setHours(23, 59, 59, 999)
 
+    if (current > limit) {
+      current = new Date(limit)
+    }
+
     let count = 0
     const maxPoints = 200
 
@@ -208,6 +212,17 @@ export function useNetWorthHistory(
       } else {
         current = addMonths(current, 1)
       }
+    }
+
+    // Se gerou apenas 1 ponto (ex: início contábil é hoje), cria um ponto inicial complementar para desenhar a curva
+    if (points.length === 1) {
+      const p = points[0]
+      const prevDate = new Date(p.date.getTime() - 24 * 60 * 60 * 1000)
+      points.unshift({
+        ...p,
+        date: prevDate,
+        dateLabel: format(prevDate, 'dd/MM'),
+      })
     }
 
     return points

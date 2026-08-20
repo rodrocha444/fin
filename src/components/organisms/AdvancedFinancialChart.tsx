@@ -911,10 +911,15 @@ export default function AdvancedFinancialChart() {
         ) : (
           /* Modo Área / Linha SVG com Suporte Touch Total */
           <div className="relative">
-            {points.length < 2 ? (
+            {rawPoints === undefined ? (
               <div className="py-20 flex flex-col items-center justify-center text-slate-500 text-xs">
                 <Activity className="w-8 h-8 text-slate-700 mb-2 animate-pulse" />
                 <p>Carregando dados...</p>
+              </div>
+            ) : points.length < 2 ? (
+              <div className="py-20 flex flex-col items-center justify-center text-slate-500 text-xs">
+                <Activity className="w-8 h-8 text-slate-700 mb-2" />
+                <p>Nenhuma movimentação registrada para o período selecionado</p>
               </div>
             ) : (
               <div className="relative">
