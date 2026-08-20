@@ -3,8 +3,10 @@ import { getClient } from './client'
 import {
   rowToCategoryGroup,
   categoryGroupToRow,
+  categoryGroupToUpdateRow,
   rowToCategory,
   categoryToRow,
+  categoryToUpdateRow,
 } from './types'
 import { createId } from '@/utils/id'
 import { notifyDataChanged } from './events'
@@ -76,8 +78,7 @@ export async function createGroup(
 
 export async function updateGroup(id: string, changes: Partial<CategoryGroup>): Promise<void> {
   const client = getClient()
-  const row = categoryGroupToRow(changes)
-  delete (row as any).id
+  const row = categoryGroupToUpdateRow(changes)
 
   const { error } = await client.from('category_groups').update(row).eq('id', id)
   if (error) throw new Error(`Erro ao atualizar grupo: ${error.message}`)
@@ -133,8 +134,7 @@ export async function createCategory(
 
 export async function updateCategory(id: string, changes: Partial<Category>): Promise<void> {
   const client = getClient()
-  const row = categoryToRow(changes)
-  delete (row as any).id
+  const row = categoryToUpdateRow(changes)
 
   const { error } = await client.from('categories').update(row).eq('id', id)
   if (error) throw new Error(`Erro ao atualizar categoria: ${error.message}`)

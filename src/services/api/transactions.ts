@@ -1,8 +1,8 @@
-// src/services/api/transactions.ts — Operações de transações via Supabase API
 import { getClient } from './client'
 import {
   rowToTransaction,
   transactionToRow,
+  transactionToUpdateRow,
   installmentGroupToRow,
 } from './types'
 import { createId } from '@/utils/id'
@@ -273,8 +273,7 @@ export async function updateInstallmentPurchase(
 
 export async function updateTransaction(id: string, changes: Partial<Transaction>): Promise<void> {
   const client = getClient()
-  const row = transactionToRow(changes)
-  delete (row as any).id
+  const row = transactionToUpdateRow(changes)
 
   const { error } = await client.from('transactions').update(row).eq('id', id)
   if (error) throw new Error(`Erro ao atualizar transação: ${error.message}`)

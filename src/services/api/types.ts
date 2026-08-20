@@ -62,6 +62,22 @@ export function accountToRow(item: Partial<Account>): Record<string, unknown> {
   }
 }
 
+export function accountToUpdateRow(changes: Partial<Account>): Record<string, unknown> {
+  const row: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (changes.name !== undefined) row.name = changes.name
+  if (changes.type !== undefined) row.type = changes.type
+  if (changes.initialBalance !== undefined) row.initial_balance = changes.initialBalance
+  if (changes.creditLimit !== undefined) row.credit_limit = changes.creditLimit
+  if (changes.statementClosingDay !== undefined) row.statement_closing_day = changes.statementClosingDay
+  if (changes.paymentDueDay !== undefined) row.payment_due_day = changes.paymentDueDay
+  if (changes.color !== undefined) row.color = changes.color
+  if (changes.icon !== undefined) row.icon = changes.icon
+  if (changes.isActive !== undefined) row.is_active = changes.isActive
+  return row
+}
+
 // 2. Grupos de Categorias
 export function rowToCategoryGroup(row: Tables<'category_groups'>): CategoryGroup {
   return {
@@ -88,6 +104,18 @@ export function categoryGroupToRow(item: Partial<CategoryGroup>): Record<string,
   }
 }
 
+export function categoryGroupToUpdateRow(changes: Partial<CategoryGroup>): Record<string, unknown> {
+  const row: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (changes.name !== undefined) row.name = changes.name
+  if (changes.type !== undefined) row.type = changes.type || null
+  if (changes.sortOrder !== undefined) row.sort_order = changes.sortOrder
+  if (changes.isHidden !== undefined) row.is_hidden = changes.isHidden
+  if (changes.isSystem !== undefined) row.is_system = changes.isSystem
+  return row
+}
+
 // 3. Categorias
 export function rowToCategory(row: Tables<'categories'>): Category {
   return {
@@ -110,6 +138,17 @@ export function categoryToRow(item: Partial<Category>): Record<string, unknown> 
     created_at: now,
     updated_at: now,
   }
+}
+
+export function categoryToUpdateRow(changes: Partial<Category>): Record<string, unknown> {
+  const row: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (changes.groupId !== undefined) row.group_id = changes.groupId
+  if (changes.name !== undefined) row.name = changes.name
+  if (changes.sortOrder !== undefined) row.sort_order = changes.sortOrder
+  if (changes.isHidden !== undefined) row.is_hidden = changes.isHidden
+  return row
 }
 
 // 4. Orçamento Mensal
@@ -136,6 +175,18 @@ export function budgetMonthToRow(item: Partial<BudgetMonth>): Record<string, unk
     created_at: now,
     updated_at: now,
   }
+}
+
+export function budgetMonthToUpdateRow(changes: Partial<BudgetMonth>): Record<string, unknown> {
+  const row: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (changes.month !== undefined) row.month = changes.month
+  if (changes.categoryId !== undefined) row.category_id = changes.categoryId
+  if (changes.budgeted !== undefined) row.budgeted = changes.budgeted
+  if (changes.activity !== undefined) row.activity = changes.activity
+  if (changes.available !== undefined) row.available = changes.available
+  return row
 }
 
 // 5. Transações
@@ -203,6 +254,38 @@ export function transactionToRow(item: Partial<Transaction>): Record<string, unk
   }
 }
 
+export function transactionToUpdateRow(changes: Partial<Transaction>): Record<string, unknown> {
+  const row: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (changes.accountId !== undefined) row.account_id = changes.accountId
+  if (changes.date !== undefined) row.date = toIso(changes.date)
+  if (changes.amount !== undefined) row.amount = changes.amount
+  if (changes.payee !== undefined) row.payee = changes.payee
+  if (changes.categoryId !== undefined) row.category_id = changes.categoryId || null
+  if (changes.notes !== undefined || changes.splitGroupId !== undefined) {
+    let notes = changes.notes !== undefined ? (changes.notes || null) : null
+    if (changes.splitGroupId) {
+      const splitTag = `[split:${changes.splitGroupId}]`
+      if (!notes) notes = splitTag
+      else if (!notes.includes(splitTag)) notes = `${notes} ${splitTag}`
+    }
+    if (notes !== null || changes.notes !== undefined) {
+      row.notes = notes
+    }
+  }
+  if (changes.cleared !== undefined) row.cleared = changes.cleared
+  if (changes.type !== undefined) row.type = changes.type
+  if (changes.transferAccountId !== undefined) row.transfer_account_id = changes.transferAccountId || null
+  if (changes.transferTransactionId !== undefined) row.transfer_transaction_id = changes.transferTransactionId || null
+  if (changes.installmentGroupId !== undefined) row.installment_group_id = changes.installmentGroupId || null
+  if (changes.installmentNumber !== undefined) row.installment_number = changes.installmentNumber ?? null
+  if (changes.installmentTotal !== undefined) row.installment_total = changes.installmentTotal ?? null
+  if (changes.isScheduledProjection !== undefined) row.is_scheduled_projection = changes.isScheduledProjection
+  if (changes.scheduledId !== undefined) row.scheduled_id = changes.scheduledId || null
+  return row
+}
+
 // 6. Grupos de Parcelamento
 export function rowToInstallmentGroup(row: Tables<'installment_groups'>): InstallmentGroup {
   return {
@@ -232,6 +315,20 @@ export function installmentGroupToRow(item: Partial<InstallmentGroup>): Record<s
     created_at: toIso(item.createdAt) || now,
     updated_at: now,
   }
+}
+
+export function installmentGroupToUpdateRow(changes: Partial<InstallmentGroup>): Record<string, unknown> {
+  const row: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (changes.description !== undefined) row.description = changes.description
+  if (changes.totalAmount !== undefined) row.total_amount = changes.totalAmount
+  if (changes.installmentCount !== undefined) row.installment_count = changes.installmentCount
+  if (changes.installmentAmount !== undefined) row.installment_amount = changes.installmentAmount
+  if (changes.startDate !== undefined) row.start_date = toIso(changes.startDate)
+  if (changes.accountId !== undefined) row.account_id = changes.accountId
+  if (changes.categoryId !== undefined) row.category_id = changes.categoryId || null
+  return row
 }
 
 // 7. Transações Agendadas
@@ -273,6 +370,24 @@ export function scheduledTransactionToRow(item: Partial<ScheduledTransaction>): 
   }
 }
 
+export function scheduledTransactionToUpdateRow(changes: Partial<ScheduledTransaction>): Record<string, unknown> {
+  const row: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (changes.accountId !== undefined) row.account_id = changes.accountId
+  if (changes.amount !== undefined) row.amount = changes.amount
+  if (changes.payee !== undefined) row.payee = changes.payee
+  if (changes.categoryId !== undefined) row.category_id = changes.categoryId || null
+  if (changes.type !== undefined) row.type = changes.type
+  if (changes.transferAccountId !== undefined) row.transfer_account_id = changes.transferAccountId || null
+  if (changes.frequency !== undefined) row.frequency = changes.frequency
+  if (changes.nextDate !== undefined) row.next_date = toIso(changes.nextDate)
+  if (changes.endDate !== undefined) row.end_date = toIso(changes.endDate)
+  if (changes.notes !== undefined) row.notes = changes.notes || null
+  if (changes.isActive !== undefined) row.is_active = changes.isActive
+  return row
+}
+
 // 8. Beneficiários (Payees)
 export function rowToPayee(row: Tables<'payees'>): Payee {
   return {
@@ -291,6 +406,15 @@ export function payeeToRow(item: Partial<Payee>): Record<string, unknown> {
     created_at: now,
     updated_at: now,
   }
+}
+
+export function payeeToUpdateRow(changes: Partial<Payee>): Record<string, unknown> {
+  const row: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (changes.name !== undefined) row.name = changes.name
+  if (changes.defaultCategoryId !== undefined) row.default_category_id = changes.defaultCategoryId || null
+  return row
 }
 
 // 9. Contas de Cobrança / Terceiros
@@ -318,6 +442,18 @@ export function debtAccountToRow(item: Partial<DebtAccount>): Record<string, unk
     created_at: toIso(item.createdAt) || now,
     updated_at: now,
   }
+}
+
+export function debtAccountToUpdateRow(changes: Partial<DebtAccount>): Record<string, unknown> {
+  const row: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (changes.name !== undefined) row.name = changes.name
+  if (changes.phone !== undefined) row.phone = changes.phone || null
+  if (changes.notes !== undefined) row.notes = changes.notes || null
+  if (changes.color !== undefined) row.color = changes.color
+  if (changes.isActive !== undefined) row.is_active = changes.isActive
+  return row
 }
 
 // 10. Itens de Cobrança / Pendências
@@ -359,4 +495,23 @@ export function debtItemToRow(item: Partial<DebtItem>): Record<string, unknown> 
     created_at: toIso(item.createdAt) || now,
     updated_at: now,
   }
+}
+
+export function debtItemToUpdateRow(changes: Partial<DebtItem>): Record<string, unknown> {
+  const row: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (changes.debtAccountId !== undefined) row.debt_account_id = changes.debtAccountId
+  if (changes.description !== undefined) row.description = changes.description.trim()
+  if (changes.type !== undefined) row.type = changes.type
+  if (changes.amount !== undefined) row.amount = changes.amount
+  if (changes.dueDate !== undefined) row.due_date = toIso(changes.dueDate)
+  if (changes.settledDate !== undefined) row.settled_date = toIso(changes.settledDate)
+  if (changes.status !== undefined) row.status = changes.status
+  if (changes.notes !== undefined) row.notes = changes.notes || null
+  if (changes.installmentGroupId !== undefined) row.installment_group_id = changes.installmentGroupId || null
+  if (changes.installmentNumber !== undefined) row.installment_number = changes.installmentNumber ?? null
+  if (changes.installmentTotal !== undefined) row.installment_total = changes.installmentTotal ?? null
+  if (changes.totalAmount !== undefined) row.total_amount = changes.totalAmount != null ? changes.totalAmount : null
+  return row
 }

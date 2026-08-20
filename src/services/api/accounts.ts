@@ -1,5 +1,5 @@
 import { getClient } from './client'
-import { rowToAccount, accountToRow } from './types'
+import { rowToAccount, accountToRow, accountToUpdateRow } from './types'
 import { createId } from '@/utils/id'
 import { notifyDataChanged } from './events'
 import type { Account, AccountType } from '@/types'
@@ -55,9 +55,7 @@ export async function createAccount(data: {
 
 export async function updateAccount(id: string, changes: Partial<Account>): Promise<void> {
   const client = getClient()
-  const row = accountToRow(changes)
-  // Remove id do payload de update
-  delete (row as any).id
+  const row = accountToUpdateRow(changes)
 
   const { error } = await client.from('accounts').update(row).eq('id', id)
   if (error) throw new Error(`Erro ao atualizar conta: ${error.message}`)

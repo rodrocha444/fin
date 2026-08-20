@@ -1,5 +1,10 @@
 import { getClient } from './client'
-import { rowToScheduledTransaction, scheduledTransactionToRow, transactionToRow } from './types'
+import {
+  rowToScheduledTransaction,
+  scheduledTransactionToRow,
+  scheduledTransactionToUpdateRow,
+  transactionToRow,
+} from './types'
 import { createId } from '@/utils/id'
 import {
   format,
@@ -54,8 +59,7 @@ export async function createScheduled(data: Omit<ScheduledTransaction, 'id' | 'c
 
 export async function updateScheduled(id: string, data: Partial<Omit<ScheduledTransaction, 'id' | 'createdAt'>>): Promise<void> {
   const client = getClient()
-  const row = scheduledTransactionToRow(data)
-  delete (row as any).id
+  const row = scheduledTransactionToUpdateRow(data)
 
   const { error } = await client.from('scheduled_transactions').update(row).eq('id', id)
   if (error) throw new Error(`Erro ao atualizar agendamento: ${error.message}`)

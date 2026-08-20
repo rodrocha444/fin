@@ -1,5 +1,12 @@
 import { getClient } from './client'
-import { rowToDebtAccount, debtAccountToRow, rowToDebtItem, debtItemToRow } from './types'
+import {
+  rowToDebtAccount,
+  debtAccountToRow,
+  debtAccountToUpdateRow,
+  rowToDebtItem,
+  debtItemToRow,
+  debtItemToUpdateRow,
+} from './types'
 import { createId } from '@/utils/id'
 import { addMonths } from 'date-fns'
 import { notifyDataChanged } from './events'
@@ -46,8 +53,7 @@ export async function createDebtAccount(data: Omit<DebtAccount, 'id' | 'createdA
 
 export async function updateDebtAccount(id: string, data: Partial<Omit<DebtAccount, 'id' | 'createdAt'>>): Promise<void> {
   const client = getClient()
-  const row = debtAccountToRow(data)
-  delete (row as any).id
+  const row = debtAccountToUpdateRow(data)
 
   const { error } = await client.from('debt_accounts').update(row).eq('id', id)
   if (error) throw new Error(`Erro ao atualizar contato de cobrança: ${error.message}`)
@@ -154,8 +160,7 @@ export async function createDebtInstallments(input: CreateDebtInstallmentsInput)
 
 export async function updateDebtItem(id: string, data: Partial<Omit<DebtItem, 'id' | 'createdAt'>>): Promise<void> {
   const client = getClient()
-  const row = debtItemToRow(data)
-  delete (row as any).id
+  const row = debtItemToUpdateRow(data)
 
   const { error } = await client.from('debt_items').update(row).eq('id', id)
   if (error) throw new Error(`Erro ao atualizar item de cobrança: ${error.message}`)

@@ -71,11 +71,15 @@ export default function DebtItemForm({
 
     if (isEdit && item.id) {
       await updateDebtItem(item.id, {
+        debtAccountId: item.debtAccountId || debtAccountId,
         description: data.description,
         type,
         amount: data.amount,
         dueDate: dueDateParsed,
         notes: data.notes?.trim() || undefined,
+        installmentGroupId: item.installmentGroupId,
+        installmentNumber: item.installmentNumber,
+        installmentTotal: item.installmentTotal,
       })
     } else if (installmentCount > 1) {
       await createDebtInstallments({
