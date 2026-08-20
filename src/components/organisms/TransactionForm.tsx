@@ -266,143 +266,152 @@ export default function TransactionForm({
   }
 
   const onSubmit = async (data: FormData) => {
-    saveLastTxDate(data.date)
-    const txDate = new Date(data.date + 'T12:00:00')
-    const selectedCat = categories?.find(c => c.id === data.categoryId)
-    const finalPayee = data.payee?.trim() || selectedCat?.name || (mode === 'transfer' ? 'Transferência' : 'Despesa')
-    const catId = data.categoryId && data.categoryId.trim() !== '' ? data.categoryId : undefined
+    try {
+      saveLastTxDate(data.date)
+      const txDate = new Date(data.date + 'T12:00:00')
+      const selectedCat = categories?.find(c => c.id === data.categoryId)
+      const finalPayee = data.payee?.trim() || selectedCat?.name || (mode === 'transfer' ? 'Transferência' : mode === 'income' ? 'Renda' : 'Despesa')
+      const catId = data.categoryId && data.categoryId.trim() !== '' ? data.categoryId : undefined
 
-    if (mode !== 'transfer' && isSplit) {
-      // Validação de soma no modo rateio
-      if (splits.length < 2) {
-        alert('Adicione pelo menos 2 categorias para dividir a transação.')
+      if (mode !== 'transfer' && isSplit) {
+        const validSplits = splits.filter(s => (s.amount || 0) > 0)
+        // Validação de divisões no modo rateio
+        if (validSplits.length < 2) {
+          alert('Adicione pelo menos 2 categorias com valores maiores que zero para dividir a transação.')
+          return
+        }
+
+        const effectiveTotal = data.amount > 0 ? data.amount : sumSplits
+        const diff = Math.abs(sumSplits - effectiveTotal)
+        if (diff >= 0.01) {
+          alert(`A soma das divisões (${formatCurrency(sumSplits)}) deve ser exatamente igual ao valor total (${formatCurrency(effectiveTotal)}). Diferença: ${formatCurrency(remainingToDistribute)}`)
+          return
+        }
+
+        // Salva ou atualiza beneficiário
+        await getOrCreatePayee(finalPayee, validSplits[0]?.categoryId)
+
+        const splitPayload = validSplits.map(s => ({
+          categoryId: s.categoryId && s.categoryId.trim() !== '' ? s.categoryId : undefined,
+          amount: s.amount,
+          notes: s.notes?.trim() || undefined,
+        }))
+
+        if (transaction?.splitGroupId) {
+          await updateSplitTransaction(transaction.splitGroupId, {
+            accountId: data.accountId,
+            date: txDate,
+            payee: finalPayee,
+            type: mode === 'income' ? 'income' : 'expense',
+            notes: data.notes,
+            splits: splitPayload,
+          })
+        } else if (isEdit && transaction?.id) {
+          // Transação avulsa anterior sendo convertida em split
+          await deleteTransaction(transaction.id)
+          await createSplitTransaction({
+            accountId: data.accountId,
+            date: txDate,
+            payee: finalPayee,
+            type: mode === 'income' ? 'income' : 'expense',
+            notes: data.notes,
+            splits: splitPayload,
+          })
+        } else {
+          await createSplitTransaction({
+            accountId: data.accountId,
+            date: txDate,
+            payee: finalPayee,
+            type: mode === 'income' ? 'income' : 'expense',
+            notes: data.notes,
+            splits: splitPayload,
+          })
+        }
+
+        onSuccess?.()
+        onClose()
         return
       }
-      if (Math.abs(remainingToDistribute) >= 0.01) {
-        alert(`A soma das divisões (${formatCurrency(sumSplits)}) deve ser exatamente igual ao valor total (${formatCurrency(data.amount)}). Restante: ${formatCurrency(remainingToDistribute)}`)
-        return
-      }
 
-      // Salva ou atualiza beneficiário
-      await getOrCreatePayee(finalPayee, splits[0]?.categoryId)
+      if (isExistingInstallment && transaction?.installmentGroupId) {
+        if (mode !== 'transfer') {
+          await getOrCreatePayee(finalPayee, catId)
+        }
+        const finalTotalAmount = installmentAmountType === 'parcel'
+          ? parseFloat((data.amount * (data.installmentCount || 2)).toFixed(2))
+          : data.amount
 
-      const splitPayload = splits.map(s => ({
-        categoryId: s.categoryId && s.categoryId.trim() !== '' ? s.categoryId : undefined,
-        amount: s.amount,
-        notes: s.notes?.trim() || undefined,
-      }))
-
-      if (transaction?.splitGroupId) {
-        await updateSplitTransaction(transaction.splitGroupId, {
+        await updateInstallmentPurchase(transaction.installmentGroupId, {
           accountId: data.accountId,
-          date: txDate,
+          categoryId: catId,
+          description: finalPayee,
+          totalAmount: finalTotalAmount,
+          installmentCount: data.installmentCount || 2,
+          startDate: txDate,
           payee: finalPayee,
-          type: mode === 'income' ? 'income' : 'expense',
           notes: data.notes,
-          splits: splitPayload,
         })
       } else if (isEdit && transaction?.id) {
-        // Transação avulsa anterior sendo convertida em split
-        await deleteTransaction(transaction.id)
-        await createSplitTransaction({
+        if (mode !== 'transfer') {
+          await getOrCreatePayee(finalPayee, catId)
+        }
+        // Se estava em split e virou única, remove o split_group_id
+        await updateTransaction(transaction.id, {
           accountId: data.accountId,
           date: txDate,
+          amount: data.amount,
           payee: finalPayee,
-          type: mode === 'income' ? 'income' : 'expense',
+          categoryId: catId,
           notes: data.notes,
-          splits: splitPayload,
+          type: mode === 'income' ? 'income' : mode === 'transfer' ? 'transfer' : 'expense',
+          transferAccountId: mode === 'transfer' ? (data.transferAccountId || undefined) : undefined,
+          splitGroupId: undefined,
+        })
+      } else if (mode === 'transfer') {
+        if (!data.transferAccountId) return
+        await createTransfer({
+          fromAccountId: data.accountId,
+          toAccountId: data.transferAccountId,
+          amount: data.amount,
+          date: txDate,
+          notes: data.notes,
+          payee: finalPayee,
+        })
+      } else if (isInstallment) {
+        if (!data.installmentCount) return
+        const finalTotalAmount = installmentAmountType === 'parcel'
+          ? parseFloat((data.amount * data.installmentCount).toFixed(2))
+          : data.amount
+
+        await createInstallmentPurchase({
+          accountId: data.accountId,
+          categoryId: catId,
+          description: finalPayee,
+          totalAmount: finalTotalAmount,
+          installmentCount: data.installmentCount,
+          startDate: txDate,
+          payee: finalPayee,
+          notes: data.notes,
         })
       } else {
-        await createSplitTransaction({
+        await getOrCreatePayee(finalPayee, catId)
+        await createTransaction({
           accountId: data.accountId,
           date: txDate,
+          amount: data.amount,
           payee: finalPayee,
-          type: mode === 'income' ? 'income' : 'expense',
+          categoryId: catId,
           notes: data.notes,
-          splits: splitPayload,
+          cleared: false,
+          type: mode === 'income' ? 'income' : 'expense',
         })
       }
-
       onSuccess?.()
       onClose()
-      return
+    } catch (err: any) {
+      console.error('Erro ao salvar transação:', err)
+      alert(err.message || 'Erro ao salvar transação.')
     }
-
-    if (isExistingInstallment && transaction?.installmentGroupId) {
-      if (mode !== 'transfer') {
-        await getOrCreatePayee(finalPayee, catId)
-      }
-      const finalTotalAmount = installmentAmountType === 'parcel'
-        ? parseFloat((data.amount * (data.installmentCount || 2)).toFixed(2))
-        : data.amount
-
-      await updateInstallmentPurchase(transaction.installmentGroupId, {
-        accountId: data.accountId,
-        categoryId: catId,
-        description: finalPayee,
-        totalAmount: finalTotalAmount,
-        installmentCount: data.installmentCount || 2,
-        startDate: txDate,
-        payee: finalPayee,
-        notes: data.notes,
-      })
-    } else if (isEdit && transaction?.id) {
-      if (mode !== 'transfer') {
-        await getOrCreatePayee(finalPayee, catId)
-      }
-      // Se estava em split e virou única, remove o split_group_id
-      await updateTransaction(transaction.id, {
-        accountId: data.accountId,
-        date: txDate,
-        amount: data.amount,
-        payee: finalPayee,
-        categoryId: catId,
-        notes: data.notes,
-        type: mode === 'income' ? 'income' : mode === 'transfer' ? 'transfer' : 'expense',
-        transferAccountId: mode === 'transfer' ? (data.transferAccountId || undefined) : undefined,
-        splitGroupId: undefined,
-      })
-    } else if (mode === 'transfer') {
-      if (!data.transferAccountId) return
-      await createTransfer({
-        fromAccountId: data.accountId,
-        toAccountId: data.transferAccountId,
-        amount: data.amount,
-        date: txDate,
-        notes: data.notes,
-        payee: finalPayee,
-      })
-    } else if (isInstallment) {
-      if (!data.installmentCount) return
-      const finalTotalAmount = installmentAmountType === 'parcel'
-        ? parseFloat((data.amount * data.installmentCount).toFixed(2))
-        : data.amount
-
-      await createInstallmentPurchase({
-        accountId: data.accountId,
-        categoryId: catId,
-        description: finalPayee,
-        totalAmount: finalTotalAmount,
-        installmentCount: data.installmentCount,
-        startDate: txDate,
-        payee: finalPayee,
-        notes: data.notes,
-      })
-    } else {
-      await getOrCreatePayee(finalPayee, catId)
-      await createTransaction({
-        accountId: data.accountId,
-        date: txDate,
-        amount: data.amount,
-        payee: finalPayee,
-        categoryId: catId,
-        notes: data.notes,
-        cleared: false,
-        type: mode === 'income' ? 'income' : 'expense',
-      })
-    }
-    onSuccess?.()
-    onClose()
   }
 
   return (

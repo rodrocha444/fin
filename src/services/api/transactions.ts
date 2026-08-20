@@ -344,7 +344,12 @@ export async function createSplitTransaction(data: {
   const splitGroupId = createId()
   const now = new Date()
 
-  const rows = data.splits.map(s => {
+  const validSplits = data.splits.filter(s => s.amount > 0)
+  if (validSplits.length === 0) {
+    throw new Error('Nenhuma divisão com valor positivo informada.')
+  }
+
+  const rows = validSplits.map(s => {
     const id = createId()
     return transactionToRow({
       id,
@@ -361,7 +366,19 @@ export async function createSplitTransaction(data: {
     })
   })
 
-  const { error } = await client.from('transactions').insert(rows)
+  let { error } = await client.from('transactions').insert(rows)
+
+  // Se o banco ainda não tiver a coluna split_group_id, faz fallback removendo o campo para não travar a gravação
+  if (error && error.message.includes('split_group_id')) {
+    const fallbackRows = rows.map(r => {
+      const copy = { ...r }
+      delete (copy as any).split_group_id
+      return copy
+    })
+    const res = await client.from('transactions').insert(fallbackRows)
+    error = res.error
+  }
+
   if (error) throw new Error(`Erro ao criar transação dividida: ${error.message}`)
 
   notifyDataChanged('transactions', 'insert')
@@ -386,8 +403,13 @@ export async function updateSplitTransaction(
   // Remove os registros antigos do grupo de rateio
   await client.from('transactions').delete().eq('split_group_id', splitGroupId)
 
+  const validSplits = data.splits.filter(s => s.amount > 0)
+  if (validSplits.length === 0) {
+    throw new Error('Nenhuma divisão com valor positivo informada.')
+  }
+
   // Insere as novas partes do rateio mantendo o mesmo splitGroupId
-  const rows = data.splits.map(s => {
+  const rows = validSplits.map(s => {
     const id = createId()
     return transactionToRow({
       id,
@@ -404,7 +426,18 @@ export async function updateSplitTransaction(
     })
   })
 
-  const { error } = await client.from('transactions').insert(rows)
+  let { error } = await client.from('transactions').insert(rows)
+
+  if (error && error.message.includes('split_group_id')) {
+    const fallbackRows = rows.map(r => {
+      const copy = { ...r }
+      delete (copy as any).split_group_id
+      return copy
+    })
+    const res = await client.from('transactions').insert(fallbackRows)
+    error = res.error
+  }
+
   if (error) throw new Error(`Erro ao atualizar transação dividida: ${error.message}`)
 
   notifyDataChanged('transactions', 'update')
