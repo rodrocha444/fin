@@ -21,7 +21,7 @@ import {
 import { format } from 'date-fns'
 import { useAccount, useAccounts, useAccountBalance } from '@/hooks/useAccounts'
 import {
-  useAccountTransactionsWithScheduled,
+  useAccountTransactions,
   useCreditCardPurchases,
   type CreditCardPurchase,
 } from '@/hooks/useTransactions'
@@ -29,7 +29,6 @@ import { usePaidInvoices, useClosedUnpaidInvoices } from '@/hooks/useInvoices'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
 import { deleteTransaction, deleteInstallmentGroup, deleteSplitTransaction } from '@/services/api/transactions'
 import { deleteAccount } from '@/services/api/accounts'
-import { deleteScheduled, confirmScheduledOccurrence } from '@/services/api/scheduled'
 import { formatCurrency, formatDate, formatMonthLabel, currentMonth, accountTypeLabel, compareTransactionsByDate } from '@/utils/format'
 import {
   getCurrentOpenInvoiceMonth,
@@ -67,10 +66,7 @@ export default function AccountDetailPage() {
   const balance = useAccountBalance(accountId) ?? 0
   const isCreditCard = account?.type === 'credit_card'
 
-  const accountTransactionsData = useAccountTransactionsWithScheduled(accountId)
-  const transactions = accountTransactionsData?.transactions
-  const futureOffset = accountTransactionsData?.futureOffset ?? 0
-  const futureBalance = balance + futureOffset
+  const transactions = useAccountTransactions(accountId)
 
   const ccPurchases = useCreditCardPurchases(accountId)
   const { categories } = useCategoriesWithGroups() ?? {}
@@ -155,17 +151,6 @@ export default function AccountDetailPage() {
     .sort(compareTransactionsByDate)
 
   const handleDeleteTx = async (tx: Transaction) => {
-    if (tx.isScheduledProjection && tx.scheduledId) {
-      const ok = await confirm({
-        title: 'Remover Agendamento',
-        message: `Deseja remover a projeção do agendamento "${tx.payee}"?`,
-        confirmText: 'Remover',
-        variant: 'danger',
-      })
-      if (!ok) return
-      await deleteScheduled(tx.scheduledId)
-      return
-    }
     if (tx.splitGroupId) {
       const splitCount = (transactions ?? []).filter(t => t.splitGroupId === tx.splitGroupId).length
       const ok = await confirm({
@@ -187,19 +172,6 @@ export default function AccountDetailPage() {
     })
     if (!ok) return
     await deleteTransaction(tx.id)
-  }
-
-  const handleConfirmScheduled = async (tx: Transaction) => {
-    if (!tx.scheduledId) return
-    try {
-      await confirmScheduledOccurrence(tx.scheduledId, tx.date)
-    } catch (err: any) {
-      await showAlert({
-        title: 'Erro no Agendamento',
-        message: err.message || 'Ocorreu um erro ao efetivar o agendamento.',
-        variant: 'danger',
-      })
-    }
   }
 
   const handleDeletePurchase = async (p: CreditCardPurchase) => {
@@ -361,16 +333,6 @@ export default function AccountDetailPage() {
                 <p className={`text-xl sm:text-2xl font-bold tabular-nums ${isNeg ? 'text-rose-400' : 'text-slate-100'}`}>
                   {formatCurrency(balance)}
                 </p>
-
-                {/* Saldo Futuro projetado com agendamentos (apenas para contas não-cartão) */}
-                {!isCreditCard && (
-                  <div className="mt-0.5 flex items-center justify-start sm:justify-end gap-1.5 text-xs text-slate-400">
-                    <span className="text-[10px] text-slate-500 uppercase tracking-wider">Saldo Futuro:</span>
-                    <span className={`font-semibold tabular-nums ${futureBalance < 0 ? 'text-rose-400' : 'text-slate-200'}`}>
-                      {formatCurrency(futureBalance)}
-                    </span>
-                  </div>
-                )}
 
                 {account.type === 'credit_card' && account.creditLimit && (
                   <p className="text-xs text-slate-400 mt-0.5">
@@ -658,7 +620,6 @@ export default function AccountDetailPage() {
                     categoryName={tx.categoryId ? categoryMap.get(tx.categoryId)?.name : undefined}
                     onEdit={() => setEditingTx(tx)}
                     onDelete={() => handleDeleteTx(tx)}
-                    onConfirmScheduled={tx.isScheduledProjection ? () => handleConfirmScheduled(tx) : undefined}
                   />
                 ))
               )

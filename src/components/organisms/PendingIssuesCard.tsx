@@ -30,8 +30,6 @@ export default function PendingIssuesCard() {
   const handleItemClick = (issue: PendingIssue, itemId: string) => {
     if (issue.ruleId === 'uncategorized_transactions') {
       navigate(`/transactions?edit=${itemId}`)
-    } else if (issue.ruleId === 'overdue_scheduled') {
-      navigate('/scheduled')
     } else if (issue.ruleId === 'overspent_categories') {
       navigate('/')
     }

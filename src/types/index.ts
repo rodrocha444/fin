@@ -83,9 +83,6 @@ export interface Transaction {
   installmentTotal?: number
   /** Se essa transação faz parte de uma divisão de categorias (split) */
   splitGroupId?: string
-  /** Se essa transação é uma projeção de agendamento futuro */
-  isScheduledProjection?: boolean
-  scheduledId?: string
   createdAt: Date
 }
 
@@ -102,27 +99,6 @@ export interface InstallmentGroup {
   startDate: Date
   accountId: string
   categoryId?: string
-  createdAt: Date
-}
-
-// ── Transações Agendadas ─────────────────────────────────────
-
-export type ScheduledFrequency = 'once' | 'weekly' | 'biweekly' | 'monthly' | 'yearly'
-
-export interface ScheduledTransaction {
-  id?: string
-  accountId: string
-  amount: number
-  payee: string
-  categoryId?: string
-  type: TransactionType
-  transferAccountId?: string
-  frequency: ScheduledFrequency
-  /** Próxima data de disparo */
-  nextDate: Date
-  endDate?: Date
-  notes?: string
-  isActive: boolean
   createdAt: Date
 }
 

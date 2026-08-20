@@ -6,7 +6,6 @@ import {
   useCategoriesQuery,
   useBudgetMonthsQuery,
   useTransactionsQuery,
-  useScheduledTransactionsQuery,
 } from '@/hooks/queries'
 import {
   calculateBudgetRows,
@@ -80,8 +79,7 @@ export function useBudgetSummary(month: string): BudgetSummary | undefined {
   const { data: categories = [], isLoading: l3 } = useCategoriesQuery()
   const { data: budgetMonths = [], isLoading: l4 } = useBudgetMonthsQuery()
   const { data: transactions = [], isLoading: l5 } = useTransactionsQuery()
-  const { data: scheduledTransactions = [], isLoading: l6 } = useScheduledTransactionsQuery()
-  const isLoading = l1 || l2 || l3 || l4 || l5 || l6
+  const isLoading = l1 || l2 || l3 || l4 || l5
 
   return useMemo(() => {
     if (isLoading && accounts.length === 0) return undefined
@@ -91,8 +89,7 @@ export function useBudgetSummary(month: string): BudgetSummary | undefined {
       categoryGroups,
       categories,
       budgetMonths,
-      transactions,
-      scheduledTransactions
+      transactions
     )
   }, [
     month,
@@ -101,7 +98,6 @@ export function useBudgetSummary(month: string): BudgetSummary | undefined {
     categories,
     budgetMonths,
     transactions,
-    scheduledTransactions,
     isLoading,
   ])
 }

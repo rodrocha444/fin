@@ -10,7 +10,6 @@ import {
   useBudgetMonthsQuery,
   useTransactionsQuery,
   useInstallmentGroupsQuery,
-  useScheduledTransactionsQuery,
   useDebtAccountsQuery,
   useDebtItemsQuery,
   usePayeesQuery,
@@ -22,7 +21,6 @@ import type {
   BudgetMonth,
   Transaction,
   InstallmentGroup,
-  ScheduledTransaction,
   DebtAccount,
   DebtItem,
   Payee,
@@ -38,7 +36,6 @@ export interface FinancialDataContextValue {
   budgetMonths: BudgetMonth[]
   transactions: Transaction[]
   installmentGroups: InstallmentGroup[]
-  scheduledTransactions: ScheduledTransaction[]
   debtAccounts: DebtAccount[]
   debtItems: DebtItem[]
   payees: Payee[]
@@ -61,12 +58,11 @@ export const FinancialDataProvider: React.FC<{ children: React.ReactNode }> = ({
   const { data: budgetMonths = [], isLoading: l4 } = useBudgetMonthsQuery()
   const { data: transactions = [], isLoading: l5 } = useTransactionsQuery()
   const { data: installmentGroups = [], isLoading: l6 } = useInstallmentGroupsQuery()
-  const { data: scheduledTransactions = [], isLoading: l7 } = useScheduledTransactionsQuery()
-  const { data: debtAccounts = [], isLoading: l8 } = useDebtAccountsQuery()
-  const { data: debtItems = [], isLoading: l9 } = useDebtItemsQuery()
-  const { data: payees = [], isLoading: l10 } = usePayeesQuery()
+  const { data: debtAccounts = [], isLoading: l7 } = useDebtAccountsQuery()
+  const { data: debtItems = [], isLoading: l8 } = useDebtItemsQuery()
+  const { data: payees = [], isLoading: l9 } = usePayeesQuery()
 
-  const isLoading = l1 || l2 || l3 || l4 || l5 || l6 || l7 || l8 || l9 || l10
+  const isLoading = l1 || l2 || l3 || l4 || l5 || l6 || l7 || l8 || l9
 
   // ── Supabase Realtime: invalida queries em vez de setar estado manualmente ──
   useEffect(() => {
@@ -75,7 +71,7 @@ export const FinancialDataProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const tables = [
       'accounts', 'category_groups', 'categories', 'budget_months',
-      'transactions', 'installment_groups', 'scheduled_transactions',
+      'transactions', 'installment_groups',
       'payees', 'debt_accounts', 'debt_items',
     ] as const
 
@@ -130,7 +126,6 @@ export const FinancialDataProvider: React.FC<{ children: React.ReactNode }> = ({
     budgetMonths,
     transactions,
     installmentGroups,
-    scheduledTransactions,
     debtAccounts,
     debtItems,
     payees,
@@ -145,7 +140,6 @@ export const FinancialDataProvider: React.FC<{ children: React.ReactNode }> = ({
     budgetMonths,
     transactions,
     installmentGroups,
-    scheduledTransactions,
     debtAccounts,
     debtItems,
     payees,

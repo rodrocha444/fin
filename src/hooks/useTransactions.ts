@@ -3,10 +3,8 @@ import { useMemo } from 'react'
 import {
   useTransactionsQuery,
   useAccountsQuery,
-  useScheduledTransactionsQuery,
   useInstallmentGroupsQuery,
 } from '@/hooks/queries'
-import { getProjectedScheduledForMonth, getProjectedScheduledForAccount } from '@/services/api/scheduled'
 import { format, addMonths } from 'date-fns'
 import { getInvoiceCycle, getInvoiceData } from '@/utils/invoices'
 import { compareTransactionsByDate } from '@/utils/format'
@@ -79,59 +77,17 @@ export function useAccountTransactions(accountId: string | undefined): Transacti
   }, [transactions, accountId, isLoading])
 }
 
-/** Transações de uma conta incluindo agendamentos futuros projetados e saldo futuro */
+/** Transações de uma conta (com rateios consolidados) e offset de saldo futuro compatível */
 export function useAccountTransactionsWithScheduled(accountId: string | undefined): {
   transactions: Transaction[]
   futureOffset: number
 } | undefined {
-  const { data: transactions = [], isLoading: l1 } = useTransactionsQuery()
-  const { data: scheduledTransactions = [], isLoading: l2 } = useScheduledTransactionsQuery()
-  const isLoading = l1 || l2
+  const txs = useAccountTransactions(accountId)
 
   return useMemo(() => {
-    if (isLoading && transactions.length === 0) return undefined
-    if (!accountId) return { transactions: [], futureOffset: 0 }
-
-    const txs = transactions.filter(
-      t => t.accountId === accountId || (t.transferAccountId === accountId && t.type === 'transfer')
-    )
-
-    const activeScheduled = scheduledTransactions.filter(s => s.isActive !== false)
-    const projected = getProjectedScheduledForAccount(accountId, activeScheduled, 6)
-
-    const projectedTxs: Transaction[] = projected.map(p => ({
-      id: `proj_${p.scheduledId}_${p.date.getTime()}`,
-      accountId: p.accountId,
-      transferAccountId: p.transferAccountId,
-      date: p.date,
-      amount: p.amount,
-      payee: p.payee,
-      categoryId: p.categoryId,
-      notes: p.notes,
-      cleared: false,
-      type: p.type,
-      isScheduledProjection: true,
-      scheduledId: p.scheduledId,
-      createdAt: p.date,
-    }))
-
-    let futureOffset = 0
-    for (const p of projected) {
-      if (p.accountId === accountId) {
-        if (p.type === 'income') futureOffset += p.amount
-        else if (p.type === 'expense' || p.type === 'transfer') futureOffset -= p.amount
-      }
-      if (p.transferAccountId === accountId && p.type === 'transfer') {
-        futureOffset += p.amount
-      }
-    }
-
-    const consolidatedTxs = consolidateSplitTransactions(txs)
-    const combined = [...consolidatedTxs, ...projectedTxs]
-    combined.sort(compareTransactionsByDate)
-
-    return { transactions: combined, futureOffset }
-  }, [transactions, scheduledTransactions, accountId, isLoading])
+    if (!txs) return undefined
+    return { transactions: txs, futureOffset: 0 }
+  }, [txs])
 }
 
 /** Transações de uma categoria em um mês específico (não consolida para exibir a fatia exata da categoria) */
@@ -180,11 +136,9 @@ export function useCategoryMonthTransactions(categoryId: string | undefined, mon
   }, [transactions, accounts, categoryId, month, isLoading])
 }
 
-/** Transações de um mês (YYYY-MM), incluindo agendamentos e consolidando rateios para o extrato */
+/** Transações de um mês (YYYY-MM), consolidando rateios para o extrato */
 export function useMonthTransactions(month: string): Transaction[] | undefined {
-  const { data: transactions = [], isLoading: l1 } = useTransactionsQuery()
-  const { data: scheduledTransactions = [], isLoading: l2 } = useScheduledTransactionsQuery()
-  const isLoading = l1 || l2
+  const { data: transactions = [], isLoading } = useTransactionsQuery()
 
   return useMemo(() => {
     if (isLoading && transactions.length === 0) return undefined
@@ -199,27 +153,8 @@ export function useMonthTransactions(month: string): Transaction[] | undefined {
     })
 
     const consolidatedTxs = consolidateSplitTransactions(txs)
-
-    const activeScheduled = scheduledTransactions.filter(s => s.isActive !== false)
-    const projected = getProjectedScheduledForMonth(activeScheduled, month)
-    const projectedTxs: Transaction[] = projected.map(p => ({
-      accountId: p.accountId,
-      transferAccountId: p.transferAccountId,
-      date: p.date,
-      amount: p.amount,
-      payee: p.payee,
-      categoryId: p.categoryId,
-      notes: p.notes,
-      cleared: false,
-      type: p.type,
-      isScheduledProjection: true,
-      scheduledId: p.scheduledId,
-      createdAt: p.date,
-    }))
-
-    const combined = [...consolidatedTxs, ...projectedTxs]
-    return combined.sort(compareTransactionsByDate)
-  }, [transactions, scheduledTransactions, month, isLoading])
+    return consolidatedTxs.sort(compareTransactionsByDate)
+  }, [transactions, month, isLoading])
 }
 
 /** Resumo (income / expense) de um mês */

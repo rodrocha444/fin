@@ -6,7 +6,6 @@ export type TableName =
   | 'budget_months'
   | 'transactions'
   | 'installment_groups'
-  | 'scheduled_transactions'
   | 'debt_accounts'
   | 'debt_items'
   | 'payees'

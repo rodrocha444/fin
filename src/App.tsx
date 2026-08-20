@@ -1,10 +1,9 @@
 // src/App.tsx — Aplicação Principal com Code-Splitting e TanStack Query
-import { useEffect, lazy, Suspense } from 'react'
+import { lazy, Suspense } from 'react'
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from '@/components/templates/Layout'
 import { FinancialDataProvider } from '@/context/FinancialDataContext'
 import { ConfirmProvider } from '@/context/ConfirmContext'
-import { processScheduledTransactions } from '@/services/api/scheduled'
 
 // Code-splitting das páginas para redução do bundle inicial
 const BudgetPage = lazy(() => import('@/components/pages/BudgetPage'))
@@ -12,7 +11,6 @@ const AccountsPage = lazy(() => import('@/components/pages/AccountsPage'))
 const AccountDetailPage = lazy(() => import('@/components/pages/AccountDetailPage'))
 const AccountInvoicePage = lazy(() => import('@/components/pages/AccountInvoicePage'))
 const TransactionsPage = lazy(() => import('@/components/pages/TransactionsPage'))
-const ScheduledPage = lazy(() => import('@/components/pages/ScheduledPage'))
 const DebtAccountPage = lazy(() => import('@/components/pages/DebtAccountPage'))
 const ReportsPage = lazy(() => import('@/components/pages/ReportsPage'))
 const SettingsPage = lazy(() => import('@/components/pages/SettingsPage'))
@@ -29,10 +27,6 @@ function PageFallback() {
 }
 
 export default function App() {
-  useEffect(() => {
-    processScheduledTransactions().catch(console.error)
-  }, [])
-
   return (
     <FinancialDataProvider>
       <ConfirmProvider>
@@ -49,7 +43,7 @@ export default function App() {
                 <Route path="transactions" element={<TransactionsPage />} />
                 <Route path="debts" element={<Navigate to="/accounts" replace />} />
                 <Route path="debts/:id" element={<DebtAccountPage />} />
-                <Route path="scheduled" element={<ScheduledPage />} />
+                <Route path="scheduled" element={<Navigate to="/budget" replace />} />
                 <Route path="reports" element={<ReportsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>

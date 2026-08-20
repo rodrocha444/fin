@@ -8,7 +8,6 @@ import {
   budgetMonthToRow,
   transactionToRow,
   installmentGroupToRow,
-  scheduledTransactionToRow,
   debtAccountToRow,
   debtItemToRow,
   payeeToRow,
@@ -33,7 +32,6 @@ const TABLES = [
   'budget_months',
   'transactions',
   'installment_groups',
-  'scheduled_transactions',
   'debt_accounts',
   'debt_items',
   'payees',
@@ -104,8 +102,6 @@ function normalizeRecordForTable(tableName: string, r: any): any {
         installmentNumber: r.installmentNumber ?? r.installment_number ?? undefined,
         installmentTotal: r.installmentTotal ?? r.installment_total ?? undefined,
         splitGroupId: r.splitGroupId || r.split_group_id || undefined,
-        isScheduledProjection: Boolean(r.isScheduledProjection ?? r.is_scheduled_projection),
-        scheduledId: r.scheduledId || r.scheduled_id || undefined,
         createdAt: r.createdAt || r.created_at,
       })
 
@@ -119,23 +115,6 @@ function normalizeRecordForTable(tableName: string, r: any): any {
         startDate: r.startDate || r.start_date,
         accountId: r.accountId || r.account_id,
         categoryId: r.categoryId || r.category_id || undefined,
-        createdAt: r.createdAt || r.created_at,
-      })
-
-    case 'scheduled_transactions':
-      return scheduledTransactionToRow({
-        id,
-        accountId: r.accountId || r.account_id,
-        amount: Number(r.amount ?? 0),
-        payee: r.payee || '',
-        categoryId: r.categoryId || r.category_id || undefined,
-        type: r.type || 'expense',
-        transferAccountId: r.transferAccountId || r.transfer_account_id || undefined,
-        frequency: r.frequency || 'monthly',
-        nextDate: r.nextDate || r.next_date,
-        endDate: r.endDate || r.end_date,
-        notes: r.notes || undefined,
-        isActive: Boolean(r.isActive ?? r.is_active ?? true),
         createdAt: r.createdAt || r.created_at,
       })
 
@@ -246,7 +225,6 @@ export async function importDatabase(
       category_groups: 'categoryGroups',
       budget_months: 'budgetMonths',
       installment_groups: 'installmentGroups',
-      scheduled_transactions: 'scheduledTransactions',
       debt_accounts: 'debtAccounts',
       debt_items: 'debtItems',
     }

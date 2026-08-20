@@ -6,7 +6,6 @@ import type {
   Category,
   CategoryGroup,
   BudgetMonth,
-  ScheduledTransaction,
   PendingIssue,
 } from '@/types'
 
@@ -14,8 +13,7 @@ export function computePendingIssues(
   transactions: Transaction[],
   categories: Category[],
   categoryGroups: CategoryGroup[],
-  budgetMonths: BudgetMonth[],
-  scheduledTransactions: ScheduledTransaction[]
+  budgetMonths: BudgetMonth[]
 ): PendingIssue[] {
   const issues: PendingIssue[] = []
 
@@ -79,33 +77,6 @@ export function computePendingIssues(
       severity: 'error',
       count: overspent.length,
       items: overspent,
-    })
-  }
-
-  // Regra 3: Agendamentos vencidos
-  const today = new Date()
-  today.setHours(23, 59, 59, 999)
-
-  const overdue = scheduledTransactions.filter(
-    s => s.isActive && new Date(s.nextDate) <= today
-  )
-
-  if (overdue.length > 0) {
-    issues.push({
-      id: 'overdue_scheduled',
-      ruleId: 'overdue_scheduled',
-      title: `${overdue.length} ${overdue.length === 1 ? 'agendamento pendente' : 'agendamentos pendentes'}`,
-      description: 'Transações recorrentes ou agendadas prontas para lançamento.',
-      severity: 'info',
-      count: overdue.length,
-      items: overdue.map(s => ({
-        id: s.id!,
-        title: s.payee,
-        subtitle: `Vencimento: ${new Date(s.nextDate).toLocaleDateString('pt-BR')}`,
-        amount: s.amount,
-        type: s.type,
-        data: s,
-      })),
     })
   }
 

@@ -66,7 +66,6 @@ export async function deleteAccount(id: string): Promise<void> {
   const client = getClient()
   // Deleta transações vinculadas primeiro
   await client.from('transactions').delete().or(`account_id.eq.${id},transfer_account_id.eq.${id}`)
-  await client.from('scheduled_transactions').delete().or(`account_id.eq.${id},transfer_account_id.eq.${id}`)
   await client.from('installment_groups').delete().eq('account_id', id)
 
   const { error } = await client.from('accounts').delete().eq('id', id)

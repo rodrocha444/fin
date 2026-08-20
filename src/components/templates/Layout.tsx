@@ -4,7 +4,6 @@ import {
   LayoutGrid,
   Wallet,
   ArrowLeftRight,
-  CalendarClock,
   BarChart3,
   Settings,
 } from 'lucide-react'
@@ -15,7 +14,6 @@ const NAV = [
   { to: '/budget', label: 'Orçamento', icon: LayoutGrid },
   { to: '/accounts', label: 'Contas', icon: Wallet },
   { to: '/transactions', label: 'Transações', icon: ArrowLeftRight },
-  { to: '/scheduled', label: 'Agenda', icon: CalendarClock },
   { to: '/reports', label: 'Relatórios', icon: BarChart3 },
   { to: '/settings', label: 'Config.', icon: Settings },
 ]

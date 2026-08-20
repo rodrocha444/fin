@@ -3,7 +3,6 @@ import { createId } from '@/utils/id'
 import { format, subMonths } from 'date-fns'
 import { isInitialSetupCategory } from '@/utils/format'
 import { getInvoiceForBudgetMonth } from '@/utils/invoices'
-import { getProjectedScheduledUpToMonth } from './scheduled'
 import { notifyDataChanged } from './events'
 import type {
   Account,
@@ -11,7 +10,6 @@ import type {
   Category,
   BudgetMonth,
   Transaction,
-  ScheduledTransaction,
   GroupBudgetRow,
   CategoryBudgetRow,
   IncomeGroupBudgetRow,
@@ -247,8 +245,7 @@ export function calculateBudgetSummary(
   categoryGroups: CategoryGroup[],
   categories: Category[],
   budgetMonths: BudgetMonth[],
-  transactions: Transaction[],
-  scheduledTransactions: ScheduledTransaction[]
+  transactions: Transaction[]
 ): BudgetSummary {
   const accountMap = new Map(accounts.map(a => [a.id!, a]))
   const allIncomeTxs = transactions.filter(t => t.type === 'income' && accountMap.get(t.accountId)?.type !== 'off_budget')
@@ -299,31 +296,9 @@ export function calculateBudgetSummary(
     }
   }
 
-  const activeScheduled = scheduledTransactions.filter(s => s.isActive !== false)
-  const scheduledTxs = getProjectedScheduledUpToMonth(activeScheduled, month)
-  for (const s of scheduledTxs) {
-    const sMonth = toMonthKey(new Date(s.date))
-    const acc = accountMap.get(s.accountId)
-    if (acc?.type === 'off_budget') continue
-
-    if (s.type === 'income') {
-      if (sMonth === month) totalIncome += s.amount
-      else if (sMonth < month) priorIncome += s.amount
-    } else if (s.type === 'expense') {
-      if (s.categoryId && ignoredCategoryIds.has(s.categoryId)) continue
-      if (s.categoryId) {
-        const key = `${sMonth}:${s.categoryId}`
-        expensesByMonthCategory.set(key, (expensesByMonthCategory.get(key) || 0) + s.amount)
-      } else {
-        uncategorizedExpensesByMonth.set(sMonth, (uncategorizedExpensesByMonth.get(sMonth) || 0) + s.amount)
-      }
-    }
-  }
-
   const allMonthsSet = new Set<string>()
   for (const tx of transactions) allMonthsSet.add(toMonthKey(new Date(tx.date)))
   for (const b of budgetMonths) allMonthsSet.add(b.month)
-  for (const s of scheduledTxs) allMonthsSet.add(toMonthKey(new Date(s.date)))
   allMonthsSet.add(month)
 
   const priorMonths = Array.from(allMonthsSet).filter(m => m < month).sort()

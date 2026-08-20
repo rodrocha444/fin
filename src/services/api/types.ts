@@ -8,7 +8,6 @@ import type {
   BudgetMonth,
   Transaction,
   InstallmentGroup,
-  ScheduledTransaction,
   Payee,
   DebtAccount,
   DebtItem,
@@ -212,8 +211,6 @@ export function rowToTransaction(row: Tables<'transactions'>): Transaction {
     installmentNumber: row.installment_number ?? undefined,
     installmentTotal: row.installment_total ?? undefined,
     splitGroupId,
-    isScheduledProjection: Boolean(row.is_scheduled_projection),
-    scheduledId: row.scheduled_id || undefined,
     createdAt: toDate(row.created_at) || new Date(),
   }
 }
@@ -247,8 +244,6 @@ export function transactionToRow(item: Partial<Transaction>): Record<string, unk
     installment_group_id: item.installmentGroupId || null,
     installment_number: item.installmentNumber ?? null,
     installment_total: item.installmentTotal ?? null,
-    is_scheduled_projection: item.isScheduledProjection ?? false,
-    scheduled_id: item.scheduledId || null,
     created_at: toIso(item.createdAt) || now,
     updated_at: now,
   }
@@ -281,8 +276,6 @@ export function transactionToUpdateRow(changes: Partial<Transaction>): Record<st
   if (changes.installmentGroupId !== undefined) row.installment_group_id = changes.installmentGroupId || null
   if (changes.installmentNumber !== undefined) row.installment_number = changes.installmentNumber ?? null
   if (changes.installmentTotal !== undefined) row.installment_total = changes.installmentTotal ?? null
-  if (changes.isScheduledProjection !== undefined) row.is_scheduled_projection = changes.isScheduledProjection
-  if (changes.scheduledId !== undefined) row.scheduled_id = changes.scheduledId || null
   return row
 }
 
@@ -331,64 +324,7 @@ export function installmentGroupToUpdateRow(changes: Partial<InstallmentGroup>):
   return row
 }
 
-// 7. Transações Agendadas
-export function rowToScheduledTransaction(row: Tables<'scheduled_transactions'>): ScheduledTransaction {
-  return {
-    id: row.id,
-    accountId: row.account_id,
-    amount: Number(row.amount),
-    payee: row.payee || '',
-    categoryId: row.category_id || undefined,
-    type: (row.type as ScheduledTransaction['type']) || 'expense',
-    transferAccountId: row.transfer_account_id || undefined,
-    frequency: (row.frequency as ScheduledTransaction['frequency']) || 'monthly',
-    nextDate: toDate(row.next_date) || new Date(),
-    endDate: toDate(row.end_date),
-    notes: row.notes || undefined,
-    isActive: Boolean(row.is_active),
-    createdAt: toDate(row.created_at) || new Date(),
-  }
-}
-
-export function scheduledTransactionToRow(item: Partial<ScheduledTransaction>): Record<string, unknown> {
-  const now = new Date().toISOString()
-  return {
-    ...(item.id ? { id: item.id } : {}),
-    account_id: item.accountId ?? '',
-    amount: item.amount ?? 0,
-    payee: item.payee || '',
-    category_id: item.categoryId || null,
-    type: item.type || 'expense',
-    transfer_account_id: item.transferAccountId || null,
-    frequency: item.frequency || 'monthly',
-    next_date: toIso(item.nextDate) || now,
-    end_date: toIso(item.endDate) || null,
-    notes: item.notes || null,
-    is_active: item.isActive ?? true,
-    created_at: toIso(item.createdAt) || now,
-    updated_at: now,
-  }
-}
-
-export function scheduledTransactionToUpdateRow(changes: Partial<ScheduledTransaction>): Record<string, unknown> {
-  const row: Record<string, unknown> = {
-    updated_at: new Date().toISOString(),
-  }
-  if (changes.accountId !== undefined) row.account_id = changes.accountId
-  if (changes.amount !== undefined) row.amount = changes.amount
-  if (changes.payee !== undefined) row.payee = changes.payee
-  if (changes.categoryId !== undefined) row.category_id = changes.categoryId || null
-  if (changes.type !== undefined) row.type = changes.type
-  if (changes.transferAccountId !== undefined) row.transfer_account_id = changes.transferAccountId || null
-  if (changes.frequency !== undefined) row.frequency = changes.frequency
-  if (changes.nextDate !== undefined) row.next_date = toIso(changes.nextDate)
-  if (changes.endDate !== undefined) row.end_date = toIso(changes.endDate)
-  if (changes.notes !== undefined) row.notes = changes.notes || null
-  if (changes.isActive !== undefined) row.is_active = changes.isActive
-  return row
-}
-
-// 8. Beneficiários (Payees)
+// 7. Beneficiários (Payees)
 export function rowToPayee(row: Tables<'payees'>): Payee {
   return {
     id: row.id,

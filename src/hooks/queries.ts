@@ -8,7 +8,6 @@ import {
   rowToBudgetMonth,
   rowToTransaction,
   rowToInstallmentGroup,
-  rowToScheduledTransaction,
   rowToDebtAccount,
   rowToDebtItem,
   rowToPayee,
@@ -20,7 +19,6 @@ import type {
   BudgetMonth,
   Transaction,
   InstallmentGroup,
-  ScheduledTransaction,
   DebtAccount,
   DebtItem,
   Payee,
@@ -34,7 +32,6 @@ export const QUERY_KEYS = {
   budgetMonths: ['budget_months'] as const,
   transactions: ['transactions'] as const,
   installmentGroups: ['installment_groups'] as const,
-  scheduledTransactions: ['scheduled_transactions'] as const,
   debtAccounts: ['debt_accounts'] as const,
   debtItems: ['debt_items'] as const,
   payees: ['payees'] as const,
@@ -48,7 +45,6 @@ export const TABLE_INVALIDATION_MAP: Record<string, ReadonlyArray<readonly strin
   budget_months: [QUERY_KEYS.budgetMonths],
   transactions: [QUERY_KEYS.transactions, QUERY_KEYS.accounts, QUERY_KEYS.budgetMonths],
   installment_groups: [QUERY_KEYS.installmentGroups, QUERY_KEYS.transactions, QUERY_KEYS.accounts],
-  scheduled_transactions: [QUERY_KEYS.scheduledTransactions],
   debt_accounts: [QUERY_KEYS.debtAccounts],
   debt_items: [QUERY_KEYS.debtItems],
   payees: [QUERY_KEYS.payees],
@@ -102,14 +98,6 @@ export async function fetchInstallmentGroups(): Promise<InstallmentGroup[]> {
   const { data, error } = await client.from('installment_groups').select('*')
   if (error) throw new Error(`installment_groups: ${error.message}`)
   return (data ?? []).map(rowToInstallmentGroup)
-}
-
-export async function fetchScheduledTransactions(): Promise<ScheduledTransaction[]> {
-  const client = getSupabaseClient()
-  if (!client) return []
-  const { data, error } = await client.from('scheduled_transactions').select('*')
-  if (error) throw new Error(`scheduled_transactions: ${error.message}`)
-  return (data ?? []).map(rowToScheduledTransaction)
 }
 
 export async function fetchDebtAccounts(): Promise<DebtAccount[]> {
@@ -174,11 +162,6 @@ export function useTransactionsQuery() {
 export function useInstallmentGroupsQuery() {
   const opts = useQueryOptions()
   return useQuery<InstallmentGroup[]>({ queryKey: QUERY_KEYS.installmentGroups, queryFn: fetchInstallmentGroups, ...opts })
-}
-
-export function useScheduledTransactionsQuery() {
-  const opts = useQueryOptions()
-  return useQuery<ScheduledTransaction[]>({ queryKey: QUERY_KEYS.scheduledTransactions, queryFn: fetchScheduledTransactions, ...opts })
 }
 
 export function useDebtAccountsQuery() {
