@@ -109,7 +109,11 @@ export default function TransactionItem({
           ) : (
             <>
               <span className="text-[10px] text-slate-500 truncate">
-                {categoryName ?? <span className="italic">Sem categoria</span>}
+                {tx.splitGroupId ? (
+                  <span className="text-indigo-400 font-medium">Divisão de categorias</span>
+                ) : (
+                  categoryName ?? <span className="italic">Sem categoria</span>
+                )}
               </span>
               <span className="text-[10px] text-slate-600">· {accountName}</span>
             </>

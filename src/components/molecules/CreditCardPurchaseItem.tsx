@@ -50,7 +50,11 @@ export default function CreditCardPurchaseItem({
           </span>
           <span>·</span>
           <span className="truncate">
-            {purchase.type === 'transfer' ? 'Transferência / Pagamento' : categoryName ?? 'Sem categoria'}
+            {purchase.type === 'transfer'
+              ? 'Transferência / Pagamento'
+              : purchase.splitGroupId
+                ? 'Divisão de categorias'
+                : categoryName ?? 'Sem categoria'}
           </span>
         </div>
         {purchase.notes && purchase.notes !== purchase.payee && <p className="text-xs text-slate-600 truncate mt-0.5">{purchase.notes}</p>}

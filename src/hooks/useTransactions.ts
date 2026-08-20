@@ -23,7 +23,39 @@ export interface CreditCardPurchase {
   isInstallment: boolean
 }
 
-/** Transações de uma conta (todas ordenadas por createdAt/date desc) */
+/**
+ * Consolida transações divididas (split) para exibição como uma única transação pai no extrato/histórico
+ */
+export function consolidateSplitTransactions(txs: Transaction[]): Transaction[] {
+  const result: Transaction[] = []
+  const seenSplitGroupIds = new Set<string>()
+
+  for (const tx of txs) {
+    if (!tx.splitGroupId) {
+      result.push(tx)
+      continue
+    }
+
+    if (seenSplitGroupIds.has(tx.splitGroupId)) {
+      continue
+    }
+    seenSplitGroupIds.add(tx.splitGroupId)
+
+    const groupTxs = txs.filter(t => t.splitGroupId === tx.splitGroupId)
+    const totalAmount = groupTxs.reduce((sum, t) => sum + t.amount, 0)
+    const first = groupTxs[0]
+
+    result.push({
+      ...first,
+      amount: totalAmount,
+      categoryId: undefined, // Transação pai de múltiplas categorias
+    })
+  }
+
+  return result
+}
+
+/** Transações de uma conta (todas ordenadas por createdAt/date desc, com rateios consolidados) */
 export function useAccountTransactions(accountId: string | undefined): Transaction[] | undefined {
   const { transactions, isLoading } = useFinancialData()
 
@@ -35,7 +67,9 @@ export function useAccountTransactions(accountId: string | undefined): Transacti
       t => t.accountId === accountId || (t.transferAccountId === accountId && t.type === 'transfer')
     )
 
-    return filtered.sort((a, b) => {
+    const consolidated = consolidateSplitTransactions(filtered)
+
+    return consolidated.sort((a, b) => {
       const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
       const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
       if (timeB !== timeA) return timeB - timeA
@@ -89,7 +123,8 @@ export function useAccountTransactionsWithScheduled(accountId: string | undefine
       }
     }
 
-    const combined = [...txs, ...projectedTxs]
+    const consolidatedTxs = consolidateSplitTransactions(txs)
+    const combined = [...consolidatedTxs, ...projectedTxs]
     combined.sort((a, b) => {
       const timeB = new Date(b.date).getTime()
       const timeA = new Date(a.date).getTime()
@@ -103,7 +138,7 @@ export function useAccountTransactionsWithScheduled(accountId: string | undefine
   }, [transactions, scheduledTransactions, accountId, isLoading])
 }
 
-/** Transações de uma categoria em um mês específico */
+/** Transações de uma categoria em um mês específico (não consolida para exibir a fatia exata da categoria) */
 export function useCategoryMonthTransactions(categoryId: string | undefined, month: string): Transaction[] | undefined {
   const { transactions, accounts, isLoading } = useFinancialData()
 
@@ -120,17 +155,17 @@ export function useCategoryMonthTransactions(categoryId: string | undefined, mon
           const d = addMonths(new Date(y, m - 1, 1), delta)
           return format(d, 'yyyy-MM')
         })
-        const txs = transactions.filter(t => t.accountId === accountId)
-        const matchedTxs: Transaction[] = []
+
         for (const mKey of checkMonths) {
           const cycle = getInvoiceCycle(mKey, acc.statementClosingDay, acc.paymentDueDay)
           if (format(cycle.dueDate, 'yyyy-MM') === month) {
+            const txs = transactions.filter(t => t.accountId === accountId)
             const data = getInvoiceData(txs, cycle)
-            matchedTxs.push(...data.transactions)
+            return data.transactions
           }
         }
-        return matchedTxs
       }
+      return []
     }
 
     const [year, monthNum] = month.split('-').map(Number)
@@ -152,7 +187,7 @@ export function useCategoryMonthTransactions(categoryId: string | undefined, mon
   }, [transactions, accounts, categoryId, month, isLoading])
 }
 
-/** Transações de um mês (YYYY-MM), incluindo ocorrências futuras de agendamentos */
+/** Transações de um mês (YYYY-MM), incluindo agendamentos e consolidando rateios para o extrato */
 export function useMonthTransactions(month: string): Transaction[] | undefined {
   const { transactions, scheduledTransactions, isLoading } = useFinancialData()
 
@@ -167,6 +202,8 @@ export function useMonthTransactions(month: string): Transaction[] | undefined {
       const tTime = new Date(t.date).getTime()
       return tTime >= startDate && tTime <= endDate
     })
+
+    const consolidatedTxs = consolidateSplitTransactions(txs)
 
     const activeScheduled = scheduledTransactions.filter(s => s.isActive !== false)
     const projected = getProjectedScheduledForMonth(activeScheduled, month)
@@ -185,7 +222,7 @@ export function useMonthTransactions(month: string): Transaction[] | undefined {
       createdAt: p.date,
     }))
 
-    const combined = [...txs, ...projectedTxs]
+    const combined = [...consolidatedTxs, ...projectedTxs]
     return combined.sort((a, b) => {
       const timeB = (b.createdAt ? new Date(b.createdAt) : new Date(b.date)).getTime()
       const timeA = (a.createdAt ? new Date(a.createdAt) : new Date(a.date)).getTime()
@@ -234,6 +271,7 @@ export function useCreditCardPurchases(accountId: string | undefined): CreditCar
 
     const groupMap = new Map(allGroups.map(g => [g.id!, g]))
     const seenGroupIds = new Set<string>()
+    const seenSplitGroupIds = new Set<string>()
     const purchases: CreditCardPurchase[] = []
 
     for (const tx of allTxs) {
@@ -279,11 +317,30 @@ export function useCreditCardPurchases(accountId: string | undefined): CreditCar
           type: 'expense',
           isInstallment: true,
         })
+      } else if (tx.splitGroupId) {
+        if (seenSplitGroupIds.has(tx.splitGroupId)) continue
+        seenSplitGroupIds.add(tx.splitGroupId)
+
+        const splitTxs = allTxs.filter(t => t.splitGroupId === tx.splitGroupId)
+        const totalAmount = splitTxs.reduce((sum, t) => sum + t.amount, 0)
+
+        purchases.push({
+          id: `split-${tx.splitGroupId}`,
+          transactionId: tx.id,
+          splitGroupId: tx.splitGroupId,
+          payee: tx.payee,
+          date: tx.date,
+          createdAt: tx.createdAt,
+          amount: totalAmount,
+          categoryId: undefined,
+          notes: tx.notes,
+          type: tx.type,
+          isInstallment: false,
+        })
       } else {
         purchases.push({
           id: `tx-${tx.id}`,
           transactionId: tx.id,
-          splitGroupId: tx.splitGroupId,
           payee: tx.payee,
           date: tx.date,
           createdAt: tx.createdAt,
