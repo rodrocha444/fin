@@ -6,7 +6,7 @@ import {
   useInstallmentGroupsQuery,
 } from '@/hooks/queries'
 import { format, addMonths } from 'date-fns'
-import { getInvoiceCycle, getInvoiceData } from '@/utils/invoices'
+import { getInvoiceCycle, getInvoiceData, getTransactionEffectiveMonth } from '@/utils/invoices'
 import { compareTransactionsByDate } from '@/utils/format'
 import type { Transaction } from '@/types'
 
@@ -123,15 +123,13 @@ export function useCategoryMonthTransactions(categoryId: string | undefined, mon
       return []
     }
 
-    const [year, monthNum] = month.split('-').map(Number)
-    const startDate = new Date(year, monthNum - 1, 1).getTime()
-    const endDate = new Date(year, monthNum, 0, 23, 59, 59, 999).getTime()
+    const accountMap = new Map(accounts.map(a => [a.id!, a]))
 
     return transactions
       .filter(t => {
         if (t.categoryId !== categoryId) return false
-        const tTime = new Date(t.date).getTime()
-        return tTime >= startDate && tTime <= endDate
+        const effMonth = getTransactionEffectiveMonth(t, accountMap)
+        return effMonth === month
       })
       .sort(compareTransactionsByDate)
   }, [transactions, accounts, categoryId, month, isLoading])

@@ -284,3 +284,35 @@ export function getInvoiceForBudgetMonth(
 
   return totalInvoice
 }
+
+/**
+ * Retorna o mês contábil/efetivo de uma transação ('YYYY-MM') para efeito de Orçamento e Regime de Caixa.
+ * - Para Conta Corrente (débito/dinheiro): o mês da data da transação.
+ * - Para Cartão de Crédito com fechamento/vencimento: o mês de vencimento da fatura onde a compra caiu.
+ */
+export function getTransactionEffectiveMonth(
+  tx: Transaction,
+  accountMap?: Map<string, Account> | Account[]
+): string {
+  const txDate = new Date(tx.date)
+  if (!tx.accountId || !accountMap) return format(txDate, 'yyyy-MM')
+
+  const map = Array.isArray(accountMap) ? new Map(accountMap.map(a => [a.id!, a])) : accountMap
+  const account = map.get(tx.accountId)
+  if (!account || account.type !== 'credit_card' || !account.statementClosingDay) {
+    return format(txDate, 'yyyy-MM')
+  }
+
+  // Cartão de crédito: calcular o mês da fatura com base no dia de fechamento
+  const closingDay = account.statementClosingDay
+  const dueDay = account.paymentDueDay
+  const txDay = txDate.getDate()
+
+  // Se o dia da compra >= closingDay, a fatura aberta já é a do mês seguinte
+  const cycleMonthDate = txDay < closingDay ? txDate : addMonths(txDate, 1)
+  const cycleMonthKey = format(cycleMonthDate, 'yyyy-MM')
+
+  // Obter o ciclo completo para saber a data de vencimento real da fatura
+  const cycle = getInvoiceCycle(cycleMonthKey, closingDay, dueDay)
+  return format(cycle.dueDate, 'yyyy-MM')
+}

@@ -63,6 +63,7 @@ export default function ReportsPage() {
   )
 
   const {
+    accounts = [],
     transactions = [],
     categories = [],
     categoryGroups = [],
@@ -141,8 +142,8 @@ export default function ReportsPage() {
 
   // Métricas consolidadas do mês conforme o regime contábil ativo e categorias ocultas
   const { income, expense, netSavings, savingsRate } = useMemo(() => {
-    return calculateReportSummary(transactions, installmentGroups, month, regime, hiddenCategoryIds)
-  }, [transactions, installmentGroups, month, regime, hiddenCategoryIds])
+    return calculateReportSummary(transactions, installmentGroups, month, regime, hiddenCategoryIds, accounts)
+  }, [transactions, installmentGroups, month, regime, hiddenCategoryIds, accounts])
 
   // ── 1. Itens de Despesa do Mês para o Gráfico de Pizza/Barras ────────────────
   const expensePieItems: CategoryPieItem[] = useMemo(() => {
@@ -151,10 +152,11 @@ export default function ReportsPage() {
       installmentGroups,
       month,
       regime,
-      hiddenCategoryIds
+      hiddenCategoryIds,
+      accounts
     )
     return buildExpensePieItems(expenseMap, categoryGroups, categories)
-  }, [transactions, installmentGroups, month, regime, hiddenCategoryIds, categoryGroups, categories])
+  }, [transactions, installmentGroups, month, regime, hiddenCategoryIds, categoryGroups, categories, accounts])
 
   // ── 2. Itens de Receita do Mês para o Gráfico de Pizza/Barras ────────────────
   const incomePieItems: CategoryPieItem[] = useMemo(() => {
@@ -178,7 +180,8 @@ export default function ReportsPage() {
       {
         type,
         categoryId: item.id,
-      }
+      },
+      accounts
     )
 
     const monthLabel = formatMonthLabel(month)
@@ -210,7 +213,8 @@ export default function ReportsPage() {
         type,
         categoryId,
         hiddenCategoryIds,
-      }
+      },
+      accounts
     )
 
     const monthLabel = formatMonthLabel(barMonth)

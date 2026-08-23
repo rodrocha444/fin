@@ -22,11 +22,12 @@ import type {
 
 /** Linhas do orçamento de despesas agrupadas por grupo/categoria para um mês */
 export function useBudgetRows(month: string): GroupBudgetRow[] | undefined {
+  const { data: accounts = [], isLoading: l0 } = useAccountsQuery()
   const { data: categoryGroups = [], isLoading: l1 } = useCategoryGroupsQuery()
   const { data: categories = [], isLoading: l2 } = useCategoriesQuery()
   const { data: budgetMonths = [], isLoading: l3 } = useBudgetMonthsQuery()
   const { data: transactions = [], isLoading: l4 } = useTransactionsQuery()
-  const isLoading = l1 || l2 || l3 || l4
+  const isLoading = l0 || l1 || l2 || l3 || l4
 
   return useMemo(() => {
     if (isLoading && categoryGroups.length === 0) return undefined
@@ -35,9 +36,10 @@ export function useBudgetRows(month: string): GroupBudgetRow[] | undefined {
       categoryGroups,
       categories,
       budgetMonths,
-      transactions
+      transactions,
+      accounts
     )
-  }, [month, categoryGroups, categories, budgetMonths, transactions, isLoading])
+  }, [month, categoryGroups, categories, budgetMonths, transactions, accounts, isLoading])
 }
 
 /** Linhas do orçamento de receitas/rendas para um mês */

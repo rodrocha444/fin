@@ -1,7 +1,8 @@
 // src/utils/accountingRegime.ts — Utilitários de cálculo para Regimes de Competência e Caixa
-import type { Transaction, InstallmentGroup, CategoryGroup, Category } from '@/types'
+import type { Transaction, InstallmentGroup, CategoryGroup, Category, Account } from '@/types'
 import { toMonthKey } from '@/services/api/budget'
 import { isInitialSetupCategory } from '@/utils/format'
+import { getTransactionEffectiveMonth } from '@/utils/invoices'
 import type { CategoryPieItem } from '@/components/molecules/CategoryPieCard'
 
 export type AccountingRegime = 'accrual' | 'cash'
@@ -93,11 +94,13 @@ export function calculateReportExpensesByCategory(
   installmentGroups: InstallmentGroup[],
   month: string,
   regime: AccountingRegime,
-  hiddenCategoryIds?: Set<string> | string[]
+  hiddenCategoryIds?: Set<string> | string[],
+  accounts?: Account[]
 ): Map<string, number> {
   const map = new Map<string, number>()
   const groupMonthMap = buildGroupPurchaseMonthMap(transactions, installmentGroups)
   const hiddenSet = hiddenCategoryIds ? new Set(hiddenCategoryIds) : null
+  const accountMap = accounts ? new Map(accounts.map(a => [a.id!, a])) : undefined
 
   for (const tx of transactions) {
     if (tx.type !== 'expense') continue
@@ -113,8 +116,10 @@ export function calculateReportExpensesByCategory(
         if (txMonth !== month) continue
       }
     } else {
-      // Regime de Caixa: data efetiva da parcela / transação
-      const txMonth = toMonthKey(new Date(tx.date))
+      // Regime de Caixa: data de vencimento da fatura do cartão ou data da despesa em conta
+      const txMonth = accountMap
+        ? getTransactionEffectiveMonth(tx, accountMap)
+        : toMonthKey(new Date(tx.date))
       if (txMonth !== month) continue
     }
 
@@ -177,7 +182,8 @@ export function calculateReportSummary(
   installmentGroups: InstallmentGroup[],
   month: string,
   regime: AccountingRegime,
-  hiddenCategoryIds?: Set<string> | string[]
+  hiddenCategoryIds?: Set<string> | string[],
+  accounts?: Account[]
 ): {
   income: number
   expense: number
@@ -189,7 +195,8 @@ export function calculateReportSummary(
     installmentGroups,
     month,
     regime,
-    hiddenCategoryIds
+    hiddenCategoryIds,
+    accounts
   )
   const incomeMap = calculateReportIncomeByCategory(
     transactions,
@@ -349,11 +356,13 @@ export function getReportTransactionsForMonth(
     categoryId?: string
     hiddenCategoryIds?: Set<string> | string[]
     selectedCategoryIds?: Set<string> | string[]
-  }
+  },
+  accounts?: Account[]
 ): Transaction[] {
   const groupMonthMap = buildGroupPurchaseMonthMap(transactions, installmentGroups)
   const hiddenSet = options?.hiddenCategoryIds ? new Set(options.hiddenCategoryIds) : null
   const selectedSet = options?.selectedCategoryIds ? new Set(options.selectedCategoryIds) : null
+  const accountMap = accounts ? new Map(accounts.map(a => [a.id!, a])) : undefined
 
   return transactions
     .filter(tx => {
@@ -403,7 +412,9 @@ export function getReportTransactionsForMonth(
           if (txMonth !== month) return false
         }
       } else {
-        const txMonth = toMonthKey(new Date(tx.date))
+        const txMonth = accountMap
+          ? getTransactionEffectiveMonth(tx, accountMap)
+          : toMonthKey(new Date(tx.date))
         if (txMonth !== month) return false
       }
 
@@ -483,7 +494,8 @@ export function calculateMonthlyEvolution(
   hiddenCategoryIds?: Set<string> | string[],
   selectedCategoryIds?: Set<string> | string[],
   categories: Category[] = [],
-  categoryGroups: CategoryGroup[] = []
+  categoryGroups: CategoryGroup[] = [],
+  accounts?: Account[]
 ): MonthlyEvolutionItem[] {
   const result: MonthlyEvolutionItem[] = []
   const selectedSet = selectedCategoryIds ? new Set(selectedCategoryIds) : null
@@ -500,7 +512,7 @@ export function calculateMonthlyEvolution(
       monthTxs = getReportTransactionsForMonth(transactions, installmentGroups, m, regime, {
         hiddenCategoryIds,
         selectedCategoryIds: selectedSet,
-      })
+      }, accounts)
       let expense = 0
       let income = 0
       for (const t of monthTxs) {
@@ -511,10 +523,10 @@ export function calculateMonthlyEvolution(
       const savingsRate = income > 0 ? (netSavings / income) * 100 : 0
       summary = { income, expense, netSavings, savingsRate }
     } else {
-      summary = calculateReportSummary(transactions, installmentGroups, m, regime, hiddenCategoryIds)
+      summary = calculateReportSummary(transactions, installmentGroups, m, regime, hiddenCategoryIds, accounts)
       monthTxs = getReportTransactionsForMonth(transactions, installmentGroups, m, regime, {
         hiddenCategoryIds,
-      })
+      }, accounts)
     }
 
     const expenseTxs = monthTxs.filter(t => t.type === 'expense')

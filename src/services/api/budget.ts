@@ -1,9 +1,9 @@
 import { getClient } from './client'
-import { rowToTransaction } from './types'
+import { rowToTransaction, rowToBudgetMonth, rowToAccount } from './types'
 import { createId } from '@/utils/id'
 import { format, subMonths } from 'date-fns'
 import { isInitialSetupCategory, currentMonth, shiftMonth } from '@/utils/format'
-import { getInvoiceForBudgetMonth } from '@/utils/invoices'
+import { getInvoiceForBudgetMonth, getTransactionEffectiveMonth } from '@/utils/invoices'
 import { getPaidInvoicesMap } from '@/services/api/invoices'
 import { isDateBeforeAccountingStart, isMonthBeforeAccountingStart } from '@/utils/accountingPeriod'
 import { notifyDataChanged } from './events'
@@ -19,6 +19,20 @@ import type {
   IncomeCategoryBudgetRow,
   BudgetSummary,
 } from '@/types'
+
+export async function getBudgetMonths(): Promise<BudgetMonth[]> {
+  const client = getClient()
+  const { data, error } = await client.from('budget_months').select('*')
+  if (error) throw new Error(`Erro ao buscar orçamentos: ${error.message}`)
+  return (data || []).map(rowToBudgetMonth)
+}
+
+export async function getBudgetMonth(month: string): Promise<BudgetMonth[]> {
+  const client = getClient()
+  const { data, error } = await client.from('budget_months').select('*').eq('month', month)
+  if (error) throw new Error(`Erro ao buscar orçamento do mês: ${error.message}`)
+  return (data || []).map(rowToBudgetMonth)
+}
 
 export function toMonthKey(date: Date): string {
   return format(date, 'yyyy-MM')
@@ -93,8 +107,10 @@ export async function coverMonthSpent(month: string, rows?: GroupBudgetRow[]): P
   const client = getClient()
   const { data: txsData, error: txsErr } = await client.from('transactions').select('*')
   if (txsErr) throw new Error(`Erro ao buscar transações: ${txsErr.message}`)
+  const { data: accsData } = await client.from('accounts').select('*')
   const txs = (txsData || []).map(rowToTransaction)
-  const activityMap = calculateActivityByCategory(txs, month)
+  const accounts = (accsData || []).map(rowToAccount)
+  const activityMap = calculateActivityByCategory(txs, month, accounts)
 
   for (const [catId, spent] of activityMap.entries()) {
     await setBudget(month, catId, spent)
@@ -107,12 +123,22 @@ export async function coverMonthSpent(month: string, rows?: GroupBudgetRow[]): P
  * Funções puras de cálculo de orçamento (instantâneas com dados em memória)
  */
 
-export function calculateActivityByCategory(transactions: Transaction[], month: string): Map<string, number> {
+export function calculateActivityByCategory(
+  transactions: Transaction[],
+  month: string,
+  accounts?: Account[] | Map<string, Account>
+): Map<string, number> {
   const map = new Map<string, number>()
+  const accountMap = accounts
+    ? (Array.isArray(accounts) ? new Map(accounts.map(a => [a.id!, a])) : accounts)
+    : undefined
+
   for (const tx of transactions) {
     if (tx.type !== 'expense') continue
-    const txMonth = toMonthKey(new Date(tx.date))
-    if (txMonth !== month) continue
+    const effectiveMonth = accountMap
+      ? getTransactionEffectiveMonth(tx, accountMap)
+      : toMonthKey(new Date(tx.date))
+    if (effectiveMonth !== month) continue
     if (tx.categoryId) {
       map.set(tx.categoryId, (map.get(tx.categoryId) || 0) + tx.amount)
     }
@@ -138,9 +164,10 @@ export function calculateBudgetRows(
   categoryGroups: CategoryGroup[],
   categories: Category[],
   budgetMonths: BudgetMonth[],
-  transactions: Transaction[]
+  transactions: Transaction[],
+  accounts?: Account[]
 ): GroupBudgetRow[] {
-  const activityMap = calculateActivityByCategory(transactions, month)
+  const activityMap = calculateActivityByCategory(transactions, month, accounts)
   const budgetByCategory = new Map(
     budgetMonths.filter(b => b.month === month).map(b => [b.categoryId, b])
   )

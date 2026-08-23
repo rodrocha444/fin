@@ -55,6 +55,7 @@ export default function MonthlyEvolutionCard({
   const [isStackedView, setIsStackedView] = useState<boolean>(true)
 
   const {
+    accounts = [],
     transactions = [],
     installmentGroups = [],
     categories = [],
@@ -196,7 +197,8 @@ export default function MonthlyEvolutionCard({
       hiddenCategoryIds,
       selectedCategoryIds,
       categories,
-      categoryGroups
+      categoryGroups,
+      accounts
     )
   }, [
     transactions,
@@ -207,6 +209,7 @@ export default function MonthlyEvolutionCard({
     selectedCategoryIds,
     categories,
     categoryGroups,
+    accounts,
   ])
 
   // Estatísticas agregadas do período
