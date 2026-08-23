@@ -24,6 +24,7 @@ import {
 import { useFinancialData } from '@/context/FinancialDataContext'
 import { formatCurrency } from '@/utils/format'
 import { getAccountingStartDate } from '@/utils/accountingPeriod'
+import { getTransactionEffectiveMonth } from '@/utils/invoices'
 import {
   type AccountingRegime,
   calculateMonthlyEvolution,
@@ -31,7 +32,7 @@ import {
 } from '@/utils/accountingRegime'
 import BarChart, { type BarChartItem, type BarChartSegment } from '@/components/atoms/BarChart'
 
-type TimeRangePreset = '6m' | '12m' | 'ytd' | 'all'
+type TimeRangePreset = '6m' | '12m' | 'ytd' | 'future' | 'all'
 type EvolutionViewMode = 'expense' | 'income' | 'comparative'
 
 interface MonthlyEvolutionCardProps {
@@ -129,16 +130,39 @@ export default function MonthlyEvolutionCard({
     const today = new Date()
     const referenceDate = isAfter(baseDate, today) ? baseDate : today
 
+    // Encontrar a data da última transação/fatura cadastrada
+    const accountMap = new Map(accounts.map(a => [a.id!, a]))
+    let latestFutureDate = today
+
+    for (const tx of transactions) {
+      if (!tx.date) continue
+      const effMonthStr = getTransactionEffectiveMonth(tx, accountMap)
+      const effDate = parseISO(`${effMonthStr}-01`)
+      if (!isNaN(effDate.getTime()) && effDate > latestFutureDate) {
+        latestFutureDate = effDate
+      }
+    }
+
     let start: Date
     let end: Date = referenceDate
 
     if (rangePreset === '6m') {
       start = subMonths(referenceDate, 5)
+      end = referenceDate
     } else if (rangePreset === '12m') {
       start = subMonths(referenceDate, 11)
+      end = referenceDate
     } else if (rangePreset === 'ytd') {
       start = startOfYear(referenceDate)
+      end = referenceDate
+    } else if (rangePreset === 'future') {
+      start = today
+      end = addMonths(today, 5)
+      if (latestFutureDate > end) {
+        end = latestFutureDate
+      }
     } else {
+      // 'all' (Tudo) - Desde o início contábil até a última parcela futura!
       const accStart = getAccountingStartDate()
       let earliestDate: Date | null = accStart ? parseISO(`${accStart}-01`) : null
 
@@ -164,9 +188,8 @@ export default function MonthlyEvolutionCard({
       if (start < maxPast) {
         start = maxPast
       }
-      if (isAfter(start, referenceDate)) {
-        start = subMonths(referenceDate, 11)
-      }
+
+      end = latestFutureDate > referenceDate ? latestFutureDate : referenceDate
     }
 
     const list: string[] = []
@@ -181,7 +204,7 @@ export default function MonthlyEvolutionCard({
     }
 
     return list
-  }, [currentActiveMonth, rangePreset, transactions])
+  }, [currentActiveMonth, rangePreset, transactions, accounts])
 
   // Dados calculados para a série temporal (com suporte a filtro de categoria)
   const selectedCategoryIds = useMemo(() => {
@@ -557,7 +580,7 @@ export default function MonthlyEvolutionCard({
             </button>
           </div>
 
-          {/* Seletor de Período (6M, 12M, YTD, Tudo) */}
+          {/* Seletor de Período (6M, 12M, YTD, +6M, Tudo) */}
           <div className="flex items-center bg-slate-950/80 p-0.5 rounded-xl border border-slate-800 text-xs font-semibold">
             <button
               type="button"
@@ -594,7 +617,20 @@ export default function MonthlyEvolutionCard({
             </button>
             <button
               type="button"
+              onClick={() => setRangePreset('future')}
+              title="Ver projeção dos próximos 6 meses com parcelas futuras"
+              className={`px-2 py-1 rounded-lg transition-colors ${
+                rangePreset === 'future'
+                  ? 'bg-slate-800 text-slate-100 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              +6M
+            </button>
+            <button
+              type="button"
               onClick={() => setRangePreset('all')}
+              title="Ver todo o histórico e parcelas futuras"
               className={`px-2 py-1 rounded-lg transition-colors ${
                 rangePreset === 'all'
                   ? 'bg-slate-800 text-slate-100 shadow-sm'
