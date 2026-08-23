@@ -114,10 +114,12 @@ function IncomeCategoryRow({
     [month, row.category.id]
   )
 
+  const diff = Math.round((row.expected - row.received) * 100) / 100
+
   const diffColor =
-    row.difference <= 0 && (row.received > 0 || row.expected > 0)
+    diff <= 0 && (row.received > 0 || row.expected > 0)
       ? 'text-emerald-400 font-medium'
-      : row.difference > 0
+      : diff > 0
       ? 'text-amber-400/90 font-medium'
       : 'text-slate-500 font-normal'
 
@@ -174,11 +176,17 @@ function IncomeCategoryRow({
         className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums cursor-pointer hover:bg-slate-800/50 ${diffColor}`}
         title="Clique para ver as transações desta categoria no mês"
       >
-        {row.difference > 0
-          ? formatCurrency(row.difference)
-          : row.difference < 0
-          ? <span className="text-emerald-400 font-semibold" title="Superou a meta prevista!">+{formatCurrency(Math.abs(row.difference))}</span>
-          : (row.expected > 0 ? <span className="text-emerald-400 text-xs font-semibold">100%</span> : <span className="text-slate-600">—</span>)}
+        {row.expected === 0 && row.received === 0 ? (
+          <span className="text-slate-600">—</span>
+        ) : diff > 0 ? (
+          formatCurrency(diff)
+        ) : diff < 0 ? (
+          <span className="text-emerald-400 font-semibold" title="Superou a meta prevista!">
+            +{formatCurrency(Math.abs(diff))}
+          </span>
+        ) : (
+          <span className="text-emerald-400 text-xs font-semibold">100%</span>
+        )}
       </td>
     </tr>
   )
@@ -194,6 +202,7 @@ function IncomeGroupRow({
   onSelectCategory: (data: CategoryModalData) => void
 }) {
   const [open, setOpen] = useState(true)
+  const groupDiff = Math.round((row.totalExpected - row.totalReceived) * 100) / 100
 
   return (
     <>
@@ -214,13 +223,17 @@ function IncomeGroupRow({
           {row.totalReceived > 0 ? `+${formatCurrency(row.totalReceived)}` : <span className="text-slate-600">—</span>}
         </td>
         <td className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm font-semibold tabular-nums ${
-          row.totalDifference <= 0 ? 'text-emerald-400' : 'text-amber-400/90'
+          groupDiff <= 0 ? 'text-emerald-400' : 'text-amber-400/90'
         }`}>
-          {row.totalDifference > 0
-            ? formatCurrency(row.totalDifference)
-            : row.totalDifference < 0
-            ? `+${formatCurrency(Math.abs(row.totalDifference))}`
-            : (row.totalExpected > 0 ? '100%' : <span className="text-slate-600">—</span>)}
+          {row.totalExpected === 0 && row.totalReceived === 0 ? (
+            <span className="text-slate-600">—</span>
+          ) : groupDiff > 0 ? (
+            formatCurrency(groupDiff)
+          ) : groupDiff < 0 ? (
+            `+${formatCurrency(Math.abs(groupDiff))}`
+          ) : (
+            '100%'
+          )}
         </td>
       </tr>
       {open && row.categories.map(c => (
