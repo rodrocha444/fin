@@ -86,7 +86,9 @@ export default function BarChart({
     return sum / items.length
   }, [items])
 
-  const hoveredItem = hoveredIndex !== null && hoveredIndex < items.length ? items[hoveredIndex] : null
+  const hoveredItem =
+    hoveredIndex !== null && hoveredIndex < items.length ? items[hoveredIndex] : null
+
   const currentSegment = useMemo(() => {
     if (!hoveredSegment || hoveredIndex === null || !hoveredItem) return null
     const segs = hoveredSegment.isSecondary ? hoveredItem.secondarySegments : hoveredItem.segments
@@ -176,10 +178,10 @@ export default function BarChart({
   return (
     <div
       className="relative select-none flex flex-col justify-between w-full"
-      style={{ minHeight: height }}
+      style={{ height }}
     >
       {/* ── Header / Tooltip Flutuante com Detalhes da Categoria ou Mês ─────── */}
-      <div className="flex items-center justify-between gap-2 pb-2.5 mb-2 border-b border-slate-800/80 text-xs min-h-[38px]">
+      <div className="flex items-center justify-between gap-2 pb-2.5 mb-2 border-b border-slate-800/80 text-xs min-h-[38px] flex-shrink-0">
         <div className="min-w-0 flex-1">
           {currentSegment && hoveredItem ? (
             <div className="flex items-center gap-2 flex-wrap animate-in fade-in duration-100">
@@ -263,11 +265,8 @@ export default function BarChart({
         </div>
       </div>
 
-      {/* ── Área das Barras Verticais Altas ─────────────────────────────────── */}
-      <div
-        className="relative flex items-end justify-between gap-1.5 sm:gap-3 pt-6 pb-2 w-full flex-1"
-        style={{ height: height - 70 }}
-      >
+      {/* ── Área de Desenho das Barras Verticais Altas ──────────────────────── */}
+      <div className="relative flex-1 flex items-end justify-between gap-1.5 sm:gap-3 pt-8 pb-1 w-full min-h-0">
         {/* Linha de Média (opcional) */}
         {showAverageLine && averageValue > 0 && (
           <div
@@ -276,18 +275,25 @@ export default function BarChart({
               bottom: `${(averageValue / maxValue) * 100}%`,
             }}
           >
-            <span className="absolute -top-3.5 right-1 text-[9px] font-semibold text-slate-500">
-              Média
+            <span className="absolute -top-4 right-1 text-[9px] font-semibold text-slate-400 bg-slate-900/90 px-1 rounded border border-slate-800">
+              Média: {formatValue(averageValue)}
             </span>
           </div>
         )}
 
         {items.map((item, index) => {
           const barHeightPct =
-            maxValue > 0 ? Math.max((item.value / maxValue) * 100, item.value > 0 ? 3 : 0) : 0
+            maxValue > 0 ? (item.value / maxValue) * 100 : 0
+          const displayHeightPct =
+            item.value > 0 ? Math.max(barHeightPct, 4) : 0
+
           const secondaryHeightPct =
             item.secondaryValue !== undefined && maxValue > 0
-              ? Math.max((item.secondaryValue / maxValue) * 100, item.secondaryValue > 0 ? 3 : 0)
+              ? (item.secondaryValue / maxValue) * 100
+              : 0
+          const displaySecondaryHeightPct =
+            item.secondaryValue !== undefined && item.secondaryValue > 0
+              ? Math.max(secondaryHeightPct, 4)
               : 0
 
           const isHovered = hoveredIndex === index
@@ -308,13 +314,13 @@ export default function BarChart({
                 setHoveredSegment(null)
               }}
               onTouchStart={() => setHoveredIndex(index)}
-              className={`flex-1 flex flex-col items-center justify-end h-full relative group transition-all ${
+              className={`flex-1 flex flex-col items-center h-full min-w-0 relative group transition-all ${
                 onBarClick || onSegmentClick ? 'cursor-pointer' : ''
               }`}
             >
               {/* Badge com Valor Total no topo da barra no hover */}
               {isHovered && !hoveredSegment && (
-                <div className="absolute -top-8 z-20 px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-700 text-[10px] font-bold text-slate-200 tabular-nums shadow-xl whitespace-nowrap pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+                <div className="absolute -top-8 z-30 px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-700 text-[10px] font-bold text-slate-100 tabular-nums shadow-2xl whitespace-nowrap pointer-events-none animate-in fade-in zoom-in-95 duration-150">
                   {formatValue(item.value)}
                 </div>
               )}
@@ -326,22 +332,20 @@ export default function BarChart({
                 </div>
               )}
 
-              {/* Estrutura da Barra */}
-              <div className="w-full flex items-end justify-center gap-1 sm:gap-1.5 h-full px-0.5 sm:px-1">
+              {/* ── Container da Barra (ocupa todo o espaço vertical disponível) ── */}
+              <div className="w-full flex-1 min-h-0 flex items-end justify-center gap-1 sm:gap-1.5 px-0.5 sm:px-1">
                 {/* ── 1. Barra Principal (Despesas ou Receitas) ──────────────── */}
                 <div
-                  className={`w-full max-w-[42px] sm:max-w-[48px] rounded-t-xl transition-all duration-200 relative flex flex-col-reverse justify-start overflow-hidden ${
+                  className={`w-full max-w-[46px] sm:max-w-[56px] rounded-t-xl transition-all duration-200 relative flex flex-col-reverse justify-start overflow-hidden ${
                     isSelected
-                      ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-slate-900 shadow-lg shadow-indigo-500/30'
+                      ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-slate-900 shadow-xl shadow-indigo-500/30'
                       : ''
                   }`}
                   style={{
-                    height: `${barHeightPct}%`,
+                    height: `${displayHeightPct}%`,
                     backgroundColor: hasSegments ? 'transparent' : barColor,
-                    opacity: hoveredIndex === null ? 0.92 : isHovered ? 1 : 0.4,
-                    filter: isHovered && !hasSegments ? `drop-shadow(0 0 12px ${barColor}77)` : 'none',
-                    transform: isHovered ? 'scaleY(1.02)' : 'scaleY(1)',
-                    transformOrigin: 'bottom',
+                    opacity: hoveredIndex === null ? 0.95 : isHovered ? 1 : 0.45,
+                    boxShadow: isHovered && !hasSegments ? `0 0 16px ${barColor}66` : 'none',
                   }}
                 >
                   {/* Segmentos de Categorias Empilhados */}
@@ -369,7 +373,7 @@ export default function BarChart({
                             setHoveredSegment({ itemIndex: index, segmentId: seg.id })
                           }}
                           onMouseLeave={() => setHoveredSegment(null)}
-                          className="w-full transition-all duration-150 relative border-b border-slate-900/40 last:border-b-0 cursor-pointer"
+                          className="w-full transition-all duration-150 relative border-b border-slate-900/30 last:border-b-0 cursor-pointer"
                           style={{
                             height: `${segHeightPct}%`,
                             backgroundColor: seg.color,
@@ -379,39 +383,37 @@ export default function BarChart({
                                 : isSegHovered
                                 ? 1
                                 : hoveredSegment.itemIndex === index
-                                ? 0.5
-                                : 0.7,
+                                ? 0.4
+                                : 0.65,
                             boxShadow: isSegHovered
-                              ? `inset 0 0 0 1.5px #ffffff, 0 0 12px ${seg.color}99`
+                              ? `inset 0 0 0 2px #ffffff, 0 0 14px ${seg.color}`
                               : 'none',
                           }}
                           title={`${seg.label}: ${formatValue(seg.value)}`}
                         >
-                          <div className="absolute inset-0 bg-gradient-to-b from-white/15 to-transparent pointer-events-none" />
+                          <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
                         </div>
                       )
                     })
                   ) : (
-                    <div className="absolute inset-0 rounded-t-xl bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
+                    <div className="absolute inset-0 rounded-t-xl bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
                   )}
                 </div>
 
                 {/* ── 2. Barra Secundária (Comparativo - Receitas) ──────────── */}
                 {item.secondaryValue !== undefined && (
                   <div
-                    className="w-full max-w-[42px] sm:max-w-[48px] rounded-t-xl transition-all duration-200 relative flex flex-col-reverse justify-start overflow-hidden"
+                    className="w-full max-w-[46px] sm:max-w-[56px] rounded-t-xl transition-all duration-200 relative flex flex-col-reverse justify-start overflow-hidden"
                     style={{
-                      height: `${secondaryHeightPct}%`,
+                      height: `${displaySecondaryHeightPct}%`,
                       backgroundColor: hasSecondarySegments
                         ? 'transparent'
                         : item.secondaryColor || '#10b981',
-                      opacity: hoveredIndex === null ? 0.92 : isHovered ? 1 : 0.4,
-                      filter:
+                      opacity: hoveredIndex === null ? 0.95 : isHovered ? 1 : 0.45,
+                      boxShadow:
                         isHovered && !hasSecondarySegments
-                          ? `drop-shadow(0 0 12px #10b98177)`
+                          ? `0 0 16px #10b98166`
                           : 'none',
-                      transform: isHovered ? 'scaleY(1.02)' : 'scaleY(1)',
-                      transformOrigin: 'bottom',
                     }}
                   >
                     {hasSecondarySegments ? (
@@ -444,7 +446,7 @@ export default function BarChart({
                               })
                             }}
                             onMouseLeave={() => setHoveredSegment(null)}
-                            className="w-full transition-all duration-150 relative border-b border-slate-900/40 last:border-b-0 cursor-pointer"
+                            className="w-full transition-all duration-150 relative border-b border-slate-900/30 last:border-b-0 cursor-pointer"
                             style={{
                               height: `${segHeightPct}%`,
                               backgroundColor: seg.color,
@@ -454,40 +456,40 @@ export default function BarChart({
                                 : isSegHovered
                                 ? 1
                                 : hoveredSegment.itemIndex === index
-                                ? 0.5
-                                : 0.7,
+                                ? 0.4
+                                : 0.65,
                               boxShadow: isSegHovered
-                                ? `inset 0 0 0 1.5px #ffffff, 0 0 12px ${seg.color}99`
+                                ? `inset 0 0 0 2px #ffffff, 0 0 14px ${seg.color}`
                                 : 'none',
                             }}
                             title={`${seg.label}: ${formatValue(seg.value)}`}
                           >
-                            <div className="absolute inset-0 bg-gradient-to-b from-white/15 to-transparent pointer-events-none" />
+                            <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
                           </div>
                         )
                       })
                     ) : (
-                      <div className="absolute inset-0 rounded-t-xl bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
+                      <div className="absolute inset-0 rounded-t-xl bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
                     )}
                   </div>
                 )}
               </div>
 
-              {/* Rótulo do Eixo X (Mês) */}
-              <div className="mt-2.5 text-center w-full">
+              {/* ── Rótulo do Eixo X (Mês) ──────────────────────────────────── */}
+              <div className="mt-2.5 text-center w-full flex-shrink-0">
                 <span
-                  className={`text-[11px] sm:text-xs block truncate transition-colors ${
+                  className={`text-xs block font-semibold truncate transition-colors ${
                     isSelected
-                      ? 'font-bold text-indigo-400'
+                      ? 'text-indigo-400 font-bold'
                       : isHovered
-                      ? 'font-semibold text-slate-200'
+                      ? 'text-slate-100'
                       : 'text-slate-400'
                   }`}
                 >
                   {item.label}
                 </span>
                 {item.sublabel && (
-                  <span className="text-[9px] text-slate-600 block truncate leading-none mt-0.5">
+                  <span className="text-[9px] text-slate-600 block truncate mt-0.5">
                     {item.sublabel}
                   </span>
                 )}

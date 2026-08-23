@@ -129,6 +129,8 @@ export default function MonthlyEvolutionCard({
     const referenceDate = isAfter(baseDate, today) ? baseDate : today
 
     let start: Date
+    let end: Date = referenceDate
+
     if (rangePreset === '6m') {
       start = subMonths(referenceDate, 5)
     } else if (rangePreset === '12m') {
@@ -137,15 +139,8 @@ export default function MonthlyEvolutionCard({
       start = startOfYear(referenceDate)
     } else {
       const accStart = getAccountingStartDate()
-      start = accStart ? parseISO(`${accStart}-01`) : subMonths(referenceDate, 24)
+      start = accStart ? parseISO(`${accStart}-01`) : subMonths(referenceDate, 23)
     }
-
-    let maxFuture = referenceDate
-    for (const tx of transactions) {
-      const d = new Date(tx.date)
-      if (d > maxFuture) maxFuture = d
-    }
-    const end = isAfter(maxFuture, referenceDate) ? maxFuture : referenceDate
 
     const list: string[] = []
     let curr = start
@@ -155,11 +150,11 @@ export default function MonthlyEvolutionCard({
         list.push(mKey)
       }
       curr = addMonths(curr, 1)
-      if (list.length > 48) break
+      if (list.length >= 36) break
     }
 
     return list
-  }, [currentActiveMonth, rangePreset, transactions])
+  }, [currentActiveMonth, rangePreset])
 
   // Dados calculados para a série temporal (com suporte a filtro de categoria)
   const selectedCategoryIds = useMemo(() => {
