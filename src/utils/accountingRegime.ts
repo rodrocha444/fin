@@ -7,6 +7,7 @@ import type { CategoryPieItem } from '@/components/molecules/CategoryPieCard'
 export type AccountingRegime = 'accrual' | 'cash'
 
 export const ACCOUNTING_REGIME_STORAGE_KEY = 'fin_accounting_regime'
+export const REPORT_HIDDEN_CATEGORIES_STORAGE_KEY = 'fin_report_hidden_categories'
 
 export function getSavedAccountingRegime(): AccountingRegime {
   try {
@@ -23,6 +24,27 @@ export function getSavedAccountingRegime(): AccountingRegime {
 export function saveAccountingRegime(regime: AccountingRegime): void {
   try {
     localStorage.setItem(ACCOUNTING_REGIME_STORAGE_KEY, regime)
+  } catch {
+    // fallback
+  }
+}
+
+export function getSavedReportHiddenCategories(): string[] {
+  try {
+    const raw = localStorage.getItem(REPORT_HIDDEN_CATEGORIES_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed
+    }
+  } catch {
+    // fallback
+  }
+  return []
+}
+
+export function saveReportHiddenCategories(hiddenIds: string[]): void {
+  try {
+    localStorage.setItem(REPORT_HIDDEN_CATEGORIES_STORAGE_KEY, JSON.stringify(hiddenIds))
   } catch {
     // fallback
   }
@@ -70,13 +92,17 @@ export function calculateReportExpensesByCategory(
   transactions: Transaction[],
   installmentGroups: InstallmentGroup[],
   month: string,
-  regime: AccountingRegime
+  regime: AccountingRegime,
+  hiddenCategoryIds?: Set<string> | string[]
 ): Map<string, number> {
   const map = new Map<string, number>()
   const groupMonthMap = buildGroupPurchaseMonthMap(transactions, installmentGroups)
+  const hiddenSet = hiddenCategoryIds ? new Set(hiddenCategoryIds) : null
 
   for (const tx of transactions) {
     if (tx.type !== 'expense') continue
+    if (tx.categoryId && hiddenSet?.has(tx.categoryId)) continue
+    if (!tx.categoryId && hiddenSet?.has('uncategorized_expense')) continue
 
     if (regime === 'accrual') {
       if (tx.installmentGroupId) {
@@ -106,13 +132,22 @@ export function calculateReportIncomeByCategory(
   transactions: Transaction[],
   installmentGroups: InstallmentGroup[],
   month: string,
-  regime: AccountingRegime
+  regime: AccountingRegime,
+  hiddenCategoryIds?: Set<string> | string[]
 ): Map<string, number> {
   const map = new Map<string, number>()
   const groupMonthMap = buildGroupPurchaseMonthMap(transactions, installmentGroups)
+  const hiddenSet = hiddenCategoryIds ? new Set(hiddenCategoryIds) : null
 
   for (const tx of transactions) {
     if (tx.type !== 'income') continue
+    if (tx.categoryId && hiddenSet?.has(tx.categoryId)) continue
+    if (
+      !tx.categoryId &&
+      (hiddenSet?.has('uncategorized_income') || (tx.payee && hiddenSet?.has(`payee_${tx.payee}`)))
+    ) {
+      continue
+    }
 
     if (regime === 'accrual') {
       if (tx.installmentGroupId) {
@@ -141,15 +176,28 @@ export function calculateReportSummary(
   transactions: Transaction[],
   installmentGroups: InstallmentGroup[],
   month: string,
-  regime: AccountingRegime
+  regime: AccountingRegime,
+  hiddenCategoryIds?: Set<string> | string[]
 ): {
   income: number
   expense: number
   netSavings: number
   savingsRate: number
 } {
-  const expenseMap = calculateReportExpensesByCategory(transactions, installmentGroups, month, regime)
-  const incomeMap = calculateReportIncomeByCategory(transactions, installmentGroups, month, regime)
+  const expenseMap = calculateReportExpensesByCategory(
+    transactions,
+    installmentGroups,
+    month,
+    regime,
+    hiddenCategoryIds
+  )
+  const incomeMap = calculateReportIncomeByCategory(
+    transactions,
+    installmentGroups,
+    month,
+    regime,
+    hiddenCategoryIds
+  )
 
   let expense = 0
   for (const amt of expenseMap.values()) {
@@ -299,15 +347,32 @@ export function getReportTransactionsForMonth(
   options?: {
     type?: 'expense' | 'income'
     categoryId?: string
+    hiddenCategoryIds?: Set<string> | string[]
   }
 ): Transaction[] {
   const groupMonthMap = buildGroupPurchaseMonthMap(transactions, installmentGroups)
+  const hiddenSet = options?.hiddenCategoryIds ? new Set(options.hiddenCategoryIds) : null
 
   return transactions
     .filter(tx => {
       // Filtragem por tipo
       if (options?.type && tx.type !== options.type) return false
       if (!options?.type && tx.type !== 'expense' && tx.type !== 'income') return false
+
+      // Filtragem de categorias ocultas nos relatórios (se não for busca de categoria explícita)
+      if (!options?.categoryId && hiddenSet) {
+        if (tx.categoryId && hiddenSet.has(tx.categoryId)) return false
+        if (!tx.categoryId && tx.type === 'expense' && hiddenSet.has('uncategorized_expense')) {
+          return false
+        }
+        if (
+          !tx.categoryId &&
+          tx.type === 'income' &&
+          (hiddenSet.has('uncategorized_income') || (tx.payee && hiddenSet.has(`payee_${tx.payee}`)))
+        ) {
+          return false
+        }
+      }
 
       // Filtragem de competência vs caixa
       if (regime === 'accrual') {
@@ -364,14 +429,17 @@ export function calculateMonthlyEvolution(
   transactions: Transaction[],
   installmentGroups: InstallmentGroup[],
   months: string[],
-  regime: AccountingRegime
+  regime: AccountingRegime,
+  hiddenCategoryIds?: Set<string> | string[]
 ): MonthlyEvolutionItem[] {
   const result: MonthlyEvolutionItem[] = []
 
   for (let i = 0; i < months.length; i++) {
     const m = months[i]
-    const summary = calculateReportSummary(transactions, installmentGroups, m, regime)
-    const monthTxs = getReportTransactionsForMonth(transactions, installmentGroups, m, regime)
+    const summary = calculateReportSummary(transactions, installmentGroups, m, regime, hiddenCategoryIds)
+    const monthTxs = getReportTransactionsForMonth(transactions, installmentGroups, m, regime, {
+      hiddenCategoryIds,
+    })
 
     const expenseCount = monthTxs.filter(t => t.type === 'expense').length
     const incomeCount = monthTxs.filter(t => t.type === 'income').length

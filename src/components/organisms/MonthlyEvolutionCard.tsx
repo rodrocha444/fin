@@ -33,6 +33,7 @@ type EvolutionViewMode = 'expense' | 'income' | 'comparative'
 interface MonthlyEvolutionCardProps {
   currentActiveMonth: string
   regime: AccountingRegime
+  hiddenCategoryIds?: Set<string>
   onSelectMonthBar: (month: string, type: 'expense' | 'income') => void
   onMonthChange?: (month: string) => void
 }
@@ -40,6 +41,7 @@ interface MonthlyEvolutionCardProps {
 export default function MonthlyEvolutionCard({
   currentActiveMonth,
   regime,
+  hiddenCategoryIds,
   onSelectMonthBar,
   onMonthChange,
 }: MonthlyEvolutionCardProps) {
@@ -91,8 +93,8 @@ export default function MonthlyEvolutionCard({
 
   // Dados calculados para a série temporal
   const evolutionData: MonthlyEvolutionItem[] = useMemo(() => {
-    return calculateMonthlyEvolution(transactions, installmentGroups, monthsList, regime)
-  }, [transactions, installmentGroups, monthsList, regime])
+    return calculateMonthlyEvolution(transactions, installmentGroups, monthsList, regime, hiddenCategoryIds)
+  }, [transactions, installmentGroups, monthsList, regime, hiddenCategoryIds])
 
   // Estatísticas agregadas do período
   const stats = useMemo(() => {

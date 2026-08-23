@@ -9,6 +9,7 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Receipt,
+  EyeOff,
 } from 'lucide-react'
 import PieChart, { type PieSlice } from '@/components/atoms/PieChart'
 import BarChart, { type BarChartItem } from '@/components/atoms/BarChart'
@@ -28,6 +29,9 @@ interface CategoryPieCardProps {
   items: CategoryPieItem[]
   monthLabel?: string
   onSelectCategory?: (item: CategoryPieItem) => void
+  onToggleHideCategory?: (categoryId: string) => void
+  onOpenHiddenManager?: () => void
+  hiddenCount?: number
 }
 
 // Paletas harmoniosas e contrastantes para despesas e receitas
@@ -65,6 +69,9 @@ export default function CategoryPieCard({
   items,
   monthLabel,
   onSelectCategory,
+  onToggleHideCategory,
+  onOpenHiddenManager,
+  hiddenCount = 0,
 }: CategoryPieCardProps) {
   const isExpense = type === 'expense'
   const defaultPalette = isExpense ? EXPENSE_PALETTE : INCOME_PALETTE
@@ -241,6 +248,16 @@ export default function CategoryPieCard({
           <p className="text-[11px] text-slate-600">
             Lance transações no orçamento ou no extrato para visualizar a distribuição.
           </p>
+          {hiddenCount > 0 && onOpenHiddenManager && (
+            <button
+              type="button"
+              onClick={onOpenHiddenManager}
+              className="btn-secondary text-[11px] py-1 px-2.5 mt-2 inline-flex items-center gap-1.5"
+            >
+              <EyeOff className="w-3 h-3 text-rose-400" />
+              <span>Ver {hiddenCount} categorias ocultas nos relatórios</span>
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
@@ -334,7 +351,7 @@ export default function CategoryPieCard({
             )}
           </div>
 
-          {/* Lista com Checkboxes e Botão de Acesso a Transações */}
+          {/* Lista com Checkboxes e Botões de Acesso a Transações e Ocultação */}
           <div className="space-y-1.5 max-h-56 sm:max-h-64 overflow-y-auto pr-1 select-none">
             {displayItems.map(item => {
               const isChecked = selectedIds.has(item.id)
@@ -348,7 +365,7 @@ export default function CategoryPieCard({
               return (
                 <div
                   key={item.id}
-                  onClick={() => onSelectCategory ? onSelectCategory(item) : toggleCategory(item.id)}
+                  onClick={() => (onSelectCategory ? onSelectCategory(item) : toggleCategory(item.id))}
                   className={`group flex items-center justify-between p-2 rounded-xl border transition-all cursor-pointer ${
                     isChecked
                       ? 'bg-slate-950/40 hover:bg-slate-800/40 border-slate-800/80 text-slate-200'
@@ -356,7 +373,7 @@ export default function CategoryPieCard({
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    {/* Checkbox customizado (apenas altera filtro sem abrir modal) */}
+                    {/* Checkbox customizado (apenas altera filtro da pizza/barra sem abrir modal) */}
                     <button
                       type="button"
                       onClick={e => toggleCategory(item.id, e)}
@@ -365,7 +382,7 @@ export default function CategoryPieCard({
                           ? 'bg-indigo-600 border-indigo-500 text-white'
                           : 'border-slate-700 bg-slate-900'
                       }`}
-                      title={isChecked ? 'Ocultar do gráfico' : 'Incluir no gráfico'}
+                      title={isChecked ? 'Desmarcar do gráfico' : 'Marcar no gráfico'}
                     >
                       {isChecked && <CheckSquare className="w-3.5 h-3.5" />}
                     </button>
@@ -392,9 +409,9 @@ export default function CategoryPieCard({
                     </div>
                   </div>
 
-                  {/* Valor, Porcentagem e Ícone de Extrato */}
-                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                    <div className="text-right">
+                  {/* Valor, Porcentagem e Ações Rápidas */}
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 ml-2">
+                    <div className="text-right mr-1">
                       <span className="text-xs font-semibold tabular-nums block text-slate-200">
                         {formatCurrency(item.amount)}
                       </span>
@@ -414,6 +431,20 @@ export default function CategoryPieCard({
                         title="Ver transações desta categoria"
                       >
                         <Receipt className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
+                    {onToggleHideCategory && (
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation()
+                          onToggleHideCategory(item.id)
+                        }}
+                        className="p-1 rounded-lg text-slate-600 hover:text-rose-400 hover:bg-rose-950/40 transition-colors"
+                        title="Ocultar esta categoria dos relatórios permanentemente"
+                      >
+                        <EyeOff className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>

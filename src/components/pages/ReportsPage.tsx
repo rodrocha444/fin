@@ -1,4 +1,4 @@
-// src/components/pages/ReportsPage.tsx — Página de Relatórios Financeiros com Evolução Temporal e Detalhamento de Transações
+// src/components/pages/ReportsPage.tsx — Página de Relatórios Financeiros com Evolução Temporal, Detalhamento e Ocultação de Categorias
 import { useState, useMemo } from 'react'
 import {
   TrendingUp,
@@ -11,6 +11,8 @@ import {
   CalendarDays,
   Receipt,
   PieChart as PieIcon,
+  EyeOff,
+  Filter,
 } from 'lucide-react'
 import { useAllBalances } from '@/hooks/useAccounts'
 import { useDebtsSummary } from '@/hooks/useDebts'
@@ -21,6 +23,8 @@ import {
   type AccountingRegime,
   getSavedAccountingRegime,
   saveAccountingRegime,
+  getSavedReportHiddenCategories,
+  saveReportHiddenCategories,
   calculateReportExpensesByCategory,
   calculateReportIncomeByCategory,
   calculateReportSummary,
@@ -31,6 +35,7 @@ import {
 import CategoryPieCard, { type CategoryPieItem } from '@/components/molecules/CategoryPieCard'
 import MonthlyEvolutionCard from '@/components/organisms/MonthlyEvolutionCard'
 import CategoryTransactionsModal from '@/components/organisms/CategoryTransactionsModal'
+import ReportHiddenCategoriesModal from '@/components/organisms/ReportHiddenCategoriesModal'
 import AdvancedFinancialChart from '@/components/organisms/AdvancedFinancialChart'
 import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
 import { addMonths, subMonths, parseISO, format } from 'date-fns'
@@ -50,6 +55,12 @@ export default function ReportsPage() {
   const [month, setMonth] = useState(() => currentMonth())
   const [regime, setRegime] = useState<AccountingRegime>(() => getSavedAccountingRegime())
   const [modalState, setModalState] = useState<TransactionsModalState | null>(null)
+  const [showHiddenModal, setShowHiddenModal] = useState(false)
+
+  // Categorias ocultadas especificamente dos relatórios
+  const [hiddenCategoryIds, setHiddenCategoryIds] = useState<Set<string>>(
+    () => new Set(getSavedReportHiddenCategories())
+  )
 
   const {
     transactions = [],
@@ -64,6 +75,43 @@ export default function ReportsPage() {
   const handleRegimeChange = (newRegime: AccountingRegime) => {
     setRegime(newRegime)
     saveAccountingRegime(newRegime)
+  }
+
+  // Ações de ocultar / exibir categorias dos relatórios
+  const handleToggleHideCategory = (id: string) => {
+    setHiddenCategoryIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      saveReportHiddenCategories(Array.from(next))
+      return next
+    })
+  }
+
+  const handleHideMultiple = (ids: string[]) => {
+    setHiddenCategoryIds(prev => {
+      const next = new Set(prev)
+      ids.forEach(id => next.add(id))
+      saveReportHiddenCategories(Array.from(next))
+      return next
+    })
+  }
+
+  const handleShowMultiple = (ids: string[]) => {
+    setHiddenCategoryIds(prev => {
+      const next = new Set(prev)
+      ids.forEach(id => next.delete(id))
+      saveReportHiddenCategories(Array.from(next))
+      return next
+    })
+  }
+
+  const handleResetAllHidden = () => {
+    setHiddenCategoryIds(new Set())
+    saveReportHiddenCategories([])
   }
 
   // Navegação de mês
@@ -84,17 +132,17 @@ export default function ReportsPage() {
     setMonth(currentMonth())
   }
 
-  // Patrimônio líquido total consolidado (Contas Bancárias + Cartões + Cobranças a Receber - Dívidas a Pagar)
+  // Patrimônio líquido total consolidado
   const netWorth = useMemo(() => {
     const bankTotal = balances ? Array.from(balances.values()).reduce((sum, v) => sum + v, 0) : 0
     const debtNet = debtSummary?.netBalance ?? 0
     return bankTotal + debtNet
   }, [balances, debtSummary])
 
-  // Métricas consolidadas do mês conforme o regime contábil ativo
+  // Métricas consolidadas do mês conforme o regime contábil ativo e categorias ocultas
   const { income, expense, netSavings, savingsRate } = useMemo(() => {
-    return calculateReportSummary(transactions, installmentGroups, month, regime)
-  }, [transactions, installmentGroups, month, regime])
+    return calculateReportSummary(transactions, installmentGroups, month, regime, hiddenCategoryIds)
+  }, [transactions, installmentGroups, month, regime, hiddenCategoryIds])
 
   // ── 1. Itens de Despesa do Mês para o Gráfico de Pizza/Barras ────────────────
   const expensePieItems: CategoryPieItem[] = useMemo(() => {
@@ -102,10 +150,11 @@ export default function ReportsPage() {
       transactions,
       installmentGroups,
       month,
-      regime
+      regime,
+      hiddenCategoryIds
     )
     return buildExpensePieItems(expenseMap, categoryGroups, categories)
-  }, [transactions, installmentGroups, month, regime, categoryGroups, categories])
+  }, [transactions, installmentGroups, month, regime, hiddenCategoryIds, categoryGroups, categories])
 
   // ── 2. Itens de Receita do Mês para o Gráfico de Pizza/Barras ────────────────
   const incomePieItems: CategoryPieItem[] = useMemo(() => {
@@ -113,10 +162,11 @@ export default function ReportsPage() {
       transactions,
       installmentGroups,
       month,
-      regime
+      regime,
+      hiddenCategoryIds
     )
     return buildIncomePieItems(incomeMap, categoryGroups, categories)
-  }, [transactions, installmentGroups, month, regime, categoryGroups, categories])
+  }, [transactions, installmentGroups, month, regime, hiddenCategoryIds, categoryGroups, categories])
 
   // ── 3. Abertura do Modal de Transações por Categoria ─────────────────────────
   const handleCategorySelect = (item: CategoryPieItem, type: 'expense' | 'income') => {
@@ -154,6 +204,7 @@ export default function ReportsPage() {
       regime,
       {
         type,
+        hiddenCategoryIds,
       }
     )
 
@@ -173,7 +224,7 @@ export default function ReportsPage() {
 
   return (
     <div className="fade-in pb-16">
-      {/* ── Header com Seletor de Regime e Mês ───────────────────────────────── */}
+      {/* ── Header com Seletor de Regime, Mês e Ocultar Categorias ─────────── */}
       <div
         className="px-3 sm:px-6 pb-3 border-b border-slate-800 bg-slate-900 sticky top-0 z-20"
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
@@ -189,6 +240,31 @@ export default function ReportsPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Botão de Categorias Ocultas */}
+            <button
+              type="button"
+              onClick={() => setShowHiddenModal(true)}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                hiddenCategoryIds.size > 0
+                  ? 'bg-rose-950/50 text-rose-300 border-rose-800/60 hover:bg-rose-900/40 shadow-sm'
+                  : 'bg-slate-950/80 text-slate-400 border-slate-800 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
+              title="Gerenciar quais categorias são incluídas ou ocultadas dos relatórios"
+            >
+              {hiddenCategoryIds.size > 0 ? (
+                <EyeOff className="w-3.5 h-3.5 text-rose-400" />
+              ) : (
+                <Filter className="w-3.5 h-3.5 text-slate-400" />
+              )}
+              <span className="hidden md:inline">Filtro de Categorias</span>
+              <span className="md:hidden">Filtro</span>
+              {hiddenCategoryIds.size > 0 && (
+                <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded-full bg-rose-500 text-white leading-none">
+                  {hiddenCategoryIds.size}
+                </span>
+              )}
+            </button>
+
             {/* Seletor de Regime Contábil */}
             <div className="flex items-center bg-slate-950/90 rounded-xl border border-slate-800 p-0.5 shadow-inner">
               <button
@@ -199,7 +275,7 @@ export default function ReportsPage() {
                     ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                 }`}
-                title="Regime de Competência: Contabiliza compras parceladas integralmente na data da compra (ideal para análise de hábitos de consumo)"
+                title="Regime de Competência: Contabiliza compras parceladas integralmente na data da compra"
               >
                 <CalendarDays className="w-3.5 h-3.5 flex-shrink-0" />
                 <span>Data da Compra</span>
@@ -214,7 +290,7 @@ export default function ReportsPage() {
                     ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                 }`}
-                title="Regime de Caixa: Contabiliza compras parceladas no mês de vencimento de cada fatura (ideal para fluxo de pagamentos)"
+                title="Regime de Caixa: Contabiliza compras parceladas no mês de vencimento de cada fatura"
               >
                 <Receipt className="w-3.5 h-3.5 flex-shrink-0" />
                 <span>Por Fatura</span>
@@ -267,32 +343,53 @@ export default function ReportsPage() {
       </div>
 
       <div className="p-3 sm:p-6 space-y-6">
-        {/* ── Banner Informativo do Regime Contábil ─────────────────────────── */}
-        <div
-          className={`flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-xs transition-colors ${
-            regime === 'accrual'
-              ? 'bg-indigo-950/30 border-indigo-800/40 text-indigo-200'
-              : 'bg-slate-950/40 border-slate-800 text-slate-300'
-          }`}
-        >
-          <div className="flex items-center gap-2.5">
-            {regime === 'accrual' ? (
-              <CalendarDays className="w-4 h-4 text-indigo-400 flex-shrink-0" />
-            ) : (
-              <Receipt className="w-4 h-4 text-slate-400 flex-shrink-0" />
-            )}
-            <div>
+        {/* ── Banner Informativo do Regime Contábil e Categorias Ocultas ─────── */}
+        <div className="space-y-2">
+          <div
+            className={`flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-xs transition-colors ${
+              regime === 'accrual'
+                ? 'bg-indigo-950/30 border-indigo-800/40 text-indigo-200'
+                : 'bg-slate-950/40 border-slate-800 text-slate-300'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
               {regime === 'accrual' ? (
-                <p>
-                  <strong className="text-indigo-300">Regime de Competência (Data da Compra):</strong> As compras parceladas e rateios de categorias são contabilizados integralmente na data em que foram realizados, refletindo o consumo real deste mês.
-                </p>
+                <CalendarDays className="w-4 h-4 text-indigo-400 flex-shrink-0" />
               ) : (
-                <p>
-                  <strong className="text-slate-200">Regime de Caixa (Por Fatura):</strong> As compras parceladas são contabilizadas no mês de vencimento de cada fatura ou parcela individual.
-                </p>
+                <Receipt className="w-4 h-4 text-slate-400 flex-shrink-0" />
               )}
+              <div>
+                {regime === 'accrual' ? (
+                  <p>
+                    <strong className="text-indigo-300">Regime de Competência (Data da Compra):</strong> As compras parceladas e rateios são contabilizados integralmente na data em que foram realizados, refletindo o consumo real deste mês.
+                  </p>
+                ) : (
+                  <p>
+                    <strong className="text-slate-200">Regime de Caixa (Por Fatura):</strong> As compras parceladas são contabilizadas no mês de vencimento de cada fatura ou parcela individual.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Aviso se houver categorias ocultadas */}
+          {hiddenCategoryIds.size > 0 && (
+            <div className="flex items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-rose-950/30 border border-rose-900/40 text-xs text-rose-300 animate-in fade-in duration-150">
+              <div className="flex items-center gap-2">
+                <EyeOff className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
+                <span>
+                  <strong>{hiddenCategoryIds.size}</strong> {hiddenCategoryIds.size === 1 ? 'categoria está oculta' : 'categorias estão ocultas'} nos cálculos dos relatórios e gráficos.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHiddenModal(true)}
+                className="underline hover:text-white font-semibold flex-shrink-0"
+              >
+                Gerenciar
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ── Cards de KPIs Principais do Mês ───────────────────────────────── */}
@@ -368,6 +465,7 @@ export default function ReportsPage() {
         <MonthlyEvolutionCard
           currentActiveMonth={month}
           regime={regime}
+          hiddenCategoryIds={hiddenCategoryIds}
           onSelectMonthBar={handleMonthBarSelect}
           onMonthChange={setMonth}
         />
@@ -389,6 +487,9 @@ export default function ReportsPage() {
               items={expensePieItems}
               monthLabel={formatMonthLabel(month)}
               onSelectCategory={item => handleCategorySelect(item, 'expense')}
+              onToggleHideCategory={handleToggleHideCategory}
+              onOpenHiddenManager={() => setShowHiddenModal(true)}
+              hiddenCount={hiddenCategoryIds.size}
             />
 
             {/* Pizza / Barras de Receitas do Mês */}
@@ -398,6 +499,9 @@ export default function ReportsPage() {
               items={incomePieItems}
               monthLabel={formatMonthLabel(month)}
               onSelectCategory={item => handleCategorySelect(item, 'income')}
+              onToggleHideCategory={handleToggleHideCategory}
+              onOpenHiddenManager={() => setShowHiddenModal(true)}
+              hiddenCount={hiddenCategoryIds.size}
             />
           </div>
         </div>
@@ -428,6 +532,17 @@ export default function ReportsPage() {
           onClose={() => setModalState(null)}
         />
       )}
+
+      {/* ── Modal para Gerenciar Categorias Ocultas dos Relatórios ────────────── */}
+      <ReportHiddenCategoriesModal
+        isOpen={showHiddenModal}
+        hiddenCategoryIds={hiddenCategoryIds}
+        onToggleCategory={handleToggleHideCategory}
+        onHideMultiple={handleHideMultiple}
+        onShowMultiple={handleShowMultiple}
+        onResetAll={handleResetAllHidden}
+        onClose={() => setShowHiddenModal(false)}
+      />
     </div>
   )
 }
