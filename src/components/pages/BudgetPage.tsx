@@ -397,7 +397,7 @@ export default function BudgetPage() {
     })
   }, [])
 
-  const totalSpent = (rows?.reduce((s, r) => s + r.totalActivity, 0) ?? 0) + (invoiceRows?.reduce((s, r) => s + r.totalActivity, 0) ?? 0)
+  const totalSpent = rows?.reduce((s, r) => s + r.totalActivity, 0) ?? 0
 
   const confirm = useConfirm()
 
@@ -561,7 +561,7 @@ export default function BudgetPage() {
                 {/* Faturas do Mês */}
                 <div
                   className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
-                  title="Faturas de cartão de crédito com vencimento neste mês (- deduz do orçamento)"
+                  title="Faturas de cartão de crédito com vencimento neste mês (já provisionadas nas categorias orçadas)"
                 >
                   <div className="w-8 h-8 rounded-lg bg-rose-950/70 border border-rose-800/60 flex items-center justify-center text-rose-400 flex-shrink-0">
                     <CreditCard className="w-4 h-4" />
@@ -569,7 +569,7 @@ export default function BudgetPage() {
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] text-slate-500 font-medium truncate">Faturas a Vencer</p>
                     <p className="text-xs sm:text-sm font-bold text-rose-400 tabular-nums truncate">
-                      {(summary.currentInvoicesDue ?? 0) > 0 ? `-${formatCurrency(summary.currentInvoicesDue ?? 0)}` : <span className="text-slate-600">—</span>}
+                      {(summary.currentInvoicesDue ?? 0) > 0 ? formatCurrency(summary.currentInvoicesDue ?? 0) : <span className="text-slate-600">—</span>}
                     </p>
                   </div>
                 </div>
@@ -593,7 +593,7 @@ export default function BudgetPage() {
                 {/* Gastos Realizados */}
                 <div
                   className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
-                  title="Total de despesas efetivamente realizadas no mês"
+                  title="Total de despesas efetivamente realizadas no mês nas categorias"
                 >
                   <div className="w-8 h-8 rounded-lg bg-amber-950/70 border border-amber-800/60 flex items-center justify-center text-amber-400 flex-shrink-0">
                     <Receipt className="w-4 h-4" />

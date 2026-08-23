@@ -340,24 +340,17 @@ export function calculateBudgetSummary(
     priorOverspending += (uncategorizedExpensesByMonth.get(pMonth) || 0)
   }
 
-  let priorInvoicesPaid = 0
   let currentInvoicesDue = 0
 
   for (const acc of ccAccounts) {
     if (!acc.id || !acc.statementClosingDay) continue
     const accTxs = transactions.filter(t => t.accountId === acc.id)
-
-    for (const pMonth of priorMonths) {
-      const invoiceAmt = getInvoiceForBudgetMonth(accTxs, acc, pMonth)
-      priorInvoicesPaid += invoiceAmt
-    }
-
     const currInvoiceAmt = getInvoiceForBudgetMonth(accTxs, acc, month)
     currentInvoicesDue += currInvoiceAmt
   }
 
-  const previousMonthSurplus = initialFunds + priorIncome - priorTotalBudgeted - priorOverspending - priorInvoicesPaid
-  const toBeBudgeted = previousMonthSurplus + totalIncome - totalBudgeted - currentInvoicesDue
+  const previousMonthSurplus = initialFunds + priorIncome - priorTotalBudgeted - priorOverspending
+  const toBeBudgeted = previousMonthSurplus + totalIncome - totalBudgeted
 
   return {
     month,
