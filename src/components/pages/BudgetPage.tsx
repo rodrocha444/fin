@@ -11,9 +11,10 @@ import {
   TrendingUp,
   ChevronDown,
   ChevronUp,
+  CheckCheck,
 } from 'lucide-react'
 import { useBudgetRows, useIncomeBudgetRows, useBudgetSummary } from '@/hooks/useBudget'
-import { setBudget, copyFromPreviousMonth, clearMonthBudgets } from '@/services/api/budget'
+import { setBudget, copyFromPreviousMonth, clearMonthBudgets, coverMonthSpent } from '@/services/api/budget'
 import { formatCurrency, currentMonth } from '@/utils/format'
 import { useAccountingPeriod } from '@/utils/accountingPeriod'
 import { useConfirm } from '@/context/ConfirmContext'
@@ -393,6 +394,19 @@ export default function BudgetPage() {
     await copyFromPreviousMonth(month)
   }
 
+  const handleCoverSpent = async () => {
+    setShowMenu(false)
+    const ok = await confirm({
+      title: 'Cobrir Gastos do Mês?',
+      message: 'Deseja ajustar o valor orçado de cada categoria para cobrir exatamente o que foi gasto neste mês?',
+      confirmText: 'Cobrir Gastos',
+      variant: 'info',
+    })
+    if (ok) {
+      await coverMonthSpent(month)
+    }
+  }
+
   const handleClear = async () => {
     setShowMenu(false)
     const ok = await confirm({
@@ -473,8 +487,12 @@ export default function BudgetPage() {
             {showMenu && (
               <>
                 <div className="fixed inset-0 z-20" onClick={() => setShowMenu(false)} />
-                <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-30 overflow-hidden min-w-[180px] fade-in">
-                  <button onClick={handleCopy} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-200 hover:bg-slate-700 active:bg-slate-600 transition-colors">
+                <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-30 overflow-hidden min-w-[190px] fade-in">
+                  <button onClick={handleCoverSpent} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-200 hover:bg-slate-700 active:bg-slate-600 transition-colors">
+                    <CheckCheck className="w-4 h-4 text-emerald-400" />
+                    Cobrir gastos do mês
+                  </button>
+                  <button onClick={handleCopy} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-200 hover:bg-slate-700 active:bg-slate-600 transition-colors border-t border-slate-700">
                     <Copy className="w-4 h-4 text-slate-400" />
                     Copiar mês anterior
                   </button>
