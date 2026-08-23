@@ -72,17 +72,13 @@ export function accountTypeLabel(type: string): string {
   return map[type] ?? type
 }
 
-/** Verifica se a categoria representa saldos iniciais ou faturas anteriores (ajustes de saldo inicial) */
+/** Verifica se a categoria representa saldos iniciais (ajustes de saldo inicial de contas) */
 export function isInitialSetupCategory(categoryName?: string, groupName?: string): boolean {
   if (!categoryName && !groupName) return false
   const normCat = (categoryName || '').trim().toLowerCase()
   const normGrp = (groupName || '').trim().toLowerCase()
 
   const keywords = [
-    'faturas anteriores',
-    'fatura anterior',
-    'faturas fechadas anteriores',
-    'fatura fechada anterior',
     'saldos iniciais',
     'saldo inicial',
     'ajustes de saldo',

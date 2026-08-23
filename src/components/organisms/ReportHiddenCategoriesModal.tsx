@@ -99,8 +99,23 @@ export default function ReportHiddenCategoriesModal({
       isHiddenInReports: hiddenCategoryIds.has('uncategorized_income'),
     })
 
+    // 5. Inclusão de quaisquer outras categorias cadastradas
+    const groupMap = new Map(categoryGroups.map(g => [g.id!, g]))
+    for (const cat of categories) {
+      if (!cat.id || list.some(item => item.id === cat.id)) continue
+      const grp = groupMap.get(cat.groupId)
+      const isIncome = grp?.type === 'income'
+      list.push({
+        id: cat.id,
+        name: cat.name,
+        groupName: grp?.name || 'Geral',
+        type: isIncome ? 'income' : 'expense',
+        isHiddenInReports: hiddenCategoryIds.has(cat.id),
+      })
+    }
+
     return list
-  }, [categories, expenseGroups, incomeGroups, hiddenCategoryIds])
+  }, [categories, categoryGroups, expenseGroups, incomeGroups, hiddenCategoryIds])
 
   // Filtragem com busca e abas
   const filteredList = useMemo(() => {

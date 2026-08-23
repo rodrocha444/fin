@@ -94,6 +94,17 @@ export default function MonthlyEvolutionCard({
       }
     }
 
+    // Inclusão de quaisquer outras categorias cadastradas correspondentes ao modo
+    const groupMap = new Map(categoryGroups.map(g => [g.id!, g]))
+    for (const cat of categories) {
+      if (!cat.id || hiddenSet.has(cat.id) || list.some(item => item.id === cat.id)) continue
+      const grp = groupMap.get(cat.groupId)
+      const isIncome = grp?.type === 'income'
+      if ((viewMode === 'income' && isIncome) || (viewMode === 'expense' && !isIncome)) {
+        list.push({ id: cat.id, name: cat.name, groupName: grp?.name || 'Geral' })
+      }
+    }
+
     return list
   }, [viewMode, categoryGroups, categories, hiddenCategoryIds])
 
