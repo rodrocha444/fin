@@ -139,7 +139,33 @@ export default function MonthlyEvolutionCard({
       start = startOfYear(referenceDate)
     } else {
       const accStart = getAccountingStartDate()
-      start = accStart ? parseISO(`${accStart}-01`) : subMonths(referenceDate, 23)
+      let earliestDate: Date | null = accStart ? parseISO(`${accStart}-01`) : null
+
+      if (!earliestDate) {
+        for (const tx of transactions) {
+          if (!tx.date) continue
+          const d = new Date(tx.date)
+          if (!isNaN(d.getTime())) {
+            if (!earliestDate || d < earliestDate) {
+              earliestDate = d
+            }
+          }
+        }
+      }
+
+      if (earliestDate && !isNaN(earliestDate.getTime())) {
+        start = parseISO(`${format(earliestDate, 'yyyy-MM')}-01`)
+      } else {
+        start = subMonths(referenceDate, 11)
+      }
+
+      const maxPast = subMonths(referenceDate, 35)
+      if (start < maxPast) {
+        start = maxPast
+      }
+      if (isAfter(start, referenceDate)) {
+        start = subMonths(referenceDate, 11)
+      }
     }
 
     const list: string[] = []
@@ -154,7 +180,7 @@ export default function MonthlyEvolutionCard({
     }
 
     return list
-  }, [currentActiveMonth, rangePreset])
+  }, [currentActiveMonth, rangePreset, transactions])
 
   // Dados calculados para a série temporal (com suporte a filtro de categoria)
   const selectedCategoryIds = useMemo(() => {
