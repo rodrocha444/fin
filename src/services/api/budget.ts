@@ -241,26 +241,53 @@ export function calculateBudgetSummary(
     if (b.month === month) totalBudgeted += b.budgeted
   }
 
-  // Saldo real consolidado das contas correntes/caixa no período até o mês selecionado
-  let totalCheckingCash = 0
+  // 1. Saldos iniciais das contas on-budget (checking)
+  let initialFunds = 0
   for (const acc of accounts) {
-    if (acc.type !== 'checking' || acc.isActive === false) continue
-    let bal = Number(acc.initialBalance || 0)
-    for (const tx of validTxs) {
-      const txMonth = toMonthKey(new Date(tx.date))
-      if (txMonth > month) continue
+    if (acc.type === 'checking' && acc.isActive !== false) {
+      initialFunds += Number(acc.initialBalance || 0)
+    }
+  }
 
-      if (tx.accountId === acc.id) {
-        const amt = Number(tx.amount || 0)
-        if (tx.type === 'income') bal += amt
-        else if (tx.type === 'expense' || tx.type === 'transfer') bal -= amt
-      }
-      if (tx.transferAccountId === acc.id && tx.type === 'transfer') {
-        bal += Number(tx.amount || 0)
+  // 2. Total de receitas recebidas nas contas checking até o mês
+  let totalIncomeFunds = 0
+  for (const tx of validTxs) {
+    const txMonth = toMonthKey(new Date(tx.date))
+    if (txMonth > month) continue
+    if (tx.type === 'income' && tx.accountId) {
+      const acc = accountMap.get(tx.accountId)
+      if (acc?.type === 'checking' && acc.isActive !== false) {
+        totalIncomeFunds += Number(tx.amount || 0)
       }
     }
-    totalCheckingCash += bal
   }
+
+  // 3. Transferências líquidas para contas Off-Budget até o mês selecionado
+  let netOffBudgetTransfers = 0
+  for (const tx of validTxs) {
+    const txMonth = toMonthKey(new Date(tx.date))
+    if (txMonth > month) continue
+    if (tx.type === 'transfer') {
+      const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
+      const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
+      if (fromAcc?.type === 'checking' && toAcc?.type === 'off_budget') {
+        netOffBudgetTransfers += Number(tx.amount || 0)
+      } else if (fromAcc?.type === 'off_budget' && toAcc?.type === 'checking') {
+        netOffBudgetTransfers -= Number(tx.amount || 0)
+      }
+    }
+  }
+
+  // 4. Total orçado em meses anteriores ao mês selecionado
+  let priorBudgeted = 0
+  for (const b of budgetMonths) {
+    if (isMonthBeforeAccountingStart(b.month)) continue
+    if (ignoredCategoryIds.has(b.categoryId)) continue
+    if (b.month < month) priorBudgeted += b.budgeted
+  }
+
+  // Fundos disponíveis para o mês selecionado
+  const availableFundsForMonth = initialFunds + totalIncomeFunds - netOffBudgetTransfers - priorBudgeted
 
   const paidMap = getPaidInvoicesMap()
 
@@ -278,34 +305,40 @@ export function calculateBudgetSummary(
 
   // ── MODO PROJEÇÃO EM CASCATA PARA MESES FUTUROS ──────────────
   if (isFutureMonth) {
-    // 1. Saldo real consolidado em conta corrente até o mês atual
-    let checkingCashNow = 0
-    for (const acc of accounts) {
-      if (acc.type !== 'checking' || acc.isActive === false) continue
-      let bal = Number(acc.initialBalance || 0)
-      for (const tx of validTxs) {
-        const txMonth = toMonthKey(new Date(tx.date))
-        if (txMonth > curMonth) continue
-
-        if (tx.accountId === acc.id) {
-          const amt = Number(tx.amount || 0)
-          if (tx.type === 'income') bal += amt
-          else if (tx.type === 'expense' || tx.type === 'transfer') bal -= amt
-        }
-        if (tx.transferAccountId === acc.id && tx.type === 'transfer') {
-          bal += Number(tx.amount || 0)
+    // 1. Fundos disponíveis e orçado do mês atual
+    let totalIncomeFundsNow = 0
+    let netOffBudgetTransfersNow = 0
+    for (const tx of validTxs) {
+      const txMonth = toMonthKey(new Date(tx.date))
+      if (txMonth > curMonth) continue
+      if (tx.type === 'income' && tx.accountId) {
+        const acc = accountMap.get(tx.accountId)
+        if (acc?.type === 'checking' && acc.isActive !== false) {
+          totalIncomeFundsNow += Number(tx.amount || 0)
         }
       }
-      checkingCashNow += bal
+      if (tx.type === 'transfer') {
+        const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
+        const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
+        if (fromAcc?.type === 'checking' && toAcc?.type === 'off_budget') {
+          netOffBudgetTransfersNow += Number(tx.amount || 0)
+        } else if (fromAcc?.type === 'off_budget' && toAcc?.type === 'checking') {
+          netOffBudgetTransfersNow -= Number(tx.amount || 0)
+        }
+      }
     }
 
-    // 2. Despesas orçadas e receitas pendentes do mês atual
+    let priorBudgetedToNow = 0
     let nowBudgeted = 0
     for (const b of budgetMonths) {
       if (isMonthBeforeAccountingStart(b.month)) continue
       if (ignoredCategoryIds.has(b.categoryId)) continue
+      if (b.month < curMonth) priorBudgetedToNow += b.budgeted
       if (b.month === curMonth) nowBudgeted += b.budgeted
     }
+
+    const availableFundsNow = initialFunds + totalIncomeFundsNow - netOffBudgetTransfersNow - priorBudgetedToNow
+    const toBeBudgetedNow = availableFundsNow - nowBudgeted
 
     const nowIncomeMap = calculateIncomeByCategory(transactions, curMonth)
     const nowBudgetMap = new Map(
@@ -324,7 +357,7 @@ export function calculateBudgetSummary(
     }
 
     // Sobra projetada do mês atual que transborda para o planejamento
-    let runningSurplus = checkingCashNow - nowBudgeted + nowPendingIncome
+    let runningSurplus = toBeBudgetedNow + nowPendingIncome
 
     // 3. Iterar pelos meses futuros intermediários até o mês selecionado
     let mCursor = shiftMonth(curMonth, 1)
@@ -397,8 +430,8 @@ export function calculateBudgetSummary(
     }
   }
 
-  // Disponível a Orçar (Caixa Real): Dinheiro total disponível em conta corrente menos o valor alocado nas categorias do mês
-  const toBeBudgeted = totalCheckingCash - totalBudgeted
+  // Disponível a Orçar (Caixa Real): Fundos disponíveis do mês menos o total alocado nas categorias do mês
+  const toBeBudgeted = availableFundsForMonth - totalBudgeted
   // Disponível a Orçar Projetado: Saldo a orçar somado às receitas previstas que ainda faltam entrar
   const projectedToBeBudgeted = toBeBudgeted + pendingExpectedIncome
 
