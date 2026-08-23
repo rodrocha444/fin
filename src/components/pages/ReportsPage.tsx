@@ -8,15 +8,24 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
+  CalendarDays,
+  Receipt,
 } from 'lucide-react'
-import { useBudgetRows, useIncomeBudgetRows } from '@/hooks/useBudget'
-import { useMonthSummary } from '@/hooks/useTransactions'
 import { useAllBalances } from '@/hooks/useAccounts'
 import { useDebtsSummary } from '@/hooks/useDebts'
 import { useFinancialData } from '@/context/FinancialDataContext'
 import { formatCurrency, formatMonthLabel, currentMonth } from '@/utils/format'
-import { toMonthKey } from '@/services/api/budget'
 import { isMonthBeforeAccountingStart } from '@/utils/accountingPeriod'
+import {
+  type AccountingRegime,
+  getSavedAccountingRegime,
+  saveAccountingRegime,
+  calculateReportExpensesByCategory,
+  calculateReportIncomeByCategory,
+  calculateReportSummary,
+  buildExpensePieItems,
+  buildIncomePieItems,
+} from '@/utils/accountingRegime'
 import CategoryPieCard, { type CategoryPieItem } from '@/components/molecules/CategoryPieCard'
 import AdvancedFinancialChart from '@/components/organisms/AdvancedFinancialChart'
 import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
@@ -24,13 +33,21 @@ import { addMonths, subMonths, parseISO, format } from 'date-fns'
 
 export default function ReportsPage() {
   const [month, setMonth] = useState(() => currentMonth())
-  const { transactions = [], categories = [], categoryGroups = [] } = useFinancialData()
+  const [regime, setRegime] = useState<AccountingRegime>(() => getSavedAccountingRegime())
+  const {
+    transactions = [],
+    categories = [],
+    categoryGroups = [],
+    installmentGroups = [],
+  } = useFinancialData()
 
-  const budgetRows = useBudgetRows(month)
-  const incomeBudgetRows = useIncomeBudgetRows(month)
-  const monthSummary = useMonthSummary(month)
   const balances = useAllBalances()
   const debtSummary = useDebtsSummary()
+
+  const handleRegimeChange = (newRegime: AccountingRegime) => {
+    setRegime(newRegime)
+    saveAccountingRegime(newRegime)
+  }
 
   // Navegação de mês
   const handlePrevMonth = () => {
@@ -57,107 +74,37 @@ export default function ReportsPage() {
     return bankTotal + debtNet
   }, [balances, debtSummary])
 
-  // Métricas do mês
-  const income = monthSummary?.income ?? 0
-  const expense = monthSummary?.expense ?? 0
-  const netSavings = income - expense
-  const savingsRate = income > 0 ? (netSavings / income) * 100 : 0
+  // Métricas consolidadas do mês conforme o regime contábil ativo
+  const { income, expense, netSavings, savingsRate } = useMemo(() => {
+    return calculateReportSummary(transactions, installmentGroups, month, regime)
+  }, [transactions, installmentGroups, month, regime])
 
   // ── 1. Itens de Despesa do Mês para o Gráfico de Pizza ──────────────────────
   const expensePieItems: CategoryPieItem[] = useMemo(() => {
-    const list: CategoryPieItem[] = []
-
-    if (budgetRows && budgetRows.length > 0) {
-      for (const group of budgetRows) {
-        for (const cat of group.categories) {
-          if (cat.activity > 0) {
-            list.push({
-              id: cat.category.id || `${group.group.id}_${cat.category.name}`,
-              name: cat.category.name,
-              groupName: group.group.name,
-              amount: cat.activity,
-            })
-          }
-        }
-      }
-    }
-
-    // Adiciona eventuais despesas sem categoria
-    const uncategorizedExpense = transactions
-      .filter(t => t.type === 'expense' && !t.categoryId && toMonthKey(new Date(t.date)) === month)
-      .reduce((s, t) => s + t.amount, 0)
-
-    if (uncategorizedExpense > 0) {
-      list.push({
-        id: 'uncategorized_expense',
-        name: 'Sem Categoria',
-        groupName: 'Diversos',
-        amount: uncategorizedExpense,
-      })
-    }
-
-    return list
-  }, [budgetRows, transactions, month])
+    const expenseMap = calculateReportExpensesByCategory(
+      transactions,
+      installmentGroups,
+      month,
+      regime
+    )
+    return buildExpensePieItems(expenseMap, categoryGroups, categories)
+  }, [transactions, installmentGroups, month, regime, categoryGroups, categories])
 
   // ── 2. Itens de Receita do Mês para o Gráfico de Pizza ──────────────────────
   const incomePieItems: CategoryPieItem[] = useMemo(() => {
-    const list: CategoryPieItem[] = []
-    const catMap = new Map(categories.map(c => [c.id!, c]))
-    const groupMap = new Map(categoryGroups.map(g => [g.id!, g]))
-
-    if (incomeBudgetRows && incomeBudgetRows.length > 0) {
-      for (const group of incomeBudgetRows) {
-        for (const cat of group.categories) {
-          if (cat.received > 0) {
-            list.push({
-              id: cat.category.id || `${group.group.id}_${cat.category.name}`,
-              name: cat.category.name,
-              groupName: group.group.name,
-              amount: cat.received,
-            })
-          }
-        }
-      }
-    }
-
-    // Se ainda não houver itens agrupados, extrai diretamente das transações de renda do mês
-    if (list.length === 0) {
-      const monthIncomeTxs = transactions.filter(
-        t => t.type === 'income' && toMonthKey(new Date(t.date)) === month
-      )
-
-      const byCategory = new Map<string, { name: string; groupName?: string; amount: number }>()
-
-      for (const tx of monthIncomeTxs) {
-        const cat = tx.categoryId ? catMap.get(tx.categoryId) : undefined
-        const grp = cat ? groupMap.get(cat.groupId) : undefined
-        const catKey = tx.categoryId || (tx.payee ? `payee_${tx.payee}` : 'uncategorized_income')
-        const catName = cat?.name || tx.payee || 'Renda Diversa'
-
-        const current = byCategory.get(catKey) || { name: catName, groupName: grp?.name, amount: 0 }
-        current.amount += tx.amount
-        byCategory.set(catKey, current)
-      }
-
-      for (const [id, data] of byCategory.entries()) {
-        if (data.amount > 0) {
-          list.push({
-            id,
-            name: data.name,
-            groupName: data.groupName,
-            amount: data.amount,
-          })
-        }
-      }
-    }
-
-    return list
-  }, [incomeBudgetRows, transactions, categories, categoryGroups, month])
+    const incomeMap = calculateReportIncomeByCategory(
+      transactions,
+      installmentGroups,
+      month,
+      regime
+    )
+    return buildIncomePieItems(incomeMap, categoryGroups, categories)
+  }, [transactions, installmentGroups, month, regime, categoryGroups, categories])
 
   return (
     <div className="fade-in pb-16">
       
-      {/* ── Header com Seletor de Mês ────────────────────────────────────────── */}
+      {/* ── Header com Seletor de Regime e Mês ───────────────────────────────── */}
       <div
         className="px-3 sm:px-6 pb-3 border-b border-slate-800 bg-slate-900 sticky top-0 z-20"
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
@@ -172,7 +119,40 @@ export default function ReportsPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Seletor de Regime Contábil */}
+            <div className="flex items-center bg-slate-950/90 rounded-xl border border-slate-800 p-0.5 shadow-inner">
+              <button
+                type="button"
+                onClick={() => handleRegimeChange('accrual')}
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  regime === 'accrual'
+                    ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
+                title="Regime de Competência: Contabiliza compras parceladas integralmente na data da compra (ideal para análise de hábitos de consumo)"
+              >
+                <CalendarDays className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>Data da Compra</span>
+                <span className="hidden md:inline text-[10px] opacity-75">(Competência)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleRegimeChange('cash')}
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  regime === 'cash'
+                    ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
+                title="Regime de Caixa: Contabiliza compras parceladas no mês de vencimento de cada fatura (ideal para fluxo de pagamentos)"
+              >
+                <Receipt className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>Por Fatura</span>
+                <span className="hidden md:inline text-[10px] opacity-75">(Caixa)</span>
+              </button>
+            </div>
+
             {/* Seletor de Mês */}
             <div className="flex items-center bg-slate-950/80 rounded-xl border border-slate-800 p-0.5">
               <button
@@ -218,6 +198,34 @@ export default function ReportsPage() {
       </div>
 
       <div className="p-3 sm:p-6 space-y-6">
+        
+        {/* ── Banner Informativo do Regime Contábil ─────────────────────────── */}
+        <div
+          className={`flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-xs transition-colors ${
+            regime === 'accrual'
+              ? 'bg-indigo-950/30 border-indigo-800/40 text-indigo-200'
+              : 'bg-slate-950/40 border-slate-800 text-slate-300'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            {regime === 'accrual' ? (
+              <CalendarDays className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+            ) : (
+              <Receipt className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            )}
+            <div>
+              {regime === 'accrual' ? (
+                <p>
+                  <strong className="text-indigo-300">Regime de Competência (Data da Compra):</strong> As compras parceladas e rateios de categorias são contabilizados integralmente na data em que foram realizados, refletindo o consumo real deste mês.
+                </p>
+              ) : (
+                <p>
+                  <strong className="text-slate-200">Regime de Caixa (Por Fatura):</strong> As compras parceladas são contabilizadas no mês de vencimento de cada fatura ou parcela individual.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
         
         {/* ── Cards de KPIs Principais do Mês ───────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
