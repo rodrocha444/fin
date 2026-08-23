@@ -176,9 +176,9 @@ export default function CategoryPieCard({
   const noneSelected = selectedIds.size === 0
 
   return (
-    <div className="card p-4 sm:p-5 bg-slate-900 border border-slate-800 space-y-4 flex flex-col justify-between h-full">
+    <div className="card p-4 sm:p-5 bg-slate-900 border border-slate-800 space-y-4 flex flex-col justify-start h-full">
       {/* Cabeçalho do Card */}
-      <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-800/80">
+      <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-800/80 flex-shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
           <div
             className={`p-2 rounded-xl border flex-shrink-0 ${
