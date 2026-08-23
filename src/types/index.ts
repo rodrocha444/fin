@@ -122,6 +122,10 @@ export interface BudgetSummary {
   totalBudgeted: number
   /** Faturas de cartão com vencimento no mês selecionado */
   currentInvoicesDue?: number
+  /** Transferências líquidas para/de contas Off-Budget no mês atual */
+  currentOffBudgetNet?: number
+  /** Transferências líquidas para/de contas Off-Budget acumuladas de meses anteriores */
+  priorOffBudgetNet?: number
   /** Sobra/falta acumulada do mês anterior */
   previousMonthSurplus: number
   /** Gastos que excederam o orçamento em meses anteriores */
