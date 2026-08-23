@@ -8,7 +8,6 @@ import {
   CreditCard,
   Layers,
   Receipt,
-  History,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react'
@@ -512,36 +511,10 @@ export default function BudgetPage() {
             </button>
           </div>
 
-          {/* Grid detalhado de 5 cards (quando expandido) */}
+          {/* Grid detalhado de 4 cards (quando expandido) */}
           {isSummaryExpanded && (
             <div className="px-3 pb-3 sm:px-6 sm:pb-3 pt-1 animate-in fade-in duration-200">
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5">
-                {/* Sobra Mês Anterior */}
-                <div
-                  className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm col-span-2 sm:col-span-1"
-                  title="Recursos não orçados ou sobras acumuladas de meses anteriores (+ soma ao orçamento)"
-                >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                    summary.previousMonthSurplus >= 0
-                      ? 'bg-emerald-950/70 border border-emerald-800/60 text-emerald-400'
-                      : 'bg-rose-950/70 border border-rose-800/60 text-rose-400'
-                  }`}>
-                    <History className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[10px] text-slate-500 font-medium truncate">Sobra Anterior</p>
-                    <p className={`text-xs sm:text-sm font-bold tabular-nums truncate ${
-                      summary.previousMonthSurplus > 0
-                        ? 'text-emerald-400'
-                        : summary.previousMonthSurplus < 0
-                        ? 'text-rose-400'
-                        : 'text-slate-500'
-                    }`}>
-                      {summary.previousMonthSurplus > 0 ? '+' : ''}{formatCurrency(summary.previousMonthSurplus)}
-                    </p>
-                  </div>
-                </div>
-
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
                 {/* Receitas do Mês */}
                 <div
                   className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"

@@ -114,21 +114,13 @@ export interface Payee {
 
 export interface BudgetSummary {
   month: string
-  /** Saldo inicial total das contas (dinheiro inicial disponível) */
-  initialFunds?: number
   /** Renda total no mês selecionado */
   totalIncome: number
   /** Total orçado no mês selecionado */
   totalBudgeted: number
   /** Faturas de cartão com vencimento no mês selecionado */
   currentInvoicesDue?: number
-  /** Sobra/falta acumulada do mês anterior */
-  previousMonthSurplus: number
-  /** Gastos que excederam o orçamento em meses anteriores */
-  priorOverspending?: number
-  /** Histórico acumulado para compatibilidade */
-  totalAllTimeBudgeted: number
-  /** Quanto ainda está disponível para ser orçado no mês (acumulativo) */
+  /** Quanto ainda está disponível para ser orçado no mês */
   toBeBudgeted: number
 }
 

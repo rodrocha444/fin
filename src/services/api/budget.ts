@@ -253,7 +253,6 @@ export function calculateBudgetSummary(
   // Filtra apenas transações dentro do período contábil ativo
   const validTxs = transactions.filter(t => !isDateBeforeAccountingStart(t.date))
   const allIncomeTxs = validTxs.filter(t => t.type === 'income' && accountMap.get(t.accountId)?.type !== 'off_budget')
-  const allExpenseTxs = validTxs.filter(t => t.type === 'expense' && accountMap.get(t.accountId)?.type !== 'off_budget')
   const ccAccounts = accounts.filter(a => a.type === 'credit_card')
 
   const groupMap = new Map(categoryGroups.map(g => [g.id!, g]))
@@ -267,77 +266,21 @@ export function calculateBudgetSummary(
     }
   }
 
-  const initialFunds = accounts
-    .filter(a => a.type === 'checking')
-    .reduce((sum, a) => sum + (a.initialBalance || 0), 0)
-
+  // Receitas do mês selecionado
   let totalIncome = 0
-  let priorIncome = 0
-
   for (const tx of allIncomeTxs) {
     const txMonth = toMonthKey(new Date(tx.date))
     if (txMonth === month) {
       totalIncome += tx.amount
-    } else if (txMonth < month && !isMonthBeforeAccountingStart(txMonth)) {
-      priorIncome += tx.amount
     }
   }
 
-  const expensesByMonthCategory = new Map<string, number>()
-  const uncategorizedExpensesByMonth = new Map<string, number>()
-
-  for (const tx of allExpenseTxs) {
-    const txMonth = toMonthKey(new Date(tx.date))
-    if (isMonthBeforeAccountingStart(txMonth)) continue
-    if (tx.categoryId && ignoredCategoryIds.has(tx.categoryId)) continue
-    if (tx.categoryId) {
-      const key = `${txMonth}:${tx.categoryId}`
-      expensesByMonthCategory.set(key, (expensesByMonthCategory.get(key) || 0) + tx.amount)
-    } else {
-      uncategorizedExpensesByMonth.set(
-        txMonth,
-        (uncategorizedExpensesByMonth.get(txMonth) || 0) + tx.amount
-      )
-    }
-  }
-
-  const allMonthsSet = new Set<string>()
-  for (const tx of validTxs) {
-    const m = toMonthKey(new Date(tx.date))
-    if (!isMonthBeforeAccountingStart(m)) allMonthsSet.add(m)
-  }
-  for (const b of budgetMonths) {
-    if (!isMonthBeforeAccountingStart(b.month)) allMonthsSet.add(b.month)
-  }
-  allMonthsSet.add(month)
-
-  const priorMonths = Array.from(allMonthsSet).filter(m => m < month && !isMonthBeforeAccountingStart(m)).sort()
-
+  // Total orçado nas categorias de despesa no mês selecionado
   let totalBudgeted = 0
-  let totalAllTimeBudgeted = 0
-  let priorTotalBudgeted = 0
-
   for (const b of budgetMonths) {
     if (isMonthBeforeAccountingStart(b.month)) continue
     if (ignoredCategoryIds.has(b.categoryId)) continue
     if (b.month === month) totalBudgeted += b.budgeted
-    else if (b.month < month) priorTotalBudgeted += b.budgeted
-    totalAllTimeBudgeted += b.budgeted
-  }
-
-  let priorOverspending = 0
-  for (const pMonth of priorMonths) {
-    const pBudgets = budgetMonths.filter(b => b.month === pMonth && !ignoredCategoryIds.has(b.categoryId))
-    for (const b of pBudgets) {
-      const exp = expensesByMonthCategory.get(`${pMonth}:${b.categoryId}`) || 0
-      if (exp > b.budgeted) priorOverspending += (exp - b.budgeted)
-    }
-    const pBudgetCatIds = new Set(pBudgets.map(b => b.categoryId))
-    for (const [key, exp] of expensesByMonthCategory.entries()) {
-      const [mKey, cId] = key.split(':')
-      if (mKey === pMonth && !pBudgetCatIds.has(cId)) priorOverspending += exp
-    }
-    priorOverspending += (uncategorizedExpensesByMonth.get(pMonth) || 0)
   }
 
   // Saldo real consolidado das contas correntes/caixa no período até o mês selecionado
@@ -361,8 +304,8 @@ export function calculateBudgetSummary(
     totalCheckingCash += bal
   }
 
+  // Faturas de cartão de crédito a vencer no mês selecionado (informativo)
   let currentInvoicesDue = 0
-
   for (const acc of ccAccounts) {
     if (!acc.id || !acc.statementClosingDay) continue
     const accTxs = transactions.filter(t => t.accountId === acc.id)
@@ -370,20 +313,14 @@ export function calculateBudgetSummary(
     currentInvoicesDue += currInvoiceAmt
   }
 
-  // Sobra Anterior: Saldo em conta corrente no início do mês (antes das receitas do mês)
-  const previousMonthSurplus = totalCheckingCash - totalIncome
   // Disponível a Orçar: Dinheiro total disponível em conta corrente menos o valor alocado nas categorias do mês
   const toBeBudgeted = totalCheckingCash - totalBudgeted
 
   return {
     month,
-    initialFunds,
     totalIncome,
     totalBudgeted,
     currentInvoicesDue,
-    previousMonthSurplus,
-    priorOverspending,
-    totalAllTimeBudgeted,
     toBeBudgeted,
   }
 }
