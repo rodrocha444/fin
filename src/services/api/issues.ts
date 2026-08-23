@@ -7,13 +7,15 @@ import type {
   CategoryGroup,
   BudgetMonth,
   PendingIssue,
+  Account,
 } from '@/types'
 
 export function computePendingIssues(
   transactions: Transaction[],
   categories: Category[],
   categoryGroups: CategoryGroup[],
-  budgetMonths: BudgetMonth[]
+  budgetMonths: BudgetMonth[],
+  accounts?: Account[]
 ): PendingIssue[] {
   const issues: PendingIssue[] = []
 
@@ -43,7 +45,7 @@ export function computePendingIssues(
 
   // Regra 2: Categorias estouradas no mês atual
   const currentMonth = toMonthKey(new Date())
-  const activityMap = calculateActivityByCategory(transactions, currentMonth)
+  const activityMap = calculateActivityByCategory(transactions, currentMonth, accounts)
   const budgetByCategory = new Map(
     budgetMonths.filter(b => b.month === currentMonth).map(b => [b.categoryId, b.budgeted])
   )

@@ -5,16 +5,18 @@ import {
   useCategoriesQuery,
   useCategoryGroupsQuery,
   useBudgetMonthsQuery,
+  useAccountsQuery,
 } from '@/hooks/queries'
 import { computePendingIssues } from '@/services/api/issues'
 import type { PendingIssue } from '@/types'
 
 export function usePendingIssues(): PendingIssue[] | undefined {
+  const { data: accounts = [], isLoading: l0 } = useAccountsQuery()
   const { data: transactions = [], isLoading: l1 } = useTransactionsQuery()
   const { data: categories = [], isLoading: l2 } = useCategoriesQuery()
   const { data: categoryGroups = [], isLoading: l3 } = useCategoryGroupsQuery()
   const { data: budgetMonths = [], isLoading: l4 } = useBudgetMonthsQuery()
-  const isLoading = l1 || l2 || l3 || l4
+  const isLoading = l0 || l1 || l2 || l3 || l4
 
   return useMemo(() => {
     if (isLoading && transactions.length === 0) return undefined
@@ -22,13 +24,15 @@ export function usePendingIssues(): PendingIssue[] | undefined {
       transactions,
       categories,
       categoryGroups,
-      budgetMonths
+      budgetMonths,
+      accounts
     )
   }, [
     transactions,
     categories,
     categoryGroups,
     budgetMonths,
+    accounts,
     isLoading,
   ])
 }
