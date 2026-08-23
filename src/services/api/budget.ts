@@ -160,9 +160,13 @@ export function calculateIncomeBudgetRows(
   month: string,
   categoryGroups: CategoryGroup[],
   categories: Category[],
+  budgetMonths: BudgetMonth[],
   transactions: Transaction[]
 ): IncomeGroupBudgetRow[] {
   const incomeMap = calculateIncomeByCategory(transactions, month)
+  const budgetByCategory = new Map(
+    budgetMonths.filter(b => b.month === month).map(b => [b.categoryId, b])
+  )
   const incomeGroups = categoryGroups.filter(g => g.type === 'income')
   const rows: IncomeGroupBudgetRow[] = []
 
@@ -175,14 +179,20 @@ export function calculateIncomeBudgetRows(
 
     for (const cat of groupCategories) {
       if (!cat.id) continue
+      const budgetRec = budgetByCategory.get(cat.id)
+      const expected = budgetRec?.budgeted ?? 0
       const received = incomeMap.get(cat.id) ?? 0
-      catRows.push({ category: cat, received })
+      const difference = expected - received
+
+      catRows.push({ category: cat, expected, received, difference })
     }
 
     rows.push({
       group,
       categories: catRows,
+      totalExpected: catRows.reduce((s, r) => s + r.expected, 0),
       totalReceived: catRows.reduce((s, r) => s + r.received, 0),
+      totalDifference: catRows.reduce((s, r) => s + r.difference, 0),
     })
   }
 

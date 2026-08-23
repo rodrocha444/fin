@@ -141,13 +141,17 @@ export interface GroupBudgetRow {
 
 export interface IncomeCategoryBudgetRow {
   category: Category
+  expected: number
   received: number
+  difference: number
 }
 
 export interface IncomeGroupBudgetRow {
   group: CategoryGroup
   categories: IncomeCategoryBudgetRow[]
+  totalExpected: number
   totalReceived: number
+  totalDifference: number
 }
 
 export interface InvoiceCategoryBudgetRow {

@@ -58,8 +58,9 @@ export function useInvoiceBudgetRows(month: string): InvoiceGroupBudgetRow[] | u
 export function useIncomeBudgetRows(month: string): IncomeGroupBudgetRow[] | undefined {
   const { data: categoryGroups = [], isLoading: l1 } = useCategoryGroupsQuery()
   const { data: categories = [], isLoading: l2 } = useCategoriesQuery()
-  const { data: transactions = [], isLoading: l3 } = useTransactionsQuery()
-  const isLoading = l1 || l2 || l3
+  const { data: budgetMonths = [], isLoading: l3 } = useBudgetMonthsQuery()
+  const { data: transactions = [], isLoading: l4 } = useTransactionsQuery()
+  const isLoading = l1 || l2 || l3 || l4
 
   return useMemo(() => {
     if (isLoading && categoryGroups.length === 0) return undefined
@@ -67,9 +68,10 @@ export function useIncomeBudgetRows(month: string): IncomeGroupBudgetRow[] | und
       month,
       categoryGroups,
       categories,
+      budgetMonths,
       transactions
     )
-  }, [month, categoryGroups, categories, transactions, isLoading])
+  }, [month, categoryGroups, categories, budgetMonths, transactions, isLoading])
 }
 
 /** Resumo "To Be Budgeted" de um mês */

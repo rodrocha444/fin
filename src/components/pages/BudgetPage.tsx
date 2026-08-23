@@ -175,32 +175,85 @@ function InvoiceGroupRow({
 
 function IncomeCategoryRow({
   row,
+  month,
   onSelectCategory,
 }: {
   row: IncomeCategoryBudgetRow
+  month: string
   onSelectCategory: (data: CategoryModalData) => void
 }) {
+  const handleSave = useCallback(
+    async (v: number) => {
+      if (row.category.id !== undefined) await setBudget(month, row.category.id, v)
+    },
+    [month, row.category.id]
+  )
+
+  const diffColor =
+    row.difference <= 0 && (row.received > 0 || row.expected > 0)
+      ? 'text-emerald-400 font-medium'
+      : row.difference > 0
+      ? 'text-amber-400/90 font-medium'
+      : 'text-slate-500 font-normal'
+
   return (
-    <tr
-      onClick={() =>
-        onSelectCategory({
-          category: row.category,
-          activity: row.received,
-          isIncome: true,
-        })
-      }
-      className="group hover:bg-slate-800/40 active:bg-slate-800/60 cursor-pointer transition-colors"
-      title="Clique para ver as transações desta categoria no mês"
-    >
-      <td className="py-2.5 pl-6 sm:pl-10 pr-2 text-xs sm:text-sm text-slate-300">
+    <tr className="group hover:bg-slate-800/30 transition-colors">
+      {/* Nome da categoria */}
+      <td
+        onClick={() =>
+          onSelectCategory({
+            category: row.category,
+            budgeted: row.expected,
+            activity: row.received,
+            isIncome: true,
+          })
+        }
+        className="py-2.5 pl-6 sm:pl-10 pr-2 text-xs sm:text-sm text-slate-300 cursor-pointer"
+        title="Clique para ver as transações desta categoria no mês"
+      >
         <span className="break-words leading-tight block group-hover:text-emerald-300 transition-colors" title={row.category.name}>
           {row.category.name}
         </span>
       </td>
-      <td colSpan={3} className="py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm text-emerald-400 font-medium tabular-nums">
+      {/* Previsto / Orçado */}
+      <td className="py-2.5 px-2 text-right">
+        <BudgetCell value={row.expected} onSave={handleSave} />
+      </td>
+      {/* Recebido */}
+      <td
+        onClick={() =>
+          onSelectCategory({
+            category: row.category,
+            budgeted: row.expected,
+            activity: row.received,
+            isIncome: true,
+          })
+        }
+        className="py-2.5 px-2 text-right text-xs sm:text-sm text-emerald-400 font-medium tabular-nums cursor-pointer hover:bg-slate-800/50"
+        title="Clique para ver as transações desta categoria no mês"
+      >
         {row.received > 0
           ? `+${formatCurrency(row.received)}`
           : <span className="text-slate-600">—</span>}
+      </td>
+      {/* A Receber / Diferença */}
+      <td
+        onClick={() =>
+          onSelectCategory({
+            category: row.category,
+            budgeted: row.expected,
+            activity: row.received,
+            isIncome: true,
+          })
+        }
+        className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums cursor-pointer hover:bg-slate-800/50 ${diffColor}`}
+        title="Clique para ver as transações desta categoria no mês"
+      >
+        {row.difference > 0
+          ? formatCurrency(row.difference)
+          : row.difference < 0
+          ? <span className="text-emerald-400 font-semibold" title="Superou a meta prevista!">+{formatCurrency(Math.abs(row.difference))}</span>
+          : (row.expected > 0 ? <span className="text-emerald-400 text-xs font-semibold">100%</span> : <span className="text-slate-600">—</span>)}
       </td>
     </tr>
   )
@@ -208,9 +261,11 @@ function IncomeCategoryRow({
 
 function IncomeGroupRow({
   row,
+  month,
   onSelectCategory,
 }: {
   row: IncomeGroupBudgetRow
+  month: string
   onSelectCategory: (data: CategoryModalData) => void
 }) {
   const [open, setOpen] = useState(true)
@@ -221,22 +276,30 @@ function IncomeGroupRow({
         className="cursor-pointer select-none bg-emerald-950/20 border-t border-emerald-900/30 hover:bg-emerald-950/30 active:bg-emerald-950/40 transition-colors"
         onClick={() => setOpen(o => !o)}
       >
-        <td colSpan={4} className="py-2.5 px-3 sm:px-6">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-emerald-400 text-xs flex-shrink-0">{open ? '▼' : '▶'}</span>
-              <span className="font-semibold text-xs sm:text-sm text-emerald-300 uppercase tracking-wider break-words leading-tight">
-                {row.group.name}
-              </span>
-            </div>
-            <span className="text-xs sm:text-sm font-bold text-emerald-400 tabular-nums flex-shrink-0">
-              +{formatCurrency(row.totalReceived)}
-            </span>
-          </div>
+        <td className="py-2.5 pl-3 sm:pl-6 pr-2 text-xs sm:text-sm font-semibold text-emerald-400 uppercase tracking-wider">
+          <span className="flex items-center gap-1.5 min-w-0">
+            <span className="text-emerald-500 text-xs flex-shrink-0">{open ? '▾' : '▸'}</span>
+            <span className="break-words leading-tight" title={row.group.name}>{row.group.name}</span>
+          </span>
+        </td>
+        <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-semibold text-emerald-300/80 tabular-nums">
+          {row.totalExpected > 0 ? formatCurrency(row.totalExpected) : <span className="text-slate-600">—</span>}
+        </td>
+        <td className="py-2.5 px-2 text-right text-xs sm:text-sm text-emerald-400 font-semibold tabular-nums">
+          {row.totalReceived > 0 ? `+${formatCurrency(row.totalReceived)}` : <span className="text-slate-600">—</span>}
+        </td>
+        <td className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm font-semibold tabular-nums ${
+          row.totalDifference <= 0 ? 'text-emerald-400' : 'text-amber-400/90'
+        }`}>
+          {row.totalDifference > 0
+            ? formatCurrency(row.totalDifference)
+            : row.totalDifference < 0
+            ? `+${formatCurrency(Math.abs(row.totalDifference))}`
+            : (row.totalExpected > 0 ? '100%' : <span className="text-slate-600">—</span>)}
         </td>
       </tr>
       {open && row.categories.map(c => (
-        <IncomeCategoryRow key={c.category.id} row={c} onSelectCategory={onSelectCategory} />
+        <IncomeCategoryRow key={c.category.id} row={c} month={month} onSelectCategory={onSelectCategory} />
       ))}
     </>
   )
@@ -629,10 +692,12 @@ export default function BudgetPage() {
                 <>
                   <tr className="bg-slate-950/90 text-[10px] sm:text-xs font-semibold text-emerald-400/90 uppercase tracking-wider border-t border-b border-emerald-900/40 select-none">
                     <th className="py-2 pl-3 sm:pl-6 pr-1 text-left">Receitas & Rendas</th>
-                    <th colSpan={3} className="py-2 pl-2 pr-3 sm:pr-6 text-right">Recebido</th>
+                    <th className="py-2 px-2 text-right">Previsto</th>
+                    <th className="py-2 px-2 text-right">Recebido</th>
+                    <th className="py-2 pl-2 pr-3 sm:pr-6 text-right">A Receber</th>
                   </tr>
                   {incomeRows.map(row => (
-                    <IncomeGroupRow key={row.group.id} row={row} onSelectCategory={setSelectedCategoryModal} />
+                    <IncomeGroupRow key={row.group.id} row={row} month={month} onSelectCategory={setSelectedCategoryModal} />
                   ))}
                 </>
               )}
