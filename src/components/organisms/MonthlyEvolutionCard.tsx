@@ -1,4 +1,4 @@
-// src/components/organisms/MonthlyEvolutionCard.tsx — Gráfico de Barras de Evolução Temporal com Filtro por Categoria
+// src/components/organisms/MonthlyEvolutionCard.tsx — Gráfico de Barras de Evolução Temporal com Divisão por Categorias e Altura Estendida
 import { useState, useMemo } from 'react'
 import {
   TrendingDown,
@@ -11,6 +11,7 @@ import {
   Filter,
   X,
   Sparkles,
+  PieChart as PieIcon,
 } from 'lucide-react'
 import {
   format,
@@ -28,7 +29,7 @@ import {
   calculateMonthlyEvolution,
   type MonthlyEvolutionItem,
 } from '@/utils/accountingRegime'
-import BarChart, { type BarChartItem } from '@/components/atoms/BarChart'
+import BarChart, { type BarChartItem, type BarChartSegment } from '@/components/atoms/BarChart'
 
 type TimeRangePreset = '6m' | '12m' | 'ytd' | 'all'
 type EvolutionViewMode = 'expense' | 'income' | 'comparative'
@@ -51,6 +52,7 @@ export default function MonthlyEvolutionCard({
   const [rangePreset, setRangePreset] = useState<TimeRangePreset>('6m')
   const [viewMode, setViewMode] = useState<EvolutionViewMode>('expense')
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
+  const [isStackedView, setIsStackedView] = useState<boolean>(true)
 
   const {
     transactions = [],
@@ -171,9 +173,20 @@ export default function MonthlyEvolutionCard({
       monthsList,
       regime,
       hiddenCategoryIds,
-      selectedCategoryIds
+      selectedCategoryIds,
+      categories,
+      categoryGroups
     )
-  }, [transactions, installmentGroups, monthsList, regime, hiddenCategoryIds, selectedCategoryIds])
+  }, [
+    transactions,
+    installmentGroups,
+    monthsList,
+    regime,
+    hiddenCategoryIds,
+    selectedCategoryIds,
+    categories,
+    categoryGroups,
+  ])
 
   // Estatísticas agregadas do período
   const stats = useMemo(() => {
@@ -223,6 +236,39 @@ export default function MonthlyEvolutionCard({
     }
   }, [evolutionData])
 
+  // Categorias consolidadas no período para a legenda
+  const periodCategoriesLegend = useMemo(() => {
+    if (selectedCategoryObj) return []
+    const map = new Map<string, { id: string; label: string; color: string; total: number }>()
+
+    for (const item of evolutionData) {
+      const segs =
+        viewMode === 'income'
+          ? item.incomeSegments
+          : viewMode === 'expense'
+          ? item.expenseSegments
+          : [...(item.expenseSegments ?? []), ...(item.incomeSegments ?? [])]
+
+      for (const seg of segs ?? []) {
+        const existing = map.get(seg.id)
+        if (existing) {
+          existing.total += seg.value
+        } else {
+          map.set(seg.id, {
+            id: seg.id,
+            label: seg.label,
+            color: seg.color || '#6366f1',
+            total: seg.value,
+          })
+        }
+      }
+    }
+
+    return Array.from(map.values())
+      .filter(c => c.total > 0)
+      .sort((a, b) => b.total - a.total)
+  }, [evolutionData, viewMode, selectedCategoryObj])
+
   // Converte os dados da evolução para os itens do BarChart
   const barChartItems: BarChartItem[] = useMemo(() => {
     return evolutionData.map(item => {
@@ -246,6 +292,18 @@ export default function MonthlyEvolutionCard({
           }
         }
 
+        const segments: BarChartSegment[] | undefined =
+          isStackedView && !selectedCategoryId
+            ? item.expenseSegments?.map(s => ({
+                id: s.id,
+                label: s.label,
+                sublabel: s.sublabel,
+                value: s.value,
+                color: s.color || '#f43f5e',
+                count: s.count,
+              }))
+            : undefined
+
         return {
           id: item.month,
           label: item.label,
@@ -259,6 +317,7 @@ export default function MonthlyEvolutionCard({
           badgeVariant,
           count: item.expenseCount,
           isActive: isSelected,
+          segments,
         }
       }
 
@@ -280,6 +339,18 @@ export default function MonthlyEvolutionCard({
           }
         }
 
+        const segments: BarChartSegment[] | undefined =
+          isStackedView && !selectedCategoryId
+            ? item.incomeSegments?.map(s => ({
+                id: s.id,
+                label: s.label,
+                sublabel: s.sublabel,
+                value: s.value,
+                color: s.color || '#10b981',
+                count: s.count,
+              }))
+            : undefined
+
         return {
           id: item.month,
           label: item.label,
@@ -293,8 +364,31 @@ export default function MonthlyEvolutionCard({
           badgeVariant,
           count: item.incomeCount,
           isActive: isSelected,
+          segments,
         }
       }
+
+      const expenseSegments: BarChartSegment[] | undefined = isStackedView
+        ? item.expenseSegments?.map(s => ({
+            id: s.id,
+            label: s.label,
+            sublabel: s.sublabel,
+            value: s.value,
+            color: s.color || '#f43f5e',
+            count: s.count,
+          }))
+        : undefined
+
+      const incomeSegments: BarChartSegment[] | undefined = isStackedView
+        ? item.incomeSegments?.map(s => ({
+            id: s.id,
+            label: s.label,
+            sublabel: s.sublabel,
+            value: s.value,
+            color: s.color || '#10b981',
+            count: s.count,
+          }))
+        : undefined
 
       return {
         id: item.month,
@@ -307,9 +401,11 @@ export default function MonthlyEvolutionCard({
         secondaryColor: isSelected ? '#34d399' : '#10b981',
         count: item.expenseCount + item.incomeCount,
         isActive: isSelected,
+        segments: expenseSegments,
+        secondarySegments: incomeSegments,
       }
     })
-  }, [evolutionData, viewMode, currentActiveMonth, selectedCategoryObj])
+  }, [evolutionData, viewMode, currentActiveMonth, selectedCategoryObj, isStackedView, selectedCategoryId])
 
   return (
     <div className="card p-4 sm:p-5 bg-slate-900 border border-slate-800 space-y-4">
@@ -324,13 +420,13 @@ export default function MonthlyEvolutionCard({
               <span>
                 {selectedCategoryObj
                   ? `Evolução: ${selectedCategoryObj.name}`
-                  : 'Evolução Temporal de Gastos e Receitas'}
+                  : 'Evolução Temporal com Divisão por Categorias'}
               </span>
             </h2>
             <p className="text-[11px] text-slate-500">
               {selectedCategoryObj
                 ? `Análise histórica de lançamentos em ${selectedCategoryObj.name}`
-                : 'Acompanhe a trajetória de despesas e receitas ao longo dos meses'}
+                : 'Acompanhe gastos e receitas divididos em categorias mês a mês'}
             </p>
           </div>
         </div>
@@ -365,6 +461,25 @@ export default function MonthlyEvolutionCard({
                 </button>
               )}
             </div>
+          )}
+
+          {/* Toggle Empilhado por Categorias vs Consolidado */}
+          {!selectedCategoryId && (
+            <button
+              type="button"
+              onClick={() => setIsStackedView(prev => !prev)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                isStackedView
+                  ? 'bg-indigo-950/80 text-indigo-300 border-indigo-800/60 shadow-sm'
+                  : 'bg-slate-950/80 text-slate-400 border-slate-800 hover:text-slate-200'
+              }`}
+              title={isStackedView ? 'Visualização dividida por categorias' : 'Visualização consolidada'}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">
+                {isStackedView ? 'Dividido por Categorias' : 'Barra Única'}
+              </span>
+            </button>
           )}
 
           {/* Seletor de Modo (Despesas, Receitas, Comparativo) */}
@@ -584,13 +699,14 @@ export default function MonthlyEvolutionCard({
         </div>
       )}
 
-      {/* ── Área do Gráfico de Barras ───────────────────────────────────────── */}
+      {/* ── Área do Gráfico de Barras Altas ─────────────────────────────────── */}
       <div className="pt-2">
         <BarChart
           items={barChartItems}
-          height={230}
+          height={340}
           orientation="vertical"
           type={viewMode === 'income' ? 'income' : 'expense'}
+          isStacked={isStackedView}
           showAverageLine={viewMode !== 'comparative'}
           onBarClick={item => {
             const targetType = viewMode === 'income' ? 'income' : 'expense'
@@ -599,8 +715,53 @@ export default function MonthlyEvolutionCard({
               onMonthChange(item.id)
             }
           }}
+          onSegmentClick={(item, seg) => {
+            const targetType = viewMode === 'income' ? 'income' : 'expense'
+            onSelectMonthBar(item.id, targetType, seg.id)
+            if (onMonthChange && item.id !== currentActiveMonth) {
+              onMonthChange(item.id)
+            }
+          }}
         />
       </div>
+
+      {/* ── Legenda Interativa de Categorias do Período ─────────────────────── */}
+      {isStackedView && !selectedCategoryId && periodCategoriesLegend.length > 0 && (
+        <div className="pt-3 border-t border-slate-800/80 space-y-2 select-none">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <PieIcon className="w-3.5 h-3.5 text-indigo-400" />
+              Categorias no Período ({periodCategoriesLegend.length})
+            </span>
+            <span className="text-[10px] text-slate-500">
+              Clique em uma categoria para filtrar o gráfico
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap max-h-24 overflow-y-auto pr-1">
+            {periodCategoriesLegend.map(cat => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setSelectedCategoryId(cat.id)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/60 hover:bg-slate-800/60 border border-slate-800 text-[11px] text-slate-300 transition-all hover:border-indigo-500/40 cursor-pointer"
+                title={`Filtrar histórico por ${cat.label} (Total: ${formatCurrency(cat.total)})`}
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: cat.color }}
+                />
+                <span className="font-medium truncate max-w-[120px] sm:max-w-[160px]">
+                  {cat.label}
+                </span>
+                <span className="text-[10px] text-slate-400 font-semibold tabular-nums">
+                  {formatCurrency(cat.total)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Rodapé Informativo ──────────────────────────────────────────────── */}
       <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-800/60">

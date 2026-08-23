@@ -427,6 +427,15 @@ export function getReportTransactionsForMonth(
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 }
 
+export interface MonthlyCategorySegment {
+  id: string
+  label: string
+  sublabel?: string
+  value: number
+  color?: string
+  count?: number
+}
+
 export interface MonthlyEvolutionItem {
   month: string // 'YYYY-MM'
   label: string // 'Jan', 'Fev' etc.
@@ -439,6 +448,28 @@ export interface MonthlyEvolutionItem {
   incomeCount: number
   expenseChangePercent?: number // vs mês anterior na série (negativo = gastou menos)
   incomeChangePercent?: number // vs mês anterior na série (positivo = ganhou mais)
+  expenseSegments?: MonthlyCategorySegment[]
+  incomeSegments?: MonthlyCategorySegment[]
+}
+
+const DEFAULT_EXPENSE_PALETTE = [
+  '#f43f5e', '#f97316', '#ec4899', '#8b5cf6', '#3b82f6',
+  '#06b6d4', '#eab308', '#d946ef', '#6366f1', '#14b8a6',
+  '#fb7185', '#a855f7', '#fb923c', '#38bdf8', '#4ade80'
+]
+
+const DEFAULT_INCOME_PALETTE = [
+  '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#14b8a6',
+  '#22c55e', '#6366f1', '#eab308', '#f59e0b', '#0ea5e9'
+]
+
+function getDeterministicColor(key: string, palette: string[]): string {
+  let hash = 0
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash << 5) - hash + key.charCodeAt(i)
+    hash |= 0
+  }
+  return palette[Math.abs(hash) % palette.length]
 }
 
 /**
@@ -450,10 +481,15 @@ export function calculateMonthlyEvolution(
   months: string[],
   regime: AccountingRegime,
   hiddenCategoryIds?: Set<string> | string[],
-  selectedCategoryIds?: Set<string> | string[]
+  selectedCategoryIds?: Set<string> | string[],
+  categories: Category[] = [],
+  categoryGroups: CategoryGroup[] = []
 ): MonthlyEvolutionItem[] {
   const result: MonthlyEvolutionItem[] = []
   const selectedSet = selectedCategoryIds ? new Set(selectedCategoryIds) : null
+
+  const catMap = new Map(categories.map(c => [c.id!, c]))
+  const grpMap = new Map(categoryGroups.map(g => [g.id!, g]))
 
   for (let i = 0; i < months.length; i++) {
     const m = months[i]
@@ -481,8 +517,64 @@ export function calculateMonthlyEvolution(
       })
     }
 
-    const expenseCount = monthTxs.filter(t => t.type === 'expense').length
-    const incomeCount = monthTxs.filter(t => t.type === 'income').length
+    const expenseTxs = monthTxs.filter(t => t.type === 'expense')
+    const incomeTxs = monthTxs.filter(t => t.type === 'income')
+    const expenseCount = expenseTxs.length
+    const incomeCount = incomeTxs.length
+
+    // Segmentos de Despesas por Categoria para o Mês
+    const expenseCatMap = new Map<string, { id: string; label: string; sublabel?: string; value: number; count: number; color: string }>()
+    for (const tx of expenseTxs) {
+      const catId = tx.categoryId || 'uncategorized_expense'
+      const cat = catMap.get(catId)
+      const grp = cat?.groupId ? grpMap.get(cat.groupId) : undefined
+      const label = cat?.name || (catId === 'uncategorized_expense' ? 'Sem Categoria' : catId)
+      const sublabel = grp?.name
+      const color = getDeterministicColor(catId, DEFAULT_EXPENSE_PALETTE)
+
+      const existing = expenseCatMap.get(catId)
+      if (existing) {
+        existing.value += tx.amount
+        existing.count += 1
+      } else {
+        expenseCatMap.set(catId, {
+          id: catId,
+          label,
+          sublabel,
+          value: tx.amount,
+          count: 1,
+          color,
+        })
+      }
+    }
+    const expenseSegments = Array.from(expenseCatMap.values()).sort((a, b) => b.value - a.value)
+
+    // Segmentos de Receitas por Categoria para o Mês
+    const incomeCatMap = new Map<string, { id: string; label: string; sublabel?: string; value: number; count: number; color: string }>()
+    for (const tx of incomeTxs) {
+      const catId = tx.categoryId || (tx.payee ? `payee_${tx.payee}` : 'uncategorized_income')
+      const cat = catMap.get(catId)
+      const grp = cat?.groupId ? grpMap.get(cat.groupId) : undefined
+      const label = cat?.name || tx.payee || (catId === 'uncategorized_income' ? 'Sem Categoria' : catId)
+      const sublabel = grp?.name
+      const color = getDeterministicColor(catId, DEFAULT_INCOME_PALETTE)
+
+      const existing = incomeCatMap.get(catId)
+      if (existing) {
+        existing.value += tx.amount
+        existing.count += 1
+      } else {
+        incomeCatMap.set(catId, {
+          id: catId,
+          label,
+          sublabel,
+          value: tx.amount,
+          count: 1,
+          color,
+        })
+      }
+    }
+    const incomeSegments = Array.from(incomeCatMap.values()).sort((a, b) => b.value - a.value)
 
     const [yearStr, monthStr] = m.split('-')
     const date = new Date(Number(yearStr), Number(monthStr) - 1, 1)
@@ -525,6 +617,8 @@ export function calculateMonthlyEvolution(
       incomeCount,
       expenseChangePercent,
       incomeChangePercent,
+      expenseSegments,
+      incomeSegments,
     })
   }
 
