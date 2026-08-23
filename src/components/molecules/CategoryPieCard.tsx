@@ -1,7 +1,17 @@
-// src/components/molecules/CategoryPieCard.tsx — Card de Pizza com lista de categorias e filtros check/uncheck
+// src/components/molecules/CategoryPieCard.tsx — Card de Categorias com Gráficos de Pizza/Barras e Abertura de Transações
 import { useState, useMemo, useEffect } from 'react'
-import { CheckSquare, Square, Search, PieChart as PieIcon, ArrowDownRight, ArrowUpRight } from 'lucide-react'
+import {
+  CheckSquare,
+  Square,
+  Search,
+  PieChart as PieIcon,
+  BarChart2,
+  ArrowDownRight,
+  ArrowUpRight,
+  Receipt,
+} from 'lucide-react'
 import PieChart, { type PieSlice } from '@/components/atoms/PieChart'
+import BarChart, { type BarChartItem } from '@/components/atoms/BarChart'
 import { formatCurrency } from '@/utils/format'
 
 export interface CategoryPieItem {
@@ -17,6 +27,7 @@ interface CategoryPieCardProps {
   type: 'expense' | 'income'
   items: CategoryPieItem[]
   monthLabel?: string
+  onSelectCategory?: (item: CategoryPieItem) => void
 }
 
 // Paletas harmoniosas e contrastantes para despesas e receitas
@@ -53,9 +64,12 @@ export default function CategoryPieCard({
   type,
   items,
   monthLabel,
+  onSelectCategory,
 }: CategoryPieCardProps) {
   const isExpense = type === 'expense'
   const defaultPalette = isExpense ? EXPENSE_PALETTE : INCOME_PALETTE
+
+  const [chartMode, setChartMode] = useState<'pie' | 'bar'>('pie')
 
   // Ordena por maior valor primeiro
   const sortedItems = useMemo(() => {
@@ -85,7 +99,8 @@ export default function CategoryPieCard({
     setSearch('')
   }, [sortedItems])
 
-  const toggleCategory = (id: string) => {
+  const toggleCategory = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation()
     setSelectedIds(prev => {
       const next = new Set(prev)
       if (next.has(id)) {
@@ -130,6 +145,17 @@ export default function CategoryPieCard({
     }))
   }, [activeItems])
 
+  // Dados formatados para o BarChart horizontal
+  const barData: BarChartItem[] = useMemo(() => {
+    return activeItems.map(item => ({
+      id: item.id,
+      label: item.name,
+      sublabel: item.groupName,
+      value: item.amount,
+      color: item.color,
+    }))
+  }, [activeItems])
+
   // Filtragem para a listagem com busca
   const displayItems = useMemo(() => {
     if (!search.trim()) return coloredItems
@@ -144,7 +170,6 @@ export default function CategoryPieCard({
 
   return (
     <div className="card p-4 sm:p-5 bg-slate-900 border border-slate-800 space-y-4 flex flex-col justify-between h-full">
-      
       {/* Cabeçalho do Card */}
       <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-800/80">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -163,17 +188,47 @@ export default function CategoryPieCard({
           </div>
         </div>
 
-        <div className="text-right flex-shrink-0">
-          <span className="text-[10px] uppercase tracking-wider text-slate-500 block font-semibold">
-            {noneSelected ? 'Filtrado' : 'Total Filtrado'}
-          </span>
-          <span
-            className={`text-sm sm:text-base font-extrabold tabular-nums ${
-              isExpense ? 'text-rose-400' : 'text-emerald-400'
-            }`}
-          >
-            {formatCurrency(activeTotal)}
-          </span>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {/* Seletor Pizza / Barras */}
+          <div className="flex items-center bg-slate-950/80 p-0.5 rounded-lg border border-slate-800">
+            <button
+              type="button"
+              onClick={() => setChartMode('pie')}
+              className={`p-1.5 rounded-md transition-colors ${
+                chartMode === 'pie'
+                  ? 'bg-slate-800 text-indigo-400 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+              title="Visualização em Gráfico de Pizza"
+            >
+              <PieIcon className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setChartMode('bar')}
+              className={`p-1.5 rounded-md transition-colors ${
+                chartMode === 'bar'
+                  ? 'bg-slate-800 text-indigo-400 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+              title="Visualização em Gráfico de Barras"
+            >
+              <BarChart2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="text-right">
+            <span className="text-[10px] uppercase tracking-wider text-slate-500 block font-semibold">
+              {noneSelected ? 'Filtrado' : 'Total Filtrado'}
+            </span>
+            <span
+              className={`text-sm sm:text-base font-extrabold tabular-nums ${
+                isExpense ? 'text-rose-400' : 'text-emerald-400'
+              }`}
+            >
+              {formatCurrency(activeTotal)}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -189,19 +244,46 @@ export default function CategoryPieCard({
         </div>
       ) : (
         <div className="space-y-4">
-          
-          {/* Gráfico Donut Central */}
-          <div className="flex justify-center py-2">
-            <PieChart
-              data={pieData}
-              size={210}
-              innerRadiusRatio={0.64}
-              centerLabel={isExpense ? 'Despesas' : 'Receitas'}
-              centerValue={activeTotal}
-              centerSublabel={`${activeItems.length} de ${coloredItems.length} ativas`}
-              emptyMessage="Marque ao menos uma categoria abaixo"
-            />
-          </div>
+          {/* Gráfico Donut ou Gráfico de Barras */}
+          {chartMode === 'pie' ? (
+            <div className="flex flex-col items-center justify-center py-2">
+              <PieChart
+                data={pieData}
+                size={210}
+                innerRadiusRatio={0.64}
+                centerLabel={isExpense ? 'Despesas' : 'Receitas'}
+                centerValue={activeTotal}
+                centerSublabel={`${activeItems.length} de ${coloredItems.length} ativas`}
+                emptyMessage="Marque ao menos uma categoria abaixo"
+                onSliceClick={slice => {
+                  const target = coloredItems.find(i => i.id === slice.id)
+                  if (target && onSelectCategory) {
+                    onSelectCategory(target)
+                  }
+                }}
+              />
+              {onSelectCategory && (
+                <p className="text-[10px] text-slate-500 mt-1">
+                  💡 Dica: Clique em uma fatia para ver as transações
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="py-2">
+              <BarChart
+                items={barData}
+                orientation="horizontal"
+                type={type}
+                emptyMessage="Marque ao menos uma categoria abaixo"
+                onBarClick={bar => {
+                  const target = coloredItems.find(i => i.id === bar.id)
+                  if (target && onSelectCategory) {
+                    onSelectCategory(target)
+                  }
+                }}
+              />
+            </div>
+          )}
 
           {/* Barra de Ações Rápidas (Marcar/Desmarcar todas) & Busca */}
           <div className="space-y-2 pt-2 border-t border-slate-800/80">
@@ -237,8 +319,8 @@ export default function CategoryPieCard({
               </span>
             </div>
 
-            {/* Input de filtro/busca se houver mais de 5 categorias */}
-            {coloredItems.length > 5 && (
+            {/* Input de filtro/busca se houver mais de 4 categorias */}
+            {coloredItems.length > 4 && (
               <div className="relative">
                 <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
                 <input
@@ -252,20 +334,21 @@ export default function CategoryPieCard({
             )}
           </div>
 
-          {/* Lista com Checkboxes Interativos */}
+          {/* Lista com Checkboxes e Botão de Acesso a Transações */}
           <div className="space-y-1.5 max-h-56 sm:max-h-64 overflow-y-auto pr-1 select-none">
             {displayItems.map(item => {
               const isChecked = selectedIds.has(item.id)
-              const pct = activeTotal > 0 && isChecked
-                ? ((item.amount / activeTotal) * 100).toFixed(1)
-                : rawTotal > 0
-                ? ((item.amount / rawTotal) * 100).toFixed(1)
-                : '0.0'
+              const pct =
+                activeTotal > 0 && isChecked
+                  ? ((item.amount / activeTotal) * 100).toFixed(1)
+                  : rawTotal > 0
+                  ? ((item.amount / rawTotal) * 100).toFixed(1)
+                  : '0.0'
 
               return (
                 <div
                   key={item.id}
-                  onClick={() => toggleCategory(item.id)}
+                  onClick={() => onSelectCategory ? onSelectCategory(item) : toggleCategory(item.id)}
                   className={`group flex items-center justify-between p-2 rounded-xl border transition-all cursor-pointer ${
                     isChecked
                       ? 'bg-slate-950/40 hover:bg-slate-800/40 border-slate-800/80 text-slate-200'
@@ -273,15 +356,16 @@ export default function CategoryPieCard({
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    {/* Checkbox customizado */}
+                    {/* Checkbox customizado (apenas altera filtro sem abrir modal) */}
                     <button
                       type="button"
-                      tabIndex={-1}
+                      onClick={e => toggleCategory(item.id, e)}
                       className={`w-4 h-4 rounded-md flex items-center justify-center border transition-all flex-shrink-0 ${
                         isChecked
                           ? 'bg-indigo-600 border-indigo-500 text-white'
                           : 'border-slate-700 bg-slate-900'
                       }`}
+                      title={isChecked ? 'Ocultar do gráfico' : 'Incluir no gráfico'}
                     >
                       {isChecked && <CheckSquare className="w-3.5 h-3.5" />}
                     </button>
@@ -297,7 +381,7 @@ export default function CategoryPieCard({
 
                     {/* Nome e Grupo */}
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium truncate leading-tight">
+                      <p className="text-xs font-medium truncate leading-tight group-hover:text-indigo-300 transition-colors">
                         {item.name}
                       </p>
                       {item.groupName && (
@@ -308,20 +392,35 @@ export default function CategoryPieCard({
                     </div>
                   </div>
 
-                  {/* Valor e Porcentagem */}
-                  <div className="text-right flex-shrink-0 ml-2">
-                    <span className="text-xs font-semibold tabular-nums block text-slate-200">
-                      {formatCurrency(item.amount)}
-                    </span>
-                    <span className="text-[10px] font-medium text-slate-400 tabular-nums block">
-                      {pct}%
-                    </span>
+                  {/* Valor, Porcentagem e Ícone de Extrato */}
+                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                    <div className="text-right">
+                      <span className="text-xs font-semibold tabular-nums block text-slate-200">
+                        {formatCurrency(item.amount)}
+                      </span>
+                      <span className="text-[10px] font-medium text-slate-400 tabular-nums block">
+                        {pct}%
+                      </span>
+                    </div>
+
+                    {onSelectCategory && (
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation()
+                          onSelectCategory(item)
+                        }}
+                        className="p-1 rounded-lg text-slate-500 hover:text-indigo-300 hover:bg-slate-800 transition-colors"
+                        title="Ver transações desta categoria"
+                      >
+                        <Receipt className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               )
             })}
           </div>
-
         </div>
       )}
     </div>

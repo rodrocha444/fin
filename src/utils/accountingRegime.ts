@@ -287,3 +287,138 @@ export function buildIncomePieItems(
 
   return list
 }
+
+/**
+ * Retorna as transações de um determinado mês e regime contábil, ordenadas por data desc.
+ */
+export function getReportTransactionsForMonth(
+  transactions: Transaction[],
+  installmentGroups: InstallmentGroup[],
+  month: string,
+  regime: AccountingRegime,
+  options?: {
+    type?: 'expense' | 'income'
+    categoryId?: string
+  }
+): Transaction[] {
+  const groupMonthMap = buildGroupPurchaseMonthMap(transactions, installmentGroups)
+
+  return transactions
+    .filter(tx => {
+      // Filtragem por tipo
+      if (options?.type && tx.type !== options.type) return false
+      if (!options?.type && tx.type !== 'expense' && tx.type !== 'income') return false
+
+      // Filtragem de competência vs caixa
+      if (regime === 'accrual') {
+        if (tx.installmentGroupId) {
+          const purchaseMonth = groupMonthMap.get(tx.installmentGroupId)
+          if (purchaseMonth !== month) return false
+        } else {
+          const txMonth = toMonthKey(new Date(tx.date))
+          if (txMonth !== month) return false
+        }
+      } else {
+        const txMonth = toMonthKey(new Date(tx.date))
+        if (txMonth !== month) return false
+      }
+
+      // Filtragem por categoria opcional
+      if (options?.categoryId) {
+        const catId = options.categoryId
+        if (catId === 'uncategorized_expense') {
+          if (tx.categoryId || tx.type !== 'expense') return false
+        } else if (catId === 'uncategorized_income') {
+          if (tx.categoryId || tx.type !== 'income') return false
+        } else if (catId.startsWith('payee_')) {
+          const payeeName = catId.replace(/^payee_/, '')
+          if (tx.payee !== payeeName) return false
+        } else {
+          if (tx.categoryId !== catId) return false
+        }
+      }
+
+      return true
+    })
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+}
+
+export interface MonthlyEvolutionItem {
+  month: string // 'YYYY-MM'
+  label: string // 'Jan', 'Fev' etc.
+  fullLabel: string // 'Janeiro de 2026'
+  expense: number
+  income: number
+  netSavings: number
+  savingsRate: number
+  expenseCount: number
+  incomeCount: number
+  expenseChangePercent?: number // vs mês anterior na série (negativo = gastou menos)
+  incomeChangePercent?: number // vs mês anterior na série (positivo = ganhou mais)
+}
+
+/**
+ * Calcula a evolução mensal de receitas e despesas ao longo de uma lista ordenada de meses.
+ */
+export function calculateMonthlyEvolution(
+  transactions: Transaction[],
+  installmentGroups: InstallmentGroup[],
+  months: string[],
+  regime: AccountingRegime
+): MonthlyEvolutionItem[] {
+  const result: MonthlyEvolutionItem[] = []
+
+  for (let i = 0; i < months.length; i++) {
+    const m = months[i]
+    const summary = calculateReportSummary(transactions, installmentGroups, m, regime)
+    const monthTxs = getReportTransactionsForMonth(transactions, installmentGroups, m, regime)
+
+    const expenseCount = monthTxs.filter(t => t.type === 'expense').length
+    const incomeCount = monthTxs.filter(t => t.type === 'income').length
+
+    const [yearStr, monthStr] = m.split('-')
+    const date = new Date(Number(yearStr), Number(monthStr) - 1, 1)
+    const rawLabel = date.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')
+    const label = rawLabel.charAt(0).toUpperCase() + rawLabel.slice(1)
+    const rawFullLabel = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+    const fullLabel = rawFullLabel.charAt(0).toUpperCase() + rawFullLabel.slice(1)
+
+    let expenseChangePercent: number | undefined = undefined
+    let incomeChangePercent: number | undefined = undefined
+
+    if (i > 0) {
+      const prev = result[i - 1]
+      if (prev.expense > 0) {
+        expenseChangePercent = ((summary.expense - prev.expense) / prev.expense) * 100
+      } else if (summary.expense > 0) {
+        expenseChangePercent = 100
+      } else {
+        expenseChangePercent = 0
+      }
+
+      if (prev.income > 0) {
+        incomeChangePercent = ((summary.income - prev.income) / prev.income) * 100
+      } else if (summary.income > 0) {
+        incomeChangePercent = 100
+      } else {
+        incomeChangePercent = 0
+      }
+    }
+
+    result.push({
+      month: m,
+      label,
+      fullLabel,
+      expense: summary.expense,
+      income: summary.income,
+      netSavings: summary.netSavings,
+      savingsRate: summary.savingsRate,
+      expenseCount,
+      incomeCount,
+      expenseChangePercent,
+      incomeChangePercent,
+    })
+  }
+
+  return result
+}

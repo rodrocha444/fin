@@ -18,6 +18,7 @@ interface PieChartProps {
   centerValue?: string | number
   centerSublabel?: string
   emptyMessage?: string
+  onSliceClick?: (slice: PieSlice) => void
 }
 
 export default function PieChart({
@@ -28,6 +29,7 @@ export default function PieChart({
   centerValue,
   centerSublabel,
   emptyMessage = 'Sem dados para exibir',
+  onSliceClick,
 }: PieChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
 
@@ -150,6 +152,7 @@ export default function PieChart({
                 onMouseEnter={() => setHoveredIndex(slice.index)}
                 onMouseLeave={() => setHoveredIndex(null)}
                 onTouchStart={() => setHoveredIndex(slice.index)}
+                onClick={() => onSliceClick?.(slice)}
               >
                 {slice.paths.map((d, pIdx) => (
                   <path

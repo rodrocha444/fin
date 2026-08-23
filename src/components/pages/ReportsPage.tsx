@@ -1,4 +1,4 @@
-// src/components/pages/ReportsPage.tsx — Página de Relatórios Financeiros Reformulada
+// src/components/pages/ReportsPage.tsx — Página de Relatórios Financeiros com Evolução Temporal e Detalhamento de Transações
 import { useState, useMemo } from 'react'
 import {
   TrendingUp,
@@ -10,6 +10,7 @@ import {
   Sparkles,
   CalendarDays,
   Receipt,
+  PieChart as PieIcon,
 } from 'lucide-react'
 import { useAllBalances } from '@/hooks/useAccounts'
 import { useDebtsSummary } from '@/hooks/useDebts'
@@ -25,15 +26,31 @@ import {
   calculateReportSummary,
   buildExpensePieItems,
   buildIncomePieItems,
+  getReportTransactionsForMonth,
 } from '@/utils/accountingRegime'
 import CategoryPieCard, { type CategoryPieItem } from '@/components/molecules/CategoryPieCard'
+import MonthlyEvolutionCard from '@/components/organisms/MonthlyEvolutionCard'
+import CategoryTransactionsModal from '@/components/organisms/CategoryTransactionsModal'
 import AdvancedFinancialChart from '@/components/organisms/AdvancedFinancialChart'
 import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
 import { addMonths, subMonths, parseISO, format } from 'date-fns'
+import type { Transaction } from '@/types'
+
+interface TransactionsModalState {
+  isOpen: boolean
+  title: string
+  description?: string
+  month: string
+  transactions: Transaction[]
+  isIncome: boolean
+  categoryId?: string
+}
 
 export default function ReportsPage() {
   const [month, setMonth] = useState(() => currentMonth())
   const [regime, setRegime] = useState<AccountingRegime>(() => getSavedAccountingRegime())
+  const [modalState, setModalState] = useState<TransactionsModalState | null>(null)
+
   const {
     transactions = [],
     categories = [],
@@ -79,7 +96,7 @@ export default function ReportsPage() {
     return calculateReportSummary(transactions, installmentGroups, month, regime)
   }, [transactions, installmentGroups, month, regime])
 
-  // ── 1. Itens de Despesa do Mês para o Gráfico de Pizza ──────────────────────
+  // ── 1. Itens de Despesa do Mês para o Gráfico de Pizza/Barras ────────────────
   const expensePieItems: CategoryPieItem[] = useMemo(() => {
     const expenseMap = calculateReportExpensesByCategory(
       transactions,
@@ -90,7 +107,7 @@ export default function ReportsPage() {
     return buildExpensePieItems(expenseMap, categoryGroups, categories)
   }, [transactions, installmentGroups, month, regime, categoryGroups, categories])
 
-  // ── 2. Itens de Receita do Mês para o Gráfico de Pizza ──────────────────────
+  // ── 2. Itens de Receita do Mês para o Gráfico de Pizza/Barras ────────────────
   const incomePieItems: CategoryPieItem[] = useMemo(() => {
     const incomeMap = calculateReportIncomeByCategory(
       transactions,
@@ -101,9 +118,61 @@ export default function ReportsPage() {
     return buildIncomePieItems(incomeMap, categoryGroups, categories)
   }, [transactions, installmentGroups, month, regime, categoryGroups, categories])
 
+  // ── 3. Abertura do Modal de Transações por Categoria ─────────────────────────
+  const handleCategorySelect = (item: CategoryPieItem, type: 'expense' | 'income') => {
+    const catTxs = getReportTransactionsForMonth(
+      transactions,
+      installmentGroups,
+      month,
+      regime,
+      {
+        type,
+        categoryId: item.id,
+      }
+    )
+
+    const monthLabel = formatMonthLabel(month)
+    const regimeLabel = regime === 'accrual' ? 'Data da Compra' : 'Por Fatura'
+
+    setModalState({
+      isOpen: true,
+      title: item.name,
+      description: `Lançamentos de ${item.name} em ${monthLabel} (${regimeLabel})`,
+      month,
+      transactions: catTxs,
+      isIncome: type === 'income',
+      categoryId: item.id,
+    })
+  }
+
+  // ── 4. Abertura do Modal de Transações por Barra Mensal ──────────────────────
+  const handleMonthBarSelect = (barMonth: string, type: 'expense' | 'income') => {
+    const monthTxs = getReportTransactionsForMonth(
+      transactions,
+      installmentGroups,
+      barMonth,
+      regime,
+      {
+        type,
+      }
+    )
+
+    const monthLabel = formatMonthLabel(barMonth)
+    const regimeLabel = regime === 'accrual' ? 'Data da Compra' : 'Por Fatura'
+    const title = type === 'expense' ? `Despesas de ${monthLabel}` : `Receitas de ${monthLabel}`
+
+    setModalState({
+      isOpen: true,
+      title,
+      description: `Todas as ${type === 'expense' ? 'despesas' : 'receitas'} de ${monthLabel} (${regimeLabel})`,
+      month: barMonth,
+      transactions: monthTxs,
+      isIncome: type === 'income',
+    })
+  }
+
   return (
     <div className="fade-in pb-16">
-      
       {/* ── Header com Seletor de Regime e Mês ───────────────────────────────── */}
       <div
         className="px-3 sm:px-6 pb-3 border-b border-slate-800 bg-slate-900 sticky top-0 z-20"
@@ -198,7 +267,6 @@ export default function ReportsPage() {
       </div>
 
       <div className="p-3 sm:p-6 space-y-6">
-        
         {/* ── Banner Informativo do Regime Contábil ─────────────────────────── */}
         <div
           className={`flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-xs transition-colors ${
@@ -226,10 +294,9 @@ export default function ReportsPage() {
             </div>
           </div>
         </div>
-        
+
         {/* ── Cards de KPIs Principais do Mês ───────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          
           {/* Receitas */}
           <div className="card !p-3.5 sm:!p-4 bg-slate-900 border border-slate-800 space-y-1.5">
             <div className="flex items-center justify-between">
@@ -295,31 +362,47 @@ export default function ReportsPage() {
             </p>
             <p className="text-[10px] text-slate-500">Saldo consolidado de todas as contas</p>
           </div>
-
         </div>
 
-        {/* ── 2 Gráficos de Pizza Interativos com Checkbox (Despesas e Receitas) ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
-          
-          {/* Pizza de Despesas do Mês */}
-          <CategoryPieCard
-            title="Despesas por Categoria"
-            type="expense"
-            items={expensePieItems}
-            monthLabel={formatMonthLabel(month)}
-          />
+        {/* ── Gráficos de Barras de Evolução Temporal de Despesas e Receitas ────── */}
+        <MonthlyEvolutionCard
+          currentActiveMonth={month}
+          regime={regime}
+          onSelectMonthBar={handleMonthBarSelect}
+          onMonthChange={setMonth}
+        />
 
-          {/* Pizza de Receitas do Mês */}
-          <CategoryPieCard
-            title="Receitas por Categoria"
-            type="income"
-            items={incomePieItems}
-            monthLabel={formatMonthLabel(month)}
-          />
+        {/* ── 2 Gráficos de Distribuição por Categoria (Despesas e Receitas) ─────── */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <PieIcon className="w-4 h-4 text-indigo-400" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300">
+              Distribuição por Categoria em {formatMonthLabel(month)}
+            </h2>
+          </div>
 
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+            {/* Pizza / Barras de Despesas do Mês */}
+            <CategoryPieCard
+              title="Despesas por Categoria"
+              type="expense"
+              items={expensePieItems}
+              monthLabel={formatMonthLabel(month)}
+              onSelectCategory={item => handleCategorySelect(item, 'expense')}
+            />
+
+            {/* Pizza / Barras de Receitas do Mês */}
+            <CategoryPieCard
+              title="Receitas por Categoria"
+              type="income"
+              items={incomePieItems}
+              monthLabel={formatMonthLabel(month)}
+              onSelectCategory={item => handleCategorySelect(item, 'income')}
+            />
+          </div>
         </div>
 
-        {/* ── Gráfico Completo Estilo Plataforma de Corretora ────────────────── */}
+        {/* ── Terminal de Evolução e Análise Financeira ────────────────────────── */}
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-indigo-400" />
@@ -330,8 +413,21 @@ export default function ReportsPage() {
 
           <AdvancedFinancialChart />
         </div>
-
       </div>
+
+      {/* ── Modal de Transações Detalhadas ao Clicar em Qualquer Seção ────────── */}
+      {modalState && modalState.isOpen && (
+        <CategoryTransactionsModal
+          category={modalState.categoryId ? { id: modalState.categoryId, name: modalState.title } : undefined}
+          month={modalState.month}
+          isIncome={modalState.isIncome}
+          customTransactions={modalState.transactions}
+          customTitle={modalState.title}
+          customDescription={modalState.description}
+          regime={regime}
+          onClose={() => setModalState(null)}
+        />
+      )}
     </div>
   )
 }
