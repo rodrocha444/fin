@@ -250,11 +250,13 @@ export function getClosedUnpaidInvoices(
 
 /**
  * Retorna o valor total das faturas de cartão de crédito cujo vencimento ocorre no mês do orçamento ('YYYY-MM')
+ * Se paidMap for fornecido, desconsidera faturas que já foram marcadas como pagas
  */
 export function getInvoiceForBudgetMonth(
   transactions: Transaction[],
   account: Account,
-  budgetMonth: string
+  budgetMonth: string,
+  paidMap?: Record<string, boolean>
 ): number {
   if (!account.statementClosingDay) return 0
 
@@ -272,6 +274,9 @@ export function getInvoiceForBudgetMonth(
   for (const monthKey of checkMonths) {
     const cycle = getInvoiceCycle(monthKey, closingDay, dueDay)
     if (format(cycle.dueDate, 'yyyy-MM') === budgetMonth) {
+      if (paidMap && account.id && paidMap[`${account.id}_${monthKey}`]) {
+        continue
+      }
       const data = getInvoiceData(transactions, cycle)
       totalInvoice += data.totalAmount
     }

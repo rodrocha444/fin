@@ -1,8 +1,9 @@
 import { getClient } from './client'
 import { createId } from '@/utils/id'
-import { format, subMonths } from 'date-fns'
+import { format, subMonths, addMonths } from 'date-fns'
 import { isInitialSetupCategory, currentMonth, shiftMonth } from '@/utils/format'
-import { getInvoiceForBudgetMonth } from '@/utils/invoices'
+import { getInvoiceForBudgetMonth, getInvoiceCycle, getInvoiceData } from '@/utils/invoices'
+import { getPaidInvoicesMap } from '@/services/api/invoices'
 import { isDateBeforeAccountingStart, isMonthBeforeAccountingStart } from '@/utils/accountingPeriod'
 import { notifyDataChanged } from './events'
 import type {
@@ -204,7 +205,7 @@ export function calculateInvoiceBudgetRows(
   accounts: Account[],
   transactions: Transaction[]
 ): InvoiceGroupBudgetRow[] {
-  const activityMap = calculateActivityByCategory(transactions, month)
+  const paidMap = getPaidInvoicesMap()
   const ccAccounts = accounts.filter(a => a.type === 'credit_card')
   if (ccAccounts.length === 0) return []
 
@@ -225,9 +226,29 @@ export function calculateInvoiceBudgetRows(
     const catName = `Fatura ${acc.name}`
 
     const accTxs = transactions.filter(t => t.accountId === acc.id)
-    const invoiceActivity = getInvoiceForBudgetMonth(accTxs, acc, month)
-    const directActivity = activityMap.get(catId) ?? 0
-    const activity = invoiceActivity + directActivity
+    const closingDay = acc.statementClosingDay
+    const dueDay = acc.paymentDueDay
+    let invoiceAmt = 0
+    let isInvoicePaid = false
+
+    if (closingDay) {
+      const [y, m] = month.split('-').map(Number)
+      const checkMonths = [-1, 0, 1].map(delta => {
+        const d = addMonths(new Date(y, m - 1, 1), delta)
+        return format(d, 'yyyy-MM')
+      })
+
+      for (const mKey of checkMonths) {
+        const cycle = getInvoiceCycle(mKey, closingDay, dueDay)
+        if (format(cycle.dueDate, 'yyyy-MM') === month) {
+          const data = getInvoiceData(accTxs, cycle)
+          invoiceAmt += data.totalAmount
+          if (paidMap[`${acc.id}_${mKey}`]) {
+            isInvoicePaid = true
+          }
+        }
+      }
+    }
 
     faturasCatRows.push({
       category: {
@@ -237,15 +258,20 @@ export function calculateInvoiceBudgetRows(
         sortOrder: 0,
         isHidden: false,
       },
-      activity,
+      activity: invoiceAmt,
+      isPaid: isInvoicePaid,
     })
   }
+
+  const unpaidTotal = faturasCatRows
+    .filter(r => !r.isPaid)
+    .reduce((s, r) => s + r.activity, 0)
 
   return [
     {
       group: faturasGroup,
       categories: faturasCatRows,
-      totalActivity: faturasCatRows.reduce((s, r) => s + r.activity, 0),
+      totalActivity: unpaidTotal,
     },
   ]
 }
@@ -314,12 +340,14 @@ export function calculateBudgetSummary(
     totalCheckingCash += bal
   }
 
-  // Faturas de cartão de crédito a vencer no mês selecionado (informativo)
+  const paidMap = getPaidInvoicesMap()
+
+  // Faturas de cartão de crédito a vencer no mês selecionado (apenas as NÃO pagas)
   let currentInvoicesDue = 0
   for (const acc of ccAccounts) {
     if (!acc.id || !acc.statementClosingDay) continue
     const accTxs = transactions.filter(t => t.accountId === acc.id)
-    const currInvoiceAmt = getInvoiceForBudgetMonth(accTxs, acc, month)
+    const currInvoiceAmt = getInvoiceForBudgetMonth(accTxs, acc, month, paidMap)
     currentInvoicesDue += currInvoiceAmt
   }
 

@@ -122,16 +122,29 @@ function InvoiceCategoryRow({
     >
       <td className="py-2.5 pl-6 sm:pl-10 pr-2 text-xs sm:text-sm text-slate-300">
         <div className="flex items-center gap-2 min-w-0">
-          <CreditCard className="w-3.5 h-3.5 text-rose-400/80 flex-shrink-0" />
-          <span className="break-words leading-tight block group-hover:text-rose-300 transition-colors" title={row.category.name}>
+          <CreditCard className={`w-3.5 h-3.5 flex-shrink-0 ${row.isPaid ? 'text-emerald-400' : 'text-rose-400/80'}`} />
+          <span className={`break-words leading-tight block transition-colors ${row.isPaid ? 'text-slate-400 line-through' : 'group-hover:text-rose-300'}`} title={row.category.name}>
             {row.category.name}
           </span>
+          {row.isPaid && (
+            <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-emerald-950/70 text-emerald-400 border border-emerald-800/40 ml-1">
+              Paga
+            </span>
+          )}
         </div>
       </td>
-      <td colSpan={3} className="py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm text-rose-400 font-medium tabular-nums">
-        {row.activity > 0
-          ? `-${formatCurrency(row.activity)}`
-          : <span className="text-slate-600">—</span>}
+      <td colSpan={3} className="py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm font-medium tabular-nums">
+        {row.isPaid ? (
+          <span className="text-emerald-400/80 line-through">
+            -{formatCurrency(row.activity)}
+          </span>
+        ) : row.activity > 0 ? (
+          <span className="text-rose-400">
+            -{formatCurrency(row.activity)}
+          </span>
+        ) : (
+          <span className="text-slate-600">—</span>
+        )}
       </td>
     </tr>
   )
@@ -145,6 +158,7 @@ function InvoiceGroupRow({
   onSelectCategory: (data: CategoryModalData) => void
 }) {
   const [open, setOpen] = useState(true)
+  const allPaid = row.categories.length > 0 && row.categories.every(c => c.isPaid || c.activity === 0)
 
   return (
     <>
@@ -160,9 +174,15 @@ function InvoiceGroupRow({
                 {row.group.name}
               </span>
             </div>
-            <span className="text-xs sm:text-sm font-bold text-rose-400 tabular-nums flex-shrink-0">
-              {row.totalActivity > 0 ? `-${formatCurrency(row.totalActivity)}` : <span className="text-slate-600">—</span>}
-            </span>
+            {allPaid ? (
+              <span className="text-xs sm:text-sm font-semibold text-emerald-400 tabular-nums flex-shrink-0 flex items-center gap-1">
+                ✓ Todas Pagas
+              </span>
+            ) : (
+              <span className="text-xs sm:text-sm font-bold text-rose-400 tabular-nums flex-shrink-0">
+                {row.totalActivity > 0 ? `-${formatCurrency(row.totalActivity)}` : <span className="text-slate-600">—</span>}
+              </span>
+            )}
           </div>
         </td>
       </tr>

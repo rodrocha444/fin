@@ -167,6 +167,7 @@ export interface IncomeGroupBudgetRow {
 export interface InvoiceCategoryBudgetRow {
   category: Category
   activity: number
+  isPaid?: boolean
 }
 
 export interface InvoiceGroupBudgetRow {
