@@ -340,37 +340,25 @@ export function calculateBudgetSummary(
     priorOverspending += (uncategorizedExpensesByMonth.get(pMonth) || 0)
   }
 
-  let currentOffBudgetNet = 0
-  let priorOffBudgetNet = 0
+  // Saldo real consolidado das contas correntes/caixa no período até o mês selecionado
+  let totalCheckingCash = 0
+  for (const acc of accounts) {
+    if (acc.type !== 'checking' || acc.isActive === false) continue
+    let bal = Number(acc.initialBalance || 0)
+    for (const tx of validTxs) {
+      const txMonth = toMonthKey(new Date(tx.date))
+      if (txMonth > month) continue
 
-  for (const tx of validTxs) {
-    if (tx.type !== 'transfer' || !tx.transferAccountId) continue
-    const txMonth = toMonthKey(new Date(tx.date))
-    if (isMonthBeforeAccountingStart(txMonth)) continue
-
-    const srcAcc = accountMap.get(tx.accountId)
-    const dstAcc = accountMap.get(tx.transferAccountId)
-    if (!srcAcc || !dstAcc) continue
-
-    const isSrcOnBudget = srcAcc.type !== 'off_budget'
-    const isDstOnBudget = dstAcc.type !== 'off_budget'
-
-    let netChange = 0
-    if (isSrcOnBudget && !isDstOnBudget) {
-      // Dinheiro saiu do orçamento para fora (ex: Conta Corrente -> Investimento)
-      netChange = -tx.amount
-    } else if (!isSrcOnBudget && isDstOnBudget) {
-      // Dinheiro entrou no orçamento vindo de fora (ex: Investimento -> Conta Corrente)
-      netChange = tx.amount
-    }
-
-    if (netChange !== 0) {
-      if (txMonth === month) {
-        currentOffBudgetNet += netChange
-      } else if (txMonth < month) {
-        priorOffBudgetNet += netChange
+      if (tx.accountId === acc.id) {
+        const amt = Number(tx.amount || 0)
+        if (tx.type === 'income') bal += amt
+        else if (tx.type === 'expense' || tx.type === 'transfer') bal -= amt
+      }
+      if (tx.transferAccountId === acc.id && tx.type === 'transfer') {
+        bal += Number(tx.amount || 0)
       }
     }
+    totalCheckingCash += bal
   }
 
   let currentInvoicesDue = 0
@@ -382,8 +370,10 @@ export function calculateBudgetSummary(
     currentInvoicesDue += currInvoiceAmt
   }
 
-  const previousMonthSurplus = initialFunds + priorIncome + priorOffBudgetNet - priorTotalBudgeted - priorOverspending
-  const toBeBudgeted = previousMonthSurplus + totalIncome + currentOffBudgetNet - totalBudgeted
+  // Sobra Anterior: Saldo em conta corrente no início do mês (antes das receitas do mês)
+  const previousMonthSurplus = totalCheckingCash - totalIncome
+  // Disponível a Orçar: Dinheiro total disponível em conta corrente menos o valor alocado nas categorias do mês
+  const toBeBudgeted = totalCheckingCash - totalBudgeted
 
   return {
     month,
@@ -391,8 +381,6 @@ export function calculateBudgetSummary(
     totalIncome,
     totalBudgeted,
     currentInvoicesDue,
-    currentOffBudgetNet,
-    priorOffBudgetNet,
     previousMonthSurplus,
     priorOverspending,
     totalAllTimeBudgeted,
