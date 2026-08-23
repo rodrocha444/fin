@@ -169,21 +169,26 @@ export async function createInstallmentPurchase(data: {
   payee?: string
   categoryId?: string
   notes?: string
+  splits?: SplitItemInput[]
 }): Promise<string> {
   const client = getClient()
   const groupId = createId()
   const desc = data.description || data.payee || 'Compra Parcelada'
-  const instAmount = Number((data.totalAmount / data.installmentCount).toFixed(2))
+  const count = Math.max(1, data.installmentCount)
+  const instAmount = Number((data.totalAmount / count).toFixed(2))
+
+  const validSplits = (data.splits || []).filter(s => s.amount > 0)
+  const hasSplits = validSplits.length > 0
 
   const groupRow = installmentGroupToRow({
     id: groupId,
     description: desc,
     totalAmount: data.totalAmount,
-    installmentCount: data.installmentCount,
+    installmentCount: count,
     installmentAmount: instAmount,
     startDate: data.startDate,
     accountId: data.accountId,
-    categoryId: data.categoryId,
+    categoryId: hasSplits ? undefined : data.categoryId,
     createdAt: new Date(),
   })
 
@@ -191,24 +196,64 @@ export async function createInstallmentPurchase(data: {
   if (groupErr) throw new Error(`Erro ao criar grupo de parcelamento: ${groupErr.message}`)
 
   const rows: any[] = []
-  for (let i = 1; i <= data.installmentCount; i++) {
-    const instDate = addMonths(new Date(data.startDate), i - 1)
-    const txId = createId()
-    rows.push(transactionToRow({
-      id: txId,
-      accountId: data.accountId,
-      date: instDate,
-      amount: instAmount,
-      payee: `${desc} (${i}/${data.installmentCount})`,
-      categoryId: data.categoryId,
-      notes: data.notes,
-      cleared: false,
-      type: 'expense',
-      installmentGroupId: groupId,
-      installmentNumber: i,
-      installmentTotal: data.installmentCount,
-      createdAt: new Date(),
-    }))
+  const now = new Date()
+
+  if (hasSplits) {
+    for (let i = 1; i <= count; i++) {
+      const instDate = addMonths(new Date(data.startDate), i - 1)
+      const splitGroupId = createId()
+
+      for (const s of validSplits) {
+        // Diferença cumulativa proporcional para evitar resíduos de centavos por categoria
+        const cumCurrent = Number(((s.amount * i) / count).toFixed(2))
+        const cumPrev = Number(((s.amount * (i - 1)) / count).toFixed(2))
+        const sliceAmount = Number((cumCurrent - cumPrev).toFixed(2))
+
+        if (sliceAmount <= 0) continue
+
+        const txId = createId()
+        rows.push(transactionToRow({
+          id: txId,
+          accountId: data.accountId,
+          date: instDate,
+          amount: sliceAmount,
+          payee: `${desc} (${i}/${count})`,
+          categoryId: s.categoryId,
+          notes: s.notes || data.notes,
+          cleared: false,
+          type: 'expense',
+          installmentGroupId: groupId,
+          installmentNumber: i,
+          installmentTotal: count,
+          splitGroupId,
+          createdAt: now,
+        }))
+      }
+    }
+  } else {
+    for (let i = 1; i <= count; i++) {
+      const instDate = addMonths(new Date(data.startDate), i - 1)
+      const cumCurrent = Number(((data.totalAmount * i) / count).toFixed(2))
+      const cumPrev = Number(((data.totalAmount * (i - 1)) / count).toFixed(2))
+      const parcelAmount = Number((cumCurrent - cumPrev).toFixed(2))
+
+      const txId = createId()
+      rows.push(transactionToRow({
+        id: txId,
+        accountId: data.accountId,
+        date: instDate,
+        amount: parcelAmount,
+        payee: `${desc} (${i}/${count})`,
+        categoryId: data.categoryId,
+        notes: data.notes,
+        cleared: false,
+        type: 'expense',
+        installmentGroupId: groupId,
+        installmentNumber: i,
+        installmentTotal: count,
+        createdAt: now,
+      }))
+    }
   }
 
   const { error: txErr } = await client.from('transactions').insert(rows)
@@ -230,6 +275,7 @@ export async function updateInstallmentPurchase(
     accountId?: string
     categoryId?: string
     notes?: string
+    splits?: SplitItemInput[]
   }
 ): Promise<void> {
   const client = getClient()
@@ -237,35 +283,92 @@ export async function updateInstallmentPurchase(
   if (!group) return
 
   const desc = data.description || data.payee || group.description
-  const count = data.installmentCount ?? group.installment_count
+  const count = Math.max(1, data.installmentCount ?? group.installment_count)
   const total = data.totalAmount ?? Number(group.total_amount)
   const instAmount = Number((total / count).toFixed(2))
+  const startDate = data.startDate ? new Date(data.startDate) : new Date(group.start_date)
+  const accountId = data.accountId || group.account_id
+
+  const validSplits = (data.splits || []).filter(s => s.amount > 0)
+  const hasSplits = validSplits.length > 0
+  const finalCategoryId = hasSplits ? null : (data.categoryId !== undefined ? data.categoryId : group.category_id)
 
   await client.from('installment_groups').update({
     description: desc,
     total_amount: total,
     installment_count: count,
     installment_amount: instAmount,
-    ...(data.startDate ? { start_date: data.startDate.toISOString() } : {}),
-    ...(data.accountId ? { account_id: data.accountId } : {}),
-    ...(data.categoryId !== undefined ? { category_id: data.categoryId } : {}),
+    start_date: startDate.toISOString(),
+    account_id: accountId,
+    category_id: finalCategoryId,
     updated_at: new Date().toISOString(),
   }).eq('id', groupId)
 
-  const { data: txs } = await client.from('transactions').select('*').eq('installment_group_id', groupId).order('installment_number', { ascending: true })
-  if (txs) {
-    for (const tx of txs as any[]) {
-      const num = tx.installment_number || 1
-      await client.from('transactions').update({
-        payee: `${desc} (${num}/${count})`,
-        amount: instAmount,
-        ...(data.accountId ? { account_id: data.accountId } : {}),
-        ...(data.categoryId !== undefined ? { category_id: data.categoryId } : {}),
-        installment_total: count,
-        updated_at: new Date().toISOString(),
-      }).eq('id', tx.id)
+  // Remove as parcelas antigas e insere o novo conjunto consistente
+  await client.from('transactions').delete().eq('installment_group_id', groupId)
+
+  const rows: any[] = []
+  const now = new Date()
+
+  if (hasSplits) {
+    for (let i = 1; i <= count; i++) {
+      const instDate = addMonths(startDate, i - 1)
+      const splitGroupId = createId()
+
+      for (const s of validSplits) {
+        const cumCurrent = Number(((s.amount * i) / count).toFixed(2))
+        const cumPrev = Number(((s.amount * (i - 1)) / count).toFixed(2))
+        const sliceAmount = Number((cumCurrent - cumPrev).toFixed(2))
+
+        if (sliceAmount <= 0) continue
+
+        const txId = createId()
+        rows.push(transactionToRow({
+          id: txId,
+          accountId,
+          date: instDate,
+          amount: sliceAmount,
+          payee: `${desc} (${i}/${count})`,
+          categoryId: s.categoryId,
+          notes: s.notes || data.notes,
+          cleared: false,
+          type: 'expense',
+          installmentGroupId: groupId,
+          installmentNumber: i,
+          installmentTotal: count,
+          splitGroupId,
+          createdAt: now,
+        }))
+      }
+    }
+  } else {
+    for (let i = 1; i <= count; i++) {
+      const instDate = addMonths(startDate, i - 1)
+      const cumCurrent = Number(((total * i) / count).toFixed(2))
+      const cumPrev = Number(((total * (i - 1)) / count).toFixed(2))
+      const parcelAmount = Number((cumCurrent - cumPrev).toFixed(2))
+
+      const txId = createId()
+      rows.push(transactionToRow({
+        id: txId,
+        accountId,
+        date: instDate,
+        amount: parcelAmount,
+        payee: `${desc} (${i}/${count})`,
+        categoryId: finalCategoryId || undefined,
+        notes: data.notes,
+        cleared: false,
+        type: 'expense',
+        installmentGroupId: groupId,
+        installmentNumber: i,
+        installmentTotal: count,
+        createdAt: now,
+      }))
     }
   }
+
+  const { error: txErr } = await client.from('transactions').insert(rows)
+  if (txErr) throw new Error(`Erro ao atualizar parcelas: ${txErr.message}`)
 
   notifyDataChanged('installment_groups', 'update', groupId)
   notifyDataChanged('transactions', 'update')

@@ -37,7 +37,7 @@ export default function CreditCardPurchaseItem({
               {purchase.installmentAmount ? `de ${formatCurrency(purchase.installmentAmount)}` : ''}
             </Badge>
           )}
-          {purchase.splitGroupId && (
+          {(purchase.splitGroupId || purchase.isSplit) && (
             <Badge variant="info">
               Rateio
             </Badge>
@@ -52,7 +52,7 @@ export default function CreditCardPurchaseItem({
           <span className="truncate">
             {purchase.type === 'transfer'
               ? 'Transferência / Pagamento'
-              : purchase.splitGroupId
+              : (purchase.splitGroupId || purchase.isSplit)
                 ? 'Rateio de categorias • clique para ver todas as partes'
                 : categoryName ?? 'Sem categoria'}
           </span>

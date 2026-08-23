@@ -114,12 +114,24 @@ export default function TransactionForm({
       : undefined
   }, [transaction?.installmentGroupId, installmentGroups])
 
-  // Busca TODOS os irmãos do rateio quando estiver editando transação dividida
+  // Busca TODAS as parcelas do grupo quando estiver editando compra parcelada
+  const groupTxs = useMemo(() => {
+    return transaction?.installmentGroupId
+      ? transactions.filter(t => t.installmentGroupId === transaction.installmentGroupId)
+      : []
+  }, [transaction?.installmentGroupId, transactions])
+
+  // Identifica se a compra parcelada existente é dividida em múltiplas categorias
+  const isExistingGroupSplit = useMemo(() => {
+    return groupTxs.some(t => !!t.splitGroupId) || (!group?.categoryId && groupTxs.length > (group?.installmentCount || 1))
+  }, [groupTxs, group])
+
+  // Busca TODOS os irmãos do rateio quando estiver editando transação dividida à vista
   const splitSiblings = useMemo(() => {
-    return transaction?.splitGroupId
+    return transaction?.splitGroupId && !transaction?.installmentGroupId
       ? transactions.filter(t => t.splitGroupId === transaction.splitGroupId)
       : []
-  }, [transaction?.splitGroupId, transactions])
+  }, [transaction?.splitGroupId, transaction?.installmentGroupId, transactions])
 
   const initialMode: TxMode = transaction
     ? (transaction.type === 'transfer' ? 'transfer' : transaction.type === 'income' ? 'income' : 'expense')
@@ -132,8 +144,8 @@ export default function TransactionForm({
   const [mode, setMode] = useState<TxMode>(initialMode)
   const [expensePaymentType, setExpensePaymentType] = useState<ExpensePaymentType>(initialExpenseType)
   const [installmentAmountType, setInstallmentAmountType] = useState<'total' | 'parcel'>('total')
-  // Se a transação tem splitGroupId, SEMPRE entra em modo split — não é possível editar isoladamente
-  const [isSplit, setIsSplit] = useState<boolean>(isExistingSplit || !!transaction?.splitGroupId)
+  // Se a transação tem splitGroupId ou é um grupo parcelado com divisões, entra em modo split
+  const [isSplit, setIsSplit] = useState<boolean>(isExistingSplit || isExistingGroupSplit || !!transaction?.splitGroupId)
   const [splits, setSplits] = useState<SplitRow[]>(() => {
     if (splitSiblings.length > 0) {
       return splitSiblings.map((s, idx) => ({
@@ -142,6 +154,24 @@ export default function TransactionForm({
         amount: s.amount,
         notes: s.notes || '',
       }))
+    }
+    if (group && isExistingGroupSplit && groupTxs.length > 0) {
+      const inst1Txs = groupTxs.filter(t => (t.installmentNumber ?? 1) === 1)
+      if (inst1Txs.length > 0) {
+        return inst1Txs.map((item, idx) => {
+          const matchingTxs = groupTxs.filter(t => t.categoryId === item.categoryId && (t.notes || '') === (item.notes || ''))
+          const totalForCat = matchingTxs.length > 0
+            ? matchingTxs.reduce((s, t) => s + t.amount, 0)
+            : Number((item.amount * (group.installmentCount || 1)).toFixed(2))
+
+          return {
+            id: item.id || `split-${idx}-${Date.now()}`,
+            categoryId: item.categoryId || '',
+            amount: parseFloat(totalForCat.toFixed(2)),
+            notes: item.notes || '',
+          }
+        })
+      }
     }
     return [
       { id: '1', categoryId: defaultCategoryId || '', amount: 0, notes: '' },
@@ -193,10 +223,33 @@ export default function TransactionForm({
       setValue('installmentCount', group.installmentCount, { shouldValidate: true })
       setValue('date', format(new Date(group.startDate), 'yyyy-MM-dd'), { shouldValidate: true })
       if (group.description) setValue('payee', group.description)
-      if (group.categoryId) setValue('categoryId', group.categoryId)
       if (group.accountId) setValue('accountId', group.accountId)
       if (transaction?.notes) {
         setValue('notes', transaction.notes.replace(/\s*\(\d+\/\d+\)$/, '').trim())
+      }
+
+      if (isExistingGroupSplit) {
+        setIsSplit(true)
+        const inst1Txs = groupTxs.filter(t => (t.installmentNumber ?? 1) === 1)
+        if (inst1Txs.length > 0) {
+          const reconstructedSplits: SplitRow[] = inst1Txs.map((item, idx) => {
+            const matchingTxs = groupTxs.filter(t => t.categoryId === item.categoryId && (t.notes || '') === (item.notes || ''))
+            const totalForCat = matchingTxs.length > 0
+              ? matchingTxs.reduce((s, t) => s + t.amount, 0)
+              : Number((item.amount * (group.installmentCount || 1)).toFixed(2))
+
+            return {
+              id: item.id || `split-${idx}-${Date.now()}`,
+              categoryId: item.categoryId || '',
+              amount: parseFloat(totalForCat.toFixed(2)),
+              notes: item.notes || '',
+            }
+          })
+          setSplits(reconstructedSplits)
+        }
+      } else {
+        setIsSplit(false)
+        if (group.categoryId) setValue('categoryId', group.categoryId)
       }
     } else if (transaction?.splitGroupId && splitSiblings.length > 0) {
       setIsSplit(true)
@@ -213,7 +266,7 @@ export default function TransactionForm({
         notes: s.notes || '',
       })))
     }
-  }, [group, transaction, splitSiblings, setValue])
+  }, [group, transaction, splitSiblings, groupTxs, isExistingGroupSplit, setValue])
 
   const selectedDate = watch('date')
   const watchAmount = watch('amount') || 0
@@ -240,16 +293,24 @@ export default function TransactionForm({
 
   const isInstallment = (mode === 'expense' && expensePaymentType === 'installment') || isExistingInstallment
 
+  // Valor total efetivo considerado no rateio (calcula o total se o usuário digitou o valor por parcela)
+  const effectiveTotalAmount = useMemo(() => {
+    if (isInstallment && installmentAmountType === 'parcel' && watchInstallmentCount && watchInstallmentCount > 0) {
+      return parseFloat(((watchAmount || 0) * watchInstallmentCount).toFixed(2))
+    }
+    return watchAmount || 0
+  }, [isInstallment, installmentAmountType, watchAmount, watchInstallmentCount])
+
   // Cálculos de Rateio / Split
   const sumSplits = splits.reduce((sum, s) => sum + (s.amount || 0), 0)
-  const remainingToDistribute = Math.round((watchAmount - sumSplits) * 100) / 100
+  const remainingToDistribute = Math.round((effectiveTotalAmount - sumSplits) * 100) / 100
 
   const handleToggleSplit = () => {
     if (!isSplit) {
       // Ativando modo Split
       const catId = watch('categoryId') || defaultCategoryId || ''
-      const half = watchAmount > 0 ? parseFloat((watchAmount / 2).toFixed(2)) : 0
-      const rest = watchAmount > 0 ? parseFloat((watchAmount - half).toFixed(2)) : 0
+      const half = effectiveTotalAmount > 0 ? parseFloat((effectiveTotalAmount / 2).toFixed(2)) : 0
+      const rest = effectiveTotalAmount > 0 ? parseFloat((effectiveTotalAmount - half).toFixed(2)) : 0
       setSplits([
         { id: `split-1-${Date.now()}`, categoryId: catId, amount: half, notes: '' },
         { id: `split-2-${Date.now()}`, categoryId: '', amount: rest, notes: '' },
@@ -294,6 +355,10 @@ export default function TransactionForm({
       const finalPayee = data.payee?.trim() || selectedCat?.name || (mode === 'transfer' ? 'Transferência' : mode === 'income' ? 'Renda' : 'Despesa')
       const catId = data.categoryId && data.categoryId.trim() !== '' ? data.categoryId : undefined
 
+      const finalTotalAmount = isInstallment && installmentAmountType === 'parcel'
+        ? parseFloat((data.amount * (data.installmentCount || 2)).toFixed(2))
+        : data.amount
+
       if (mode !== 'transfer' && isSplit) {
         const validSplits = splits.filter(s => (s.amount || 0) > 0)
         // Validação de divisões no modo rateio
@@ -306,7 +371,7 @@ export default function TransactionForm({
           return
         }
 
-        const effectiveTotal = data.amount > 0 ? data.amount : sumSplits
+        const effectiveTotal = finalTotalAmount > 0 ? finalTotalAmount : sumSplits
         const diff = Math.abs(sumSplits - effectiveTotal)
         if (diff >= 0.01) {
           await showAlert({
@@ -326,7 +391,29 @@ export default function TransactionForm({
           notes: s.notes?.trim() || undefined,
         }))
 
-        if (transaction?.splitGroupId) {
+        if (isExistingInstallment && transaction?.installmentGroupId) {
+          await updateInstallmentPurchase(transaction.installmentGroupId, {
+            accountId: data.accountId,
+            description: finalPayee,
+            totalAmount: effectiveTotal,
+            installmentCount: data.installmentCount || 2,
+            startDate: txDate,
+            payee: finalPayee,
+            notes: data.notes,
+            splits: splitPayload,
+          })
+        } else if (isInstallment) {
+          await createInstallmentPurchase({
+            accountId: data.accountId,
+            description: finalPayee,
+            totalAmount: effectiveTotal,
+            installmentCount: data.installmentCount || 2,
+            startDate: txDate,
+            payee: finalPayee,
+            notes: data.notes,
+            splits: splitPayload,
+          })
+        } else if (transaction?.splitGroupId) {
           await updateSplitTransaction(transaction.splitGroupId, {
             accountId: data.accountId,
             date: txDate,
@@ -366,9 +453,6 @@ export default function TransactionForm({
         if (mode !== 'transfer') {
           await getOrCreatePayee(finalPayee, catId)
         }
-        const finalTotalAmount = installmentAmountType === 'parcel'
-          ? parseFloat((data.amount * (data.installmentCount || 2)).toFixed(2))
-          : data.amount
 
         await updateInstallmentPurchase(transaction.installmentGroupId, {
           accountId: data.accountId,
@@ -408,9 +492,6 @@ export default function TransactionForm({
         })
       } else if (isInstallment) {
         if (!data.installmentCount) return
-        const finalTotalAmount = installmentAmountType === 'parcel'
-          ? parseFloat((data.amount * data.installmentCount).toFixed(2))
-          : data.amount
 
         await createInstallmentPurchase({
           accountId: data.accountId,
@@ -457,10 +538,10 @@ export default function TransactionForm({
           <h2 className="font-semibold text-slate-100 text-base sm:text-lg">
             {isExistingInstallment
               ? `Editar Parcela ${transaction.installmentNumber} de ${transaction.installmentTotal}`
-              : isExistingSplit
+              : isExistingSplit || isExistingGroupSplit
                 ? 'Editar transação dividida'
                 : isSplit
-                  ? 'Nova transação dividida'
+                  ? (isInstallment ? 'Nova compra parcelada dividida' : 'Nova transação dividida')
                   : isEdit
                     ? 'Editar transação'
                     : 'Nova transação'}
@@ -473,7 +554,7 @@ export default function TransactionForm({
           {isSplit && (
             <p className="text-xs text-indigo-400 mt-0.5 flex items-center gap-1 font-normal">
               <Split className="w-3 h-3" />
-              {isExistingSplit
+              {isExistingSplit || isExistingGroupSplit
                 ? `Todas as ${splits.length} partes do rateio`
                 : `Rateio entre ${splits.length} categorias`}
             </p>
@@ -504,13 +585,13 @@ export default function TransactionForm({
             ))}
           </div>
 
-          {/* Sub-seletor de Despesa: À vista vs Parcelado (bloqueado quando editando split existente) */}
+          {/* Sub-seletor de Despesa: À vista vs Parcelado */}
           {mode === 'expense' && (
             <div className="flex bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
               <button
                 type="button"
-                onClick={() => !isExistingInstallment && !isExistingSplit && setExpensePaymentType('single')}
-                disabled={isExistingInstallment || isExistingSplit}
+                onClick={() => !isExistingInstallment && setExpensePaymentType('single')}
+                disabled={isExistingInstallment}
                 className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${
                   expensePaymentType === 'single'
                     ? 'bg-slate-700 text-slate-100 shadow'
@@ -522,11 +603,9 @@ export default function TransactionForm({
               <button
                 type="button"
                 onClick={() => {
-                  if (isExistingSplit) return
                   setExpensePaymentType('installment')
-                  setIsSplit(false)
                 }}
-                disabled={isExistingSplit}
+                disabled={isExistingSplit && !isExistingInstallment}
                 className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${
                   expensePaymentType === 'installment'
                     ? 'bg-violet-600 text-white shadow'
@@ -764,7 +843,7 @@ export default function TransactionForm({
           )}
 
           {/* Categoria / Rateio em Múltiplas Categorias */}
-          {mode !== 'transfer' && !isInstallment && (
+          {mode !== 'transfer' && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="label mb-0">Categoria</label>
@@ -867,6 +946,13 @@ export default function TransactionForm({
                           />
                         </div>
 
+                        {/* Dica da parcela correspondente */}
+                        {isInstallment && watchInstallmentCount && watchInstallmentCount >= 2 && split.amount > 0 && (
+                          <p className="text-[10px] text-violet-300/80 font-medium">
+                            {watchInstallmentCount}x de ~{formatCurrency(split.amount / watchInstallmentCount)}/mês
+                          </p>
+                        )}
+
                         <input
                           type="text"
                           value={split.notes}
@@ -884,7 +970,7 @@ export default function TransactionForm({
                     <div className="flex items-center gap-2">
                       <span className="text-slate-400">Distribuído:</span>
                       <strong className="text-slate-200 tabular-nums">{formatCurrency(sumSplits)}</strong>
-                      <span className="text-slate-600">/ {formatCurrency(watchAmount)}</span>
+                      <span className="text-slate-600">/ {formatCurrency(effectiveTotalAmount)}</span>
                     </div>
 
                     <div className="flex items-center justify-between sm:justify-end gap-2">
@@ -913,37 +999,6 @@ export default function TransactionForm({
                   </div>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Categoria única em compra parcelada */}
-          {isInstallment && (
-            <div>
-              <label className="label">Categoria</label>
-              <Controller
-                name="categoryId"
-                control={control}
-                render={({ field }) => (
-                  <select
-                    value={field.value ?? ''}
-                    onChange={e => field.onChange(e.target.value || undefined)}
-                    onBlur={field.onBlur}
-                    style={{ colorScheme: 'dark' }}
-                    className="input-base"
-                  >
-                    <option value="" className="text-slate-400 bg-slate-900">Sem categoria</option>
-                    {groupedCategories.map(({ group: g, cats }) => (
-                      <optgroup key={g.id} label={g.name} className="bg-slate-950 text-indigo-300 font-semibold">
-                        {cats.map(c => (
-                          <option key={c.id} value={c.id} className="bg-slate-900 text-slate-100 py-1">
-                            {c.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                )}
-              />
             </div>
           )}
 

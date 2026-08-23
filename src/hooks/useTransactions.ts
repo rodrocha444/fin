@@ -15,6 +15,7 @@ export interface CreditCardPurchase {
   groupId?: string
   transactionId?: string
   splitGroupId?: string
+  isSplit?: boolean
   payee: string
   date: Date
   createdAt?: Date
@@ -230,6 +231,7 @@ export function useCreditCardPurchases(accountId: string | undefined): CreditCar
         const totalAmount = group?.totalAmount || groupTxs.reduce((sum, t) => sum + t.amount, 0)
         const count = group?.installmentCount || tx.installmentTotal || groupTxs.length
         const instAmount = group?.installmentAmount || (count > 0 ? totalAmount / count : totalAmount)
+        const isGroupSplit = groupTxs.some(t => !!t.splitGroupId) || (!group?.categoryId && groupTxs.length > count)
 
         purchases.push({
           id: `group-${tx.installmentGroupId}`,
@@ -240,10 +242,11 @@ export function useCreditCardPurchases(accountId: string | undefined): CreditCar
           amount: totalAmount,
           installmentCount: count,
           installmentAmount: instAmount,
-          categoryId: group?.categoryId || tx.categoryId,
+          categoryId: isGroupSplit ? undefined : (group?.categoryId || tx.categoryId),
           notes: group?.description || tx.notes?.replace(/\s*\(\d+\/\d+\)$/, ''),
           type: 'expense',
           isInstallment: true,
+          isSplit: isGroupSplit,
         })
       } else if (tx.splitGroupId) {
         if (seenSplitGroupIds.has(tx.splitGroupId)) continue
