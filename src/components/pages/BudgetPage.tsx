@@ -8,12 +8,14 @@ import {
   CreditCard,
   Layers,
   Receipt,
+  TrendingUp,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react'
 import { useBudgetRows, useIncomeBudgetRows, useInvoiceBudgetRows, useBudgetSummary } from '@/hooks/useBudget'
 import { setBudget, copyFromPreviousMonth, clearMonthBudgets } from '@/services/api/budget'
 import { formatCurrency, currentMonth } from '@/utils/format'
+import { useAccountingPeriod } from '@/utils/accountingPeriod'
 import { useConfirm } from '@/context/ConfirmContext'
 import PriceInput from '@/components/atoms/PriceInput'
 import MonthNavigator from '@/components/atoms/MonthNavigator'
@@ -440,6 +442,8 @@ export default function BudgetPage() {
   const [showMenu, setShowMenu] = useState(false)
   const [selectedCategoryModal, setSelectedCategoryModal] = useState<CategoryModalData | null>(null)
 
+  const { startMonth } = useAccountingPeriod()
+
   const rows = useBudgetRows(month)
   const invoiceRows = useInvoiceBudgetRows(month)
   const incomeRows = useIncomeBudgetRows(month)
@@ -495,23 +499,36 @@ export default function BudgetPage() {
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
       >
 
-        {/* Navegação de mês (Atom) */}
-        <MonthNavigator month={month} onChangeMonth={setMonth} />
+        {/* Navegação de mês (Atom com trava de início contábil) */}
+        <MonthNavigator month={month} onChangeMonth={setMonth} minMonth={startMonth} />
 
         {/* To Be Budgeted */}
         {summary && (
           <div className="text-center flex-1 min-w-0">
             <div className="flex items-center justify-center gap-1.5 flex-wrap">
               <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
-                {(summary.totalExpectedIncome ?? 0) > 0 ? 'A orçar (Caixa)' : 'A orçar'}
+                {summary.isFutureMonth
+                  ? 'A orçar (Projetado)'
+                  : (summary.totalExpectedIncome ?? 0) > 0
+                  ? 'A orçar (Caixa)'
+                  : 'A orçar'}
               </p>
-              {(summary.totalExpectedIncome ?? 0) > 0 && (
+              {summary.isFutureMonth ? (
                 <span
                   className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-950/80 text-indigo-300 border border-indigo-800/50"
-                  title="Saldo projetado a orçar considerando todas as receitas previstas no mês"
+                  title={`Sobra vinda do mês anterior: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)} | Receitas previstas: ${formatCurrency(summary.totalExpectedIncome ?? 0)}`}
                 >
-                  Previsto: {formatCurrency(summary.projectedToBeBudgeted)}
+                  Sobra: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
                 </span>
+              ) : (
+                (summary.pendingExpectedIncome ?? 0) > 0 && (
+                  <span
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-950/80 text-indigo-300 border border-indigo-800/50"
+                    title="Saldo projetado a orçar ao fim do mês considerando receitas previstas pendentes"
+                  >
+                    Previsto ao fim: {formatCurrency(summary.projectedToBeBudgeted)}
+                  </span>
+                )
               )}
             </div>
             <p className={`text-base sm:text-lg font-bold tabular-nums truncate ${tbbColor}`}>
@@ -562,16 +579,29 @@ export default function BudgetPage() {
           >
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider group-hover:text-slate-300 transition-colors">
-                Resumo do Mês
+                {summary.isFutureMonth ? 'Planejamento do Mês' : 'Resumo do Mês'}
               </span>
               {!isSummaryExpanded && (
                 <div className="hidden sm:flex items-center gap-3 text-xs text-slate-400 truncate">
-                  <span className="text-slate-600">•</span>
-                  <span>Receitas: <strong className="text-emerald-400 font-medium">+{formatCurrency(summary.totalIncome)}</strong></span>
-                  <span className="text-slate-600">•</span>
-                  <span>Orçado: <strong className="text-indigo-300 font-medium">-{formatCurrency(summary.totalBudgeted)}</strong></span>
-                  <span className="text-slate-600">•</span>
-                  <span>Gastos: <strong className="text-amber-400 font-medium">{formatCurrency(totalSpent)}</strong></span>
+                  {summary.isFutureMonth ? (
+                    <>
+                      <span className="text-slate-600">•</span>
+                      <span>Sobra Anterior: <strong className="text-indigo-300 font-medium">+{formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}</strong></span>
+                      <span className="text-slate-600">•</span>
+                      <span>Previsto: <strong className="text-emerald-400 font-medium">+{formatCurrency(summary.totalExpectedIncome ?? 0)}</strong></span>
+                      <span className="text-slate-600">•</span>
+                      <span>Orçado: <strong className="text-indigo-300 font-medium">-{formatCurrency(summary.totalBudgeted)}</strong></span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-slate-600">•</span>
+                      <span>Receitas: <strong className="text-emerald-400 font-medium">+{formatCurrency(summary.totalIncome)}</strong></span>
+                      <span className="text-slate-600">•</span>
+                      <span>Orçado: <strong className="text-indigo-300 font-medium">-{formatCurrency(summary.totalBudgeted)}</strong></span>
+                      <span className="text-slate-600">•</span>
+                      <span>Gastos: <strong className="text-amber-400 font-medium">{formatCurrency(totalSpent)}</strong></span>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -590,28 +620,69 @@ export default function BudgetPage() {
           {isSummaryExpanded && (
             <div className="px-3 pb-3 sm:px-6 sm:pb-3 pt-1 animate-in fade-in duration-200">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
-                {/* Receitas do Mês */}
-                <div
-                  className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
-                  title="Entradas registradas no mês e meta prevista"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-emerald-950/70 border border-emerald-800/60 flex items-center justify-center text-emerald-400 flex-shrink-0">
-                    <ArrowDownLeft className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-1">
-                      <p className="text-[10px] text-slate-500 font-medium truncate">Receitas Mês</p>
-                      {(summary.totalExpectedIncome ?? 0) > 0 && (
-                        <span className="text-[9px] text-indigo-400 font-medium truncate">
-                          Meta: {formatCurrency(summary.totalExpectedIncome ?? 0)}
-                        </span>
-                      )}
+                {summary.isFutureMonth ? (
+                  <>
+                    {/* Sobra Projetada do Mês Anterior */}
+                    <div
+                      className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
+                      title="Sobra líquida projetada que transborda do planejamento do mês anterior"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-indigo-950/70 border border-indigo-800/60 flex items-center justify-center text-indigo-400 flex-shrink-0">
+                        <TrendingUp className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] text-slate-500 font-medium truncate">Sobra Anterior</p>
+                        <p className={`text-xs sm:text-sm font-bold tabular-nums truncate ${
+                          (summary.rolloverFromPreviousMonth ?? 0) >= 0 ? 'text-indigo-300' : 'text-rose-400'
+                        }`}>
+                          {(summary.rolloverFromPreviousMonth ?? 0) >= 0 ? '+' : ''}
+                          {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-xs sm:text-sm font-bold text-emerald-400 tabular-nums truncate">
-                      +{formatCurrency(summary.totalIncome)}
-                    </p>
-                  </div>
-                </div>
+
+                    {/* Receitas Previstas */}
+                    <div
+                      className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
+                      title="Receitas e rendas previstas/planejadas para este mês futuro"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-emerald-950/70 border border-emerald-800/60 flex items-center justify-center text-emerald-400 flex-shrink-0">
+                        <ArrowDownLeft className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] text-slate-500 font-medium truncate">Receitas Previstas</p>
+                        <p className="text-xs sm:text-sm font-bold text-emerald-400 tabular-nums truncate">
+                          +{(summary.totalExpectedIncome ?? 0) > 0 ? formatCurrency(summary.totalExpectedIncome ?? 0) : formatCurrency(0)}
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Receitas do Mês */}
+                    <div
+                      className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
+                      title="Entradas registradas no mês e meta prevista"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-emerald-950/70 border border-emerald-800/60 flex items-center justify-center text-emerald-400 flex-shrink-0">
+                        <ArrowDownLeft className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <p className="text-[10px] text-slate-500 font-medium truncate">Receitas Mês</p>
+                          {(summary.totalExpectedIncome ?? 0) > 0 && (
+                            <span className="text-[9px] text-indigo-400 font-medium truncate">
+                              Meta: {formatCurrency(summary.totalExpectedIncome ?? 0)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs sm:text-sm font-bold text-emerald-400 tabular-nums truncate">
+                          +{formatCurrency(summary.totalIncome)}
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {/* Faturas do Mês */}
                 <div
@@ -645,21 +716,23 @@ export default function BudgetPage() {
                   </div>
                 </div>
 
-                {/* Gastos Realizados */}
-                <div
-                  className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
-                  title="Total de despesas efetivamente realizadas no mês nas categorias"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-amber-950/70 border border-amber-800/60 flex items-center justify-center text-amber-400 flex-shrink-0">
-                    <Receipt className="w-4 h-4" />
+                {!summary.isFutureMonth && (
+                  /* Gastos Realizados */
+                  <div
+                    className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
+                    title="Total de despesas efetivamente realizadas no mês nas categorias"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-amber-950/70 border border-amber-800/60 flex items-center justify-center text-amber-400 flex-shrink-0">
+                      <Receipt className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] text-slate-500 font-medium truncate">Gastos Reais</p>
+                      <p className="text-xs sm:text-sm font-bold text-amber-400/90 tabular-nums truncate">
+                        {totalSpent > 0 ? formatCurrency(totalSpent) : <span className="text-slate-600">—</span>}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[10px] text-slate-500 font-medium truncate">Gastos Reais</p>
-                    <p className="text-xs sm:text-sm font-bold text-amber-400/90 tabular-nums truncate">
-                      {totalSpent > 0 ? formatCurrency(totalSpent) : <span className="text-slate-600">—</span>}
-                    </p>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           )}

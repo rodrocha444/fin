@@ -114,6 +114,10 @@ export interface Payee {
 
 export interface BudgetSummary {
   month: string
+  /** Se o mês selecionado é um mês futuro em relação ao mês atual */
+  isFutureMonth?: boolean
+  /** Sobra projetada vinda do mês anterior no planejamento de meses futuros */
+  rolloverFromPreviousMonth?: number
   /** Renda total já recebida no mês selecionado */
   totalIncome: number
   /** Renda total prevista/orçada no mês selecionado */
@@ -124,7 +128,7 @@ export interface BudgetSummary {
   totalBudgeted: number
   /** Faturas de cartão com vencimento no mês selecionado */
   currentInvoicesDue?: number
-  /** Quanto ainda está disponível para ser orçado no mês (saldo em caixa) */
+  /** Quanto ainda está disponível para ser orçado no mês (saldo em caixa ou projetado) */
   toBeBudgeted: number
   /** Saldo projetado a orçar considerando as receitas previstas restantes */
   projectedToBeBudgeted: number

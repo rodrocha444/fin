@@ -1,7 +1,7 @@
 import { getClient } from './client'
 import { createId } from '@/utils/id'
 import { format, subMonths } from 'date-fns'
-import { isInitialSetupCategory } from '@/utils/format'
+import { isInitialSetupCategory, currentMonth, shiftMonth } from '@/utils/format'
 import { getInvoiceForBudgetMonth } from '@/utils/invoices'
 import { isDateBeforeAccountingStart, isMonthBeforeAccountingStart } from '@/utils/accountingPeriod'
 import { notifyDataChanged } from './events'
@@ -323,6 +323,110 @@ export function calculateBudgetSummary(
     currentInvoicesDue += currInvoiceAmt
   }
 
+  const curMonth = currentMonth()
+  const isFutureMonth = month > curMonth
+
+  // ── MODO PROJEÇÃO EM CASCATA PARA MESES FUTUROS ──────────────
+  if (isFutureMonth) {
+    // 1. Saldo real consolidado em conta corrente até o mês atual
+    let checkingCashNow = 0
+    for (const acc of accounts) {
+      if (acc.type !== 'checking' || acc.isActive === false) continue
+      let bal = Number(acc.initialBalance || 0)
+      for (const tx of validTxs) {
+        const txMonth = toMonthKey(new Date(tx.date))
+        if (txMonth > curMonth) continue
+
+        if (tx.accountId === acc.id) {
+          const amt = Number(tx.amount || 0)
+          if (tx.type === 'income') bal += amt
+          else if (tx.type === 'expense' || tx.type === 'transfer') bal -= amt
+        }
+        if (tx.transferAccountId === acc.id && tx.type === 'transfer') {
+          bal += Number(tx.amount || 0)
+        }
+      }
+      checkingCashNow += bal
+    }
+
+    // 2. Despesas orçadas e receitas pendentes do mês atual
+    let nowBudgeted = 0
+    for (const b of budgetMonths) {
+      if (isMonthBeforeAccountingStart(b.month)) continue
+      if (ignoredCategoryIds.has(b.categoryId)) continue
+      if (b.month === curMonth) nowBudgeted += b.budgeted
+    }
+
+    const nowIncomeMap = calculateIncomeByCategory(transactions, curMonth)
+    const nowBudgetMap = new Map(
+      budgetMonths.filter(b => b.month === curMonth).map(b => [b.categoryId, b])
+    )
+    let nowPendingIncome = 0
+    for (const cat of categories) {
+      if (!cat.id) continue
+      const grp = groupMap.get(cat.groupId)
+      if (grp?.type !== 'income') continue
+      const expected = nowBudgetMap.get(cat.id)?.budgeted ?? 0
+      const received = nowIncomeMap.get(cat.id) ?? 0
+      if (expected > received) {
+        nowPendingIncome += (expected - received)
+      }
+    }
+
+    // Sobra projetada do mês atual que transborda para o planejamento
+    let runningSurplus = checkingCashNow - nowBudgeted + nowPendingIncome
+
+    // 3. Iterar pelos meses futuros intermediários até o mês selecionado
+    let mCursor = shiftMonth(curMonth, 1)
+    let rolloverForSelectedMonth = runningSurplus
+
+    while (mCursor <= month) {
+      const cursorBudgetMap = new Map(
+        budgetMonths.filter(b => b.month === mCursor).map(b => [b.categoryId, b])
+      )
+      const cursorIncomeMap = calculateIncomeByCategory(transactions, mCursor)
+
+      let cursorExpectedIncome = 0
+      for (const cat of categories) {
+        if (!cat.id) continue
+        const grp = groupMap.get(cat.groupId)
+        if (grp?.type !== 'income') continue
+        const expected = cursorBudgetMap.get(cat.id)?.budgeted ?? 0
+        const received = cursorIncomeMap.get(cat.id) ?? 0
+        cursorExpectedIncome += Math.max(expected, received)
+      }
+
+      let cursorBudgetedExpenses = 0
+      for (const b of budgetMonths) {
+        if (isMonthBeforeAccountingStart(b.month)) continue
+        if (ignoredCategoryIds.has(b.categoryId)) continue
+        if (b.month === mCursor) cursorBudgetedExpenses += b.budgeted
+      }
+
+      if (mCursor === month) {
+        rolloverForSelectedMonth = runningSurplus
+        const futureToBeBudgeted = rolloverForSelectedMonth + cursorExpectedIncome - cursorBudgetedExpenses
+
+        return {
+          month,
+          isFutureMonth: true,
+          rolloverFromPreviousMonth: rolloverForSelectedMonth,
+          totalIncome,
+          totalExpectedIncome: cursorExpectedIncome,
+          pendingExpectedIncome: cursorExpectedIncome,
+          totalBudgeted: cursorBudgetedExpenses,
+          currentInvoicesDue,
+          toBeBudgeted: futureToBeBudgeted,
+          projectedToBeBudgeted: futureToBeBudgeted,
+        }
+      }
+
+      runningSurplus = runningSurplus + cursorExpectedIncome - cursorBudgetedExpenses
+      mCursor = shiftMonth(mCursor, 1)
+    }
+  }
+
+  // ── MODO CAIXA REAL (MÊS ATUAL OU PASSADO) ─────────────────────
   // Previsão de receitas orçadas para o mês selecionado
   const incomeMap = calculateIncomeByCategory(transactions, month)
   const budgetMap = new Map(
@@ -350,6 +454,8 @@ export function calculateBudgetSummary(
 
   return {
     month,
+    isFutureMonth: false,
+    rolloverFromPreviousMonth: 0,
     totalIncome,
     totalExpectedIncome,
     pendingExpectedIncome,
