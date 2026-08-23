@@ -119,7 +119,7 @@ export function calculateBudgetRows(
   )
 
   const expenseGroups = categoryGroups.filter(
-    g => g.type !== 'income' && g.name !== 'Faturas Atuais' && g.name !== 'Faturas de Cartão'
+    g => g.type !== 'income'
   )
 
   const rows: GroupBudgetRow[] = []
