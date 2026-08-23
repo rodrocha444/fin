@@ -10,13 +10,11 @@ import {
 import {
   calculateBudgetRows,
   calculateIncomeBudgetRows,
-  calculateInvoiceBudgetRows,
   calculateBudgetSummary,
 } from '@/services/api/budget'
 import type {
   GroupBudgetRow,
   IncomeGroupBudgetRow,
-  InvoiceGroupBudgetRow,
   BudgetSummary,
   CategoryGroup,
   Category,
@@ -40,18 +38,6 @@ export function useBudgetRows(month: string): GroupBudgetRow[] | undefined {
       transactions
     )
   }, [month, categoryGroups, categories, budgetMonths, transactions, isLoading])
-}
-
-/** Linhas de faturas de cartão de crédito para um mês */
-export function useInvoiceBudgetRows(month: string): InvoiceGroupBudgetRow[] | undefined {
-  const { data: accounts = [], isLoading: l1 } = useAccountsQuery()
-  const { data: transactions = [], isLoading: l2 } = useTransactionsQuery()
-  const isLoading = l1 || l2
-
-  return useMemo(() => {
-    if (isLoading && accounts.length === 0) return undefined
-    return calculateInvoiceBudgetRows(month, accounts, transactions)
-  }, [month, accounts, transactions, isLoading])
 }
 
 /** Linhas do orçamento de receitas/rendas para um mês */

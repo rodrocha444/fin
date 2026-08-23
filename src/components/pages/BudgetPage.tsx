@@ -12,7 +12,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react'
-import { useBudgetRows, useIncomeBudgetRows, useInvoiceBudgetRows, useBudgetSummary } from '@/hooks/useBudget'
+import { useBudgetRows, useIncomeBudgetRows, useBudgetSummary } from '@/hooks/useBudget'
 import { setBudget, copyFromPreviousMonth, clearMonthBudgets } from '@/services/api/budget'
 import { formatCurrency, currentMonth } from '@/utils/format'
 import { useAccountingPeriod } from '@/utils/accountingPeriod'
@@ -28,8 +28,6 @@ import type {
   GroupBudgetRow,
   IncomeCategoryBudgetRow,
   IncomeGroupBudgetRow,
-  InvoiceCategoryBudgetRow,
-  InvoiceGroupBudgetRow,
 } from '@/types'
 
 export interface CategoryModalData {
@@ -94,102 +92,6 @@ function BudgetCell({ value, onSave }: { value: number; onSave: (v: number) => v
     >
       {value === 0 ? <span className="text-slate-600">—</span> : formatCurrency(value)}
     </button>
-  )
-}
-
-// ── Linhas de Faturas de Cartão (Grupo Especial com 1 Coluna) ──
-
-function InvoiceCategoryRow({
-  row,
-  onSelectCategory,
-}: {
-  row: InvoiceCategoryBudgetRow
-  onSelectCategory: (data: CategoryModalData) => void
-}) {
-  return (
-    <tr
-      onClick={() =>
-        onSelectCategory({
-          category: row.category,
-          activity: row.activity,
-          budgeted: row.activity,
-          available: 0,
-          isIncome: false,
-        })
-      }
-      className="group hover:bg-slate-800/40 active:bg-slate-800/60 cursor-pointer transition-colors"
-      title="Clique para ver as transações desta fatura no mês"
-    >
-      <td className="py-2.5 pl-6 sm:pl-10 pr-2 text-xs sm:text-sm text-slate-300">
-        <div className="flex items-center gap-2 min-w-0">
-          <CreditCard className={`w-3.5 h-3.5 flex-shrink-0 ${row.isPaid ? 'text-emerald-400' : 'text-rose-400/80'}`} />
-          <span className={`break-words leading-tight block transition-colors ${row.isPaid ? 'text-slate-400 line-through' : 'group-hover:text-rose-300'}`} title={row.category.name}>
-            {row.category.name}
-          </span>
-          {row.isPaid && (
-            <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-emerald-950/70 text-emerald-400 border border-emerald-800/40 ml-1">
-              Paga
-            </span>
-          )}
-        </div>
-      </td>
-      <td colSpan={3} className="py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm font-medium tabular-nums">
-        {row.isPaid ? (
-          <span className="text-emerald-400/80 line-through">
-            -{formatCurrency(row.activity)}
-          </span>
-        ) : row.activity > 0 ? (
-          <span className="text-rose-400">
-            -{formatCurrency(row.activity)}
-          </span>
-        ) : (
-          <span className="text-slate-600">—</span>
-        )}
-      </td>
-    </tr>
-  )
-}
-
-function InvoiceGroupRow({
-  row,
-  onSelectCategory,
-}: {
-  row: InvoiceGroupBudgetRow
-  onSelectCategory: (data: CategoryModalData) => void
-}) {
-  const [open, setOpen] = useState(true)
-  const allPaid = row.categories.length > 0 && row.categories.every(c => c.isPaid || c.activity === 0)
-
-  return (
-    <>
-      <tr
-        className="cursor-pointer select-none bg-rose-950/20 border-t border-rose-900/30 hover:bg-rose-950/30 active:bg-rose-950/40 transition-colors"
-        onClick={() => setOpen(o => !o)}
-      >
-        <td colSpan={4} className="py-2.5 px-3 sm:px-6">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-rose-400 text-xs flex-shrink-0">{open ? '▼' : '▶'}</span>
-              <span className="font-semibold text-xs sm:text-sm text-rose-300 uppercase tracking-wider break-words leading-tight">
-                {row.group.name}
-              </span>
-            </div>
-            {allPaid ? (
-              <span className="text-xs sm:text-sm font-semibold text-emerald-400 tabular-nums flex-shrink-0 flex items-center gap-1">
-                ✓ Todas Pagas
-              </span>
-            ) : (
-              <span className="text-xs sm:text-sm font-bold text-rose-400 tabular-nums flex-shrink-0">
-                {row.totalActivity > 0 ? `-${formatCurrency(row.totalActivity)}` : <span className="text-slate-600">—</span>}
-              </span>
-            )}
-          </div>
-        </td>
-      </tr>
-      {open && row.categories.map(c => (
-        <InvoiceCategoryRow key={c.category.id} row={c} onSelectCategory={onSelectCategory} />
-      ))}
-    </>
   )
 }
 
@@ -465,7 +367,6 @@ export default function BudgetPage() {
   const { startMonth } = useAccountingPeriod()
 
   const rows = useBudgetRows(month)
-  const invoiceRows = useInvoiceBudgetRows(month)
   const incomeRows = useIncomeBudgetRows(month)
   const summary = useBudgetSummary(month)
 
@@ -766,9 +667,9 @@ export default function BudgetPage() {
           <PendingIssuesCard />
         </div>
 
-        {!rows && !incomeRows && !invoiceRows ? (
+        {!rows && !incomeRows ? (
           <div className="flex items-center justify-center h-32 text-slate-600 text-sm">Carregando…</div>
-        ) : (rows?.length === 0 && incomeRows?.length === 0 && invoiceRows?.length === 0) ? (
+        ) : (rows?.length === 0 && incomeRows?.length === 0) ? (
           <div className="flex flex-col items-center justify-center h-64 gap-3 px-4 text-center">
             <p className="text-slate-500 text-sm">Nenhuma categoria ainda.</p>
             <Link to="/settings" className="btn-secondary text-xs">
@@ -810,19 +711,6 @@ export default function BudgetPage() {
                   </tr>
                   {incomeRows.map(row => (
                     <IncomeGroupRow key={row.group.id} row={row} month={month} onSelectCategory={setSelectedCategoryModal} />
-                  ))}
-                </>
-              )}
-
-              {/* ── Seção de Faturas de Cartão (Grupo especial com 1 coluna como Receitas) ── */}
-              {invoiceRows && invoiceRows.length > 0 && (
-                <>
-                  <tr className="bg-slate-950/90 text-[10px] sm:text-xs font-semibold text-rose-400/90 uppercase tracking-wider border-t border-b border-rose-900/40 select-none">
-                    <th className="py-2 pl-3 sm:pl-6 pr-1 text-left">Faturas de Cartão</th>
-                    <th colSpan={3} className="py-2 pl-2 pr-3 sm:pr-6 text-right">Fatura a Vencer</th>
-                  </tr>
-                  {invoiceRows.map(row => (
-                    <InvoiceGroupRow key={row.group.id} row={row} onSelectCategory={setSelectedCategoryModal} />
                   ))}
                 </>
               )}

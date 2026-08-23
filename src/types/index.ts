@@ -164,18 +164,6 @@ export interface IncomeGroupBudgetRow {
   totalDifference: number
 }
 
-export interface InvoiceCategoryBudgetRow {
-  category: Category
-  activity: number
-  isPaid?: boolean
-}
-
-export interface InvoiceGroupBudgetRow {
-  group: CategoryGroup
-  categories: InvoiceCategoryBudgetRow[]
-  totalActivity: number
-}
-
 // ── Tipos de Pendências e Regras do Sistema ──────────────────
 
 export type IssueSeverity = 'warning' | 'error' | 'info'
