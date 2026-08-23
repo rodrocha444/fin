@@ -403,7 +403,7 @@ export default function BudgetPage() {
       variant: 'info',
     })
     if (ok) {
-      await coverMonthSpent(month)
+      await coverMonthSpent(month, rows)
     }
   }
 

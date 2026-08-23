@@ -1,4 +1,5 @@
 import { getClient } from './client'
+import { rowToTransaction } from './types'
 import { createId } from '@/utils/id'
 import { format, subMonths } from 'date-fns'
 import { isInitialSetupCategory, currentMonth, shiftMonth } from '@/utils/format'
@@ -76,39 +77,26 @@ export async function clearMonthBudgets(month: string): Promise<void> {
   notifyDataChanged('budget_months', 'update')
 }
 
-export async function coverMonthSpent(month: string): Promise<void> {
-  const client = getClient()
-
-  // Buscar transações válidas
-  const { data: txsData, error: txsErr } = await client.from('transactions').select('*')
-  if (txsErr) throw new Error(`Erro ao buscar transações: ${txsErr.message}`)
-
-  // Buscar grupos e categorias de despesa
-  const { data: groupsData } = await client.from('category_groups').select('id, type, name')
-  const groupMap = new Map((groupsData || []).map(g => [g.id, g]))
-
-  const { data: catsData } = await client.from('categories').select('id, group_id, name')
-  const expenseCatIds = new Set(
-    (catsData || [])
-      .filter(c => {
-        const grp = groupMap.get(c.group_id)
-        return grp?.type !== 'income' && !isInitialSetupCategory(c.name, grp?.name)
-      })
-      .map(c => c.id)
-  )
-
-  // Mapear gastos por categoria no mês selecionado
-  const spentMap = new Map<string, number>()
-  for (const tx of txsData || []) {
-    if (isDateBeforeAccountingStart(new Date(tx.date))) continue
-    if (tx.type !== 'expense' || !tx.category_id || !expenseCatIds.has(tx.category_id)) continue
-    const txMonth = toMonthKey(new Date(tx.date))
-    if (txMonth !== month) continue
-    spentMap.set(tx.category_id, (spentMap.get(tx.category_id) || 0) + Number(tx.amount || 0))
+export async function coverMonthSpent(month: string, rows?: GroupBudgetRow[]): Promise<void> {
+  if (rows && rows.length > 0) {
+    for (const groupRow of rows) {
+      for (const catRow of groupRow.categories) {
+        if (catRow.category.id) {
+          await setBudget(month, catRow.category.id, catRow.activity)
+        }
+      }
+    }
+    notifyDataChanged('budget_months', 'upsert')
+    return
   }
 
-  // Atualizar orçamento para cada categoria que teve gasto
-  for (const [catId, spent] of spentMap.entries()) {
+  const client = getClient()
+  const { data: txsData, error: txsErr } = await client.from('transactions').select('*')
+  if (txsErr) throw new Error(`Erro ao buscar transações: ${txsErr.message}`)
+  const txs = (txsData || []).map(rowToTransaction)
+  const activityMap = calculateActivityByCategory(txs, month)
+
+  for (const [catId, spent] of activityMap.entries()) {
     await setBudget(month, catId, spent)
   }
 
