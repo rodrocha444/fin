@@ -501,9 +501,21 @@ export default function BudgetPage() {
         {/* To Be Budgeted */}
         {summary && (
           <div className="text-center flex-1 min-w-0">
-            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">A orçar</p>
+            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                {(summary.totalExpectedIncome ?? 0) > 0 ? 'A orçar (Caixa)' : 'A orçar'}
+              </p>
+              {(summary.totalExpectedIncome ?? 0) > 0 && (
+                <span
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-950/80 text-indigo-300 border border-indigo-800/50"
+                  title="Saldo projetado a orçar considerando todas as receitas previstas no mês"
+                >
+                  Previsto: {formatCurrency(summary.projectedToBeBudgeted)}
+                </span>
+              )}
+            </div>
             <p className={`text-base sm:text-lg font-bold tabular-nums truncate ${tbbColor}`}>
-              {formatCurrency(Math.abs(summary.toBeBudgeted))}
+              {formatCurrency(summary.toBeBudgeted)}
             </p>
           </div>
         )}
@@ -581,13 +593,20 @@ export default function BudgetPage() {
                 {/* Receitas do Mês */}
                 <div
                   className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
-                  title="Entradas e rendas registradas no mês (+ soma ao orçamento)"
+                  title="Entradas registradas no mês e meta prevista"
                 >
                   <div className="w-8 h-8 rounded-lg bg-emerald-950/70 border border-emerald-800/60 flex items-center justify-center text-emerald-400 flex-shrink-0">
                     <ArrowDownLeft className="w-4 h-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10px] text-slate-500 font-medium truncate">Receitas Mês</p>
+                    <div className="flex items-center justify-between gap-1">
+                      <p className="text-[10px] text-slate-500 font-medium truncate">Receitas Mês</p>
+                      {(summary.totalExpectedIncome ?? 0) > 0 && (
+                        <span className="text-[9px] text-indigo-400 font-medium truncate">
+                          Meta: {formatCurrency(summary.totalExpectedIncome ?? 0)}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs sm:text-sm font-bold text-emerald-400 tabular-nums truncate">
                       +{formatCurrency(summary.totalIncome)}
                     </p>

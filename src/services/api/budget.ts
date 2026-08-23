@@ -323,14 +323,39 @@ export function calculateBudgetSummary(
     currentInvoicesDue += currInvoiceAmt
   }
 
-  // Disponível a Orçar: Dinheiro total disponível em conta corrente menos o valor alocado nas categorias do mês
+  // Previsão de receitas orçadas para o mês selecionado
+  const incomeMap = calculateIncomeByCategory(transactions, month)
+  const budgetMap = new Map(
+    budgetMonths.filter(b => b.month === month).map(b => [b.categoryId, b])
+  )
+  let totalExpectedIncome = 0
+  let pendingExpectedIncome = 0
+
+  for (const cat of categories) {
+    if (!cat.id) continue
+    const grp = groupMap.get(cat.groupId)
+    if (grp?.type !== 'income') continue
+    const expected = budgetMap.get(cat.id)?.budgeted ?? 0
+    const received = incomeMap.get(cat.id) ?? 0
+    totalExpectedIncome += expected
+    if (expected > received) {
+      pendingExpectedIncome += (expected - received)
+    }
+  }
+
+  // Disponível a Orçar (Caixa Real): Dinheiro total disponível em conta corrente menos o valor alocado nas categorias do mês
   const toBeBudgeted = totalCheckingCash - totalBudgeted
+  // Disponível a Orçar Projetado: Saldo a orçar somado às receitas previstas que ainda faltam entrar
+  const projectedToBeBudgeted = toBeBudgeted + pendingExpectedIncome
 
   return {
     month,
     totalIncome,
+    totalExpectedIncome,
+    pendingExpectedIncome,
     totalBudgeted,
     currentInvoicesDue,
     toBeBudgeted,
+    projectedToBeBudgeted,
   }
 }

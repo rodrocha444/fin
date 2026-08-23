@@ -114,14 +114,20 @@ export interface Payee {
 
 export interface BudgetSummary {
   month: string
-  /** Renda total no mês selecionado */
+  /** Renda total já recebida no mês selecionado */
   totalIncome: number
-  /** Total orçado no mês selecionado */
+  /** Renda total prevista/orçada no mês selecionado */
+  totalExpectedIncome?: number
+  /** Renda prevista que ainda falta entrar no mês */
+  pendingExpectedIncome?: number
+  /** Total orçado nas categorias de despesa no mês selecionado */
   totalBudgeted: number
   /** Faturas de cartão com vencimento no mês selecionado */
   currentInvoicesDue?: number
-  /** Quanto ainda está disponível para ser orçado no mês */
+  /** Quanto ainda está disponível para ser orçado no mês (saldo em caixa) */
   toBeBudgeted: number
+  /** Saldo projetado a orçar considerando as receitas previstas restantes */
+  projectedToBeBudgeted: number
 }
 
 export interface CategoryBudgetRow {
