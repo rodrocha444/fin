@@ -196,7 +196,11 @@ export default function ReportsPage() {
   }
 
   // ── 4. Abertura do Modal de Transações por Barra Mensal ──────────────────────
-  const handleMonthBarSelect = (barMonth: string, type: 'expense' | 'income') => {
+  const handleMonthBarSelect = (
+    barMonth: string,
+    type: 'expense' | 'income',
+    categoryId?: string
+  ) => {
     const monthTxs = getReportTransactionsForMonth(
       transactions,
       installmentGroups,
@@ -204,21 +208,38 @@ export default function ReportsPage() {
       regime,
       {
         type,
+        categoryId,
         hiddenCategoryIds,
       }
     )
 
     const monthLabel = formatMonthLabel(barMonth)
     const regimeLabel = regime === 'accrual' ? 'Data da Compra' : 'Por Fatura'
-    const title = type === 'expense' ? `Despesas de ${monthLabel}` : `Receitas de ${monthLabel}`
+
+    let title: string
+    let description: string
+
+    if (categoryId) {
+      const catObj = categories.find(c => c.id === categoryId)
+      const catName =
+        catObj?.name || (categoryId.startsWith('uncategorized') ? 'Sem Categoria' : categoryId)
+      title = catName
+      description = `Lançamentos de ${catName} em ${monthLabel} (${regimeLabel})`
+    } else {
+      title = type === 'expense' ? `Despesas de ${monthLabel}` : `Receitas de ${monthLabel}`
+      description = `Todas as ${
+        type === 'expense' ? 'despesas' : 'receitas'
+      } de ${monthLabel} (${regimeLabel})`
+    }
 
     setModalState({
       isOpen: true,
       title,
-      description: `Todas as ${type === 'expense' ? 'despesas' : 'receitas'} de ${monthLabel} (${regimeLabel})`,
+      description,
       month: barMonth,
       transactions: monthTxs,
       isIncome: type === 'income',
+      categoryId,
     })
   }
 

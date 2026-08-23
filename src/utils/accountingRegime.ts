@@ -348,10 +348,12 @@ export function getReportTransactionsForMonth(
     type?: 'expense' | 'income'
     categoryId?: string
     hiddenCategoryIds?: Set<string> | string[]
+    selectedCategoryIds?: Set<string> | string[]
   }
 ): Transaction[] {
   const groupMonthMap = buildGroupPurchaseMonthMap(transactions, installmentGroups)
   const hiddenSet = options?.hiddenCategoryIds ? new Set(options.hiddenCategoryIds) : null
+  const selectedSet = options?.selectedCategoryIds ? new Set(options.selectedCategoryIds) : null
 
   return transactions
     .filter(tx => {
@@ -359,8 +361,25 @@ export function getReportTransactionsForMonth(
       if (options?.type && tx.type !== options.type) return false
       if (!options?.type && tx.type !== 'expense' && tx.type !== 'income') return false
 
+      // Filtragem por categorias selecionadas especificamente no gráfico
+      if (selectedSet && selectedSet.size > 0) {
+        let matchesSelected = false
+        if (tx.categoryId && selectedSet.has(tx.categoryId)) matchesSelected = true
+        if (!tx.categoryId && tx.type === 'expense' && selectedSet.has('uncategorized_expense')) {
+          matchesSelected = true
+        }
+        if (
+          !tx.categoryId &&
+          tx.type === 'income' &&
+          (selectedSet.has('uncategorized_income') || (tx.payee && selectedSet.has(`payee_${tx.payee}`)))
+        ) {
+          matchesSelected = true
+        }
+        if (!matchesSelected) return false
+      }
+
       // Filtragem de categorias ocultas nos relatórios (se não for busca de categoria explícita)
-      if (!options?.categoryId && hiddenSet) {
+      if (!options?.categoryId && !selectedSet && hiddenSet) {
         if (tx.categoryId && hiddenSet.has(tx.categoryId)) return false
         if (!tx.categoryId && tx.type === 'expense' && hiddenSet.has('uncategorized_expense')) {
           return false
@@ -430,16 +449,37 @@ export function calculateMonthlyEvolution(
   installmentGroups: InstallmentGroup[],
   months: string[],
   regime: AccountingRegime,
-  hiddenCategoryIds?: Set<string> | string[]
+  hiddenCategoryIds?: Set<string> | string[],
+  selectedCategoryIds?: Set<string> | string[]
 ): MonthlyEvolutionItem[] {
   const result: MonthlyEvolutionItem[] = []
+  const selectedSet = selectedCategoryIds ? new Set(selectedCategoryIds) : null
 
   for (let i = 0; i < months.length; i++) {
     const m = months[i]
-    const summary = calculateReportSummary(transactions, installmentGroups, m, regime, hiddenCategoryIds)
-    const monthTxs = getReportTransactionsForMonth(transactions, installmentGroups, m, regime, {
-      hiddenCategoryIds,
-    })
+    let summary: { income: number; expense: number; netSavings: number; savingsRate: number }
+    let monthTxs: Transaction[]
+
+    if (selectedSet && selectedSet.size > 0) {
+      monthTxs = getReportTransactionsForMonth(transactions, installmentGroups, m, regime, {
+        hiddenCategoryIds,
+        selectedCategoryIds: selectedSet,
+      })
+      let expense = 0
+      let income = 0
+      for (const t of monthTxs) {
+        if (t.type === 'expense') expense += t.amount
+        if (t.type === 'income') income += t.amount
+      }
+      const netSavings = income - expense
+      const savingsRate = income > 0 ? (netSavings / income) * 100 : 0
+      summary = { income, expense, netSavings, savingsRate }
+    } else {
+      summary = calculateReportSummary(transactions, installmentGroups, m, regime, hiddenCategoryIds)
+      monthTxs = getReportTransactionsForMonth(transactions, installmentGroups, m, regime, {
+        hiddenCategoryIds,
+      })
+    }
 
     const expenseCount = monthTxs.filter(t => t.type === 'expense').length
     const incomeCount = monthTxs.filter(t => t.type === 'income').length

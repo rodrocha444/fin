@@ -1,4 +1,4 @@
-// src/components/organisms/MonthlyEvolutionCard.tsx — Gráfico de Barras de Evolução Temporal de Despesas e Receitas
+// src/components/organisms/MonthlyEvolutionCard.tsx — Gráfico de Barras de Evolução Temporal com Filtro por Categoria
 import { useState, useMemo } from 'react'
 import {
   TrendingDown,
@@ -8,6 +8,9 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Info,
+  Filter,
+  X,
+  Sparkles,
 } from 'lucide-react'
 import {
   format,
@@ -34,7 +37,7 @@ interface MonthlyEvolutionCardProps {
   currentActiveMonth: string
   regime: AccountingRegime
   hiddenCategoryIds?: Set<string>
-  onSelectMonthBar: (month: string, type: 'expense' | 'income') => void
+  onSelectMonthBar: (month: string, type: 'expense' | 'income', categoryId?: string) => void
   onMonthChange?: (month: string) => void
 }
 
@@ -47,8 +50,64 @@ export default function MonthlyEvolutionCard({
 }: MonthlyEvolutionCardProps) {
   const [rangePreset, setRangePreset] = useState<TimeRangePreset>('6m')
   const [viewMode, setViewMode] = useState<EvolutionViewMode>('expense')
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
 
-  const { transactions = [], installmentGroups = [] } = useFinancialData()
+  const {
+    transactions = [],
+    installmentGroups = [],
+    categories = [],
+    categoryGroups = [],
+  } = useFinancialData()
+
+  // Lista de categorias disponíveis para filtro no modo atual
+  const availableCategoryOptions = useMemo(() => {
+    const list: Array<{ id: string; name: string; groupName?: string }> = []
+    const hiddenSet = hiddenCategoryIds ?? new Set()
+
+    if (viewMode === 'expense') {
+      const expenseGroups = categoryGroups.filter(
+        g => g.type !== 'income' && g.name !== 'Faturas Atuais' && g.name !== 'Faturas de Cartão'
+      )
+      for (const group of expenseGroups) {
+        if (group.isHidden) continue
+        const groupCats = categories.filter(c => c.groupId === group.id && !c.isHidden)
+        for (const cat of groupCats) {
+          if (!cat.id || hiddenSet.has(cat.id)) continue
+          list.push({ id: cat.id, name: cat.name, groupName: group.name })
+        }
+      }
+      if (!hiddenSet.has('uncategorized_expense')) {
+        list.push({ id: 'uncategorized_expense', name: 'Sem Categoria (Despesas)' })
+      }
+    } else if (viewMode === 'income') {
+      const incomeGroups = categoryGroups.filter(g => g.type === 'income')
+      for (const group of incomeGroups) {
+        if (group.isHidden) continue
+        const groupCats = categories.filter(c => c.groupId === group.id && !c.isHidden)
+        for (const cat of groupCats) {
+          if (!cat.id || hiddenSet.has(cat.id)) continue
+          list.push({ id: cat.id, name: cat.name, groupName: group.name })
+        }
+      }
+      if (!hiddenSet.has('uncategorized_income')) {
+        list.push({ id: 'uncategorized_income', name: 'Sem Categoria (Receitas)' })
+      }
+    }
+
+    return list
+  }, [viewMode, categoryGroups, categories, hiddenCategoryIds])
+
+  // Nome da categoria atualmente selecionada
+  const selectedCategoryObj = useMemo(() => {
+    if (!selectedCategoryId) return null
+    if (selectedCategoryId === 'uncategorized_expense') {
+      return { id: 'uncategorized_expense', name: 'Sem Categoria' }
+    }
+    if (selectedCategoryId === 'uncategorized_income') {
+      return { id: 'uncategorized_income', name: 'Sem Categoria' }
+    }
+    return categories.find(c => c.id === selectedCategoryId) ?? null
+  }, [selectedCategoryId, categories])
 
   // Gera a lista de meses com base no preset selecionado
   const monthsList = useMemo(() => {
@@ -64,12 +123,10 @@ export default function MonthlyEvolutionCard({
     } else if (rangePreset === 'ytd') {
       start = startOfYear(referenceDate)
     } else {
-      // 'all'
       const accStart = getAccountingStartDate()
       start = accStart ? parseISO(`${accStart}-01`) : subMonths(referenceDate, 24)
     }
 
-    // Identifica o último mês que possui transações ou parcelas futuras
     let maxFuture = referenceDate
     for (const tx of transactions) {
       const d = new Date(tx.date)
@@ -85,16 +142,27 @@ export default function MonthlyEvolutionCard({
         list.push(mKey)
       }
       curr = addMonths(curr, 1)
-      if (list.length > 48) break // proteção de segurança
+      if (list.length > 48) break
     }
 
     return list
   }, [currentActiveMonth, rangePreset, transactions])
 
-  // Dados calculados para a série temporal
+  // Dados calculados para a série temporal (com suporte a filtro de categoria)
+  const selectedCategoryIds = useMemo(() => {
+    return selectedCategoryId ? [selectedCategoryId] : undefined
+  }, [selectedCategoryId])
+
   const evolutionData: MonthlyEvolutionItem[] = useMemo(() => {
-    return calculateMonthlyEvolution(transactions, installmentGroups, monthsList, regime, hiddenCategoryIds)
-  }, [transactions, installmentGroups, monthsList, regime, hiddenCategoryIds])
+    return calculateMonthlyEvolution(
+      transactions,
+      installmentGroups,
+      monthsList,
+      regime,
+      hiddenCategoryIds,
+      selectedCategoryIds
+    )
+  }, [transactions, installmentGroups, monthsList, regime, hiddenCategoryIds, selectedCategoryIds])
 
   // Estatísticas agregadas do período
   const stats = useMemo(() => {
@@ -116,7 +184,6 @@ export default function MonthlyEvolutionCard({
     const avgExpense = totalExpense / evolutionData.length
     const avgIncome = totalIncome / evolutionData.length
 
-    // Mês de menor gasto com valor > 0
     const nonZeroExpenses = evolutionData.filter(e => e.expense > 0)
     const minExpenseMonth =
       nonZeroExpenses.length > 0
@@ -158,10 +225,10 @@ export default function MonthlyEvolutionCard({
           const val = item.expenseChangePercent
           if (val < -0.1) {
             badge = `↓ ${Math.abs(val).toFixed(0)}%`
-            badgeVariant = 'success' // Gastou menos = bom!
+            badgeVariant = 'success'
           } else if (val > 0.1) {
             badge = `↑ ${val.toFixed(0)}%`
-            badgeVariant = 'danger' // Gastou mais = atenção!
+            badgeVariant = 'danger'
           } else {
             badge = '= 0%'
             badgeVariant = 'neutral'
@@ -171,8 +238,10 @@ export default function MonthlyEvolutionCard({
         return {
           id: item.month,
           label: item.label,
-          sublabel: item.month.split('-')[0].slice(2), // Ex: '26'
-          fullLabel: item.fullLabel,
+          sublabel: item.month.split('-')[0].slice(2),
+          fullLabel: selectedCategoryObj
+            ? `${selectedCategoryObj.name} · ${item.fullLabel}`
+            : item.fullLabel,
           value: item.expense,
           color: isSelected ? '#fb7185' : '#f43f5e',
           badge,
@@ -190,10 +259,10 @@ export default function MonthlyEvolutionCard({
           const val = item.incomeChangePercent
           if (val > 0.1) {
             badge = `↑ ${val.toFixed(0)}%`
-            badgeVariant = 'success' // Ganhou mais = bom!
+            badgeVariant = 'success'
           } else if (val < -0.1) {
             badge = `↓ ${Math.abs(val).toFixed(0)}%`
-            badgeVariant = 'danger' // Ganhou menos = atenção!
+            badgeVariant = 'danger'
           } else {
             badge = '= 0%'
             badgeVariant = 'neutral'
@@ -204,7 +273,9 @@ export default function MonthlyEvolutionCard({
           id: item.month,
           label: item.label,
           sublabel: item.month.split('-')[0].slice(2),
-          fullLabel: item.fullLabel,
+          fullLabel: selectedCategoryObj
+            ? `${selectedCategoryObj.name} · ${item.fullLabel}`
+            : item.fullLabel,
           value: item.income,
           color: isSelected ? '#34d399' : '#10b981',
           badge,
@@ -214,7 +285,6 @@ export default function MonthlyEvolutionCard({
         }
       }
 
-      // Modo Comparativo (Despesa vs Receita)
       return {
         id: item.month,
         label: item.label,
@@ -228,11 +298,11 @@ export default function MonthlyEvolutionCard({
         isActive: isSelected,
       }
     })
-  }, [evolutionData, viewMode, currentActiveMonth])
+  }, [evolutionData, viewMode, currentActiveMonth, selectedCategoryObj])
 
   return (
     <div className="card p-4 sm:p-5 bg-slate-900 border border-slate-800 space-y-4">
-      {/* ── Cabeçalho do Card com Filtros e Abas ──────────────────────────── */}
+      {/* ── Cabeçalho do Card com Filtros, Seletor de Categoria e Abas ───────── */}
       <div className="flex items-center justify-between gap-3 flex-wrap pb-3 border-b border-slate-800/80">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex-shrink-0">
@@ -240,20 +310,60 @@ export default function MonthlyEvolutionCard({
           </div>
           <div>
             <h2 className="text-sm sm:text-base font-bold text-slate-100 flex items-center gap-2">
-              <span>Evolução Temporal de Gastos e Receitas</span>
+              <span>
+                {selectedCategoryObj
+                  ? `Evolução: ${selectedCategoryObj.name}`
+                  : 'Evolução Temporal de Gastos e Receitas'}
+              </span>
             </h2>
             <p className="text-[11px] text-slate-500">
-              Acompanhe a trajetória de despesas e receitas ao longo dos meses
+              {selectedCategoryObj
+                ? `Análise histórica de lançamentos em ${selectedCategoryObj.name}`
+                : 'Acompanhe a trajetória de despesas e receitas ao longo dos meses'}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Seletor de Categoria */}
+          {viewMode !== 'comparative' && availableCategoryOptions.length > 0 && (
+            <div className="flex items-center gap-1.5 bg-slate-950/90 px-2.5 py-1.5 rounded-xl border border-slate-800 text-xs shadow-inner">
+              <Filter className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+              <select
+                value={selectedCategoryId}
+                onChange={e => setSelectedCategoryId(e.target.value)}
+                className="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer max-w-[140px] sm:max-w-[200px] truncate"
+              >
+                <option value="" className="bg-slate-900 text-slate-200">
+                  {viewMode === 'income' ? 'Todas as Receitas' : 'Todas as Despesas'}
+                </option>
+                {availableCategoryOptions.map(opt => (
+                  <option key={opt.id} value={opt.id} className="bg-slate-900 text-slate-200">
+                    {opt.groupName ? `${opt.name} · ${opt.groupName}` : opt.name}
+                  </option>
+                ))}
+              </select>
+              {selectedCategoryId && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategoryId('')}
+                  className="text-slate-400 hover:text-rose-400 p-0.5 transition-colors"
+                  title="Limpar seleção de categoria"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Seletor de Modo (Despesas, Receitas, Comparativo) */}
           <div className="flex items-center bg-slate-950/80 p-0.5 rounded-xl border border-slate-800 text-xs">
             <button
               type="button"
-              onClick={() => setViewMode('expense')}
+              onClick={() => {
+                setViewMode('expense')
+                setSelectedCategoryId('')
+              }}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-semibold transition-all ${
                 viewMode === 'expense'
                   ? 'bg-rose-600 text-white shadow-sm shadow-rose-600/30'
@@ -266,7 +376,10 @@ export default function MonthlyEvolutionCard({
 
             <button
               type="button"
-              onClick={() => setViewMode('income')}
+              onClick={() => {
+                setViewMode('income')
+                setSelectedCategoryId('')
+              }}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-semibold transition-all ${
                 viewMode === 'income'
                   ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/30'
@@ -279,7 +392,10 @@ export default function MonthlyEvolutionCard({
 
             <button
               type="button"
-              onClick={() => setViewMode('comparative')}
+              onClick={() => {
+                setViewMode('comparative')
+                setSelectedCategoryId('')
+              }}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-semibold transition-all ${
                 viewMode === 'comparative'
                   ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
@@ -341,11 +457,34 @@ export default function MonthlyEvolutionCard({
         </div>
       </div>
 
+      {/* ── Badge de Categoria Selecionada Ativa ─────────────────────────────── */}
+      {selectedCategoryObj && (
+        <div className="flex items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-indigo-950/30 border border-indigo-800/40 text-xs text-indigo-200 animate-in fade-in duration-150">
+          <div className="flex items-center gap-2 min-w-0">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+            <span className="truncate">
+              Exibindo histórico de <strong>{selectedCategoryObj.name}</strong> ao longo do tempo.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSelectedCategoryId('')}
+            className="btn-secondary text-[11px] py-1 px-2 text-indigo-300 hover:text-white flex-shrink-0"
+          >
+            Ver todas as categorias
+          </button>
+        </div>
+      )}
+
       {/* ── KPIs Rápidos de Destaque da Tendência ─────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
         <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80 space-y-1">
-          <span className="text-[10px] text-slate-500 font-medium block">
-            {viewMode === 'income' ? 'Média Mensal de Receitas' : 'Média Mensal de Gastos'}
+          <span className="text-[10px] text-slate-500 font-medium block truncate">
+            {selectedCategoryObj
+              ? `Média em ${selectedCategoryObj.name}`
+              : viewMode === 'income'
+              ? 'Média Mensal de Receitas'
+              : 'Média Mensal de Gastos'}
           </span>
           <p className="text-sm font-bold text-slate-200 tabular-nums">
             {formatCurrency(viewMode === 'income' ? stats.avgIncome : stats.avgExpense)}
@@ -353,8 +492,12 @@ export default function MonthlyEvolutionCard({
         </div>
 
         <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80 space-y-1">
-          <span className="text-[10px] text-slate-500 font-medium block">
-            {viewMode === 'income' ? 'Total Recebido no Período' : 'Total de Despesas no Período'}
+          <span className="text-[10px] text-slate-500 font-medium block truncate">
+            {selectedCategoryObj
+              ? `Total em ${selectedCategoryObj.name}`
+              : viewMode === 'income'
+              ? 'Total Recebido no Período'
+              : 'Total de Despesas no Período'}
           </span>
           <p
             className={`text-sm font-bold tabular-nums ${
@@ -366,7 +509,7 @@ export default function MonthlyEvolutionCard({
         </div>
 
         <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80 space-y-1">
-          <span className="text-[10px] text-slate-500 font-medium block">
+          <span className="text-[10px] text-slate-500 font-medium block truncate">
             {viewMode === 'income' ? 'Mês de Maior Receita' : 'Mês de Menor Gasto'}
           </span>
           <p className="text-sm font-bold text-indigo-300 truncate">
@@ -381,7 +524,7 @@ export default function MonthlyEvolutionCard({
         </div>
 
         <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80 space-y-1">
-          <span className="text-[10px] text-slate-500 font-medium block">
+          <span className="text-[10px] text-slate-500 font-medium block truncate">
             Tendência no Último Mês
           </span>
           <div className="flex items-center gap-1.5">
@@ -440,7 +583,7 @@ export default function MonthlyEvolutionCard({
           showAverageLine={viewMode !== 'comparative'}
           onBarClick={item => {
             const targetType = viewMode === 'income' ? 'income' : 'expense'
-            onSelectMonthBar(item.id, targetType)
+            onSelectMonthBar(item.id, targetType, selectedCategoryId || undefined)
             if (onMonthChange && item.id !== currentActiveMonth) {
               onMonthChange(item.id)
             }
@@ -454,7 +597,7 @@ export default function MonthlyEvolutionCard({
           <Info className="w-3.5 h-3.5 text-indigo-400" />
           <span>
             {regime === 'accrual'
-              ? 'Regime de Competência: compras parceladas contabilizadas integralmente no mês da compra.'
+              ? 'Regime de Competência: compras parceladas contabilizadas no mês da compra.'
               : 'Regime de Caixa: compras parceladas contabilizadas no mês da fatura.'}
           </span>
         </div>
