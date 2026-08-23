@@ -26,12 +26,14 @@ export interface InvoiceData {
 }
 
 /**
- * Retorna o 'YYYY-MM' da fatura aberta atual com base no dia de fechamento
+ * Retorna o 'YYYY-MM' da fatura aberta atual com base no dia de fechamento.
+ * Se o fechamento é dia 22, compras no dia 22 NÃO entram na fatura deste mês, mas sim na próxima.
+ * Portanto, a partir do dia de fechamento (inclusive), a fatura aberta já é a do mês seguinte.
  */
 export function getCurrentOpenInvoiceMonth(closingDay: number): string {
   const now = new Date()
   const today = now.getDate()
-  if (today <= closingDay) {
+  if (today < closingDay) {
     return format(now, 'yyyy-MM')
   } else {
     return format(addMonths(now, 1), 'yyyy-MM')
@@ -39,7 +41,18 @@ export function getCurrentOpenInvoiceMonth(closingDay: number): string {
 }
 
 /**
- * Calcula o ciclo (início, fechamento, vencimento, status) para um determinado mês e dia de fechamento
+ * Calcula o ciclo (início, fechamento, vencimento, status) para um determinado mês e dia de fechamento.
+ * Regra: Se o fechamento é dia 22, compras no dia 22 NÃO entram na fatura atual, mas sim na próxima.
+ * 
+ * Para a fatura com monthKey 'YYYY-MM':
+ * - Data de Início: dia `closingDay` do mês anterior às 00:00:00.000
+ * - Data de Fechamento: dia anterior ao `closingDay` deste mês às 23:59:59.999
+ * 
+ * Exemplo: fechamento dia 22 para a fatura de Agosto/2026:
+ * - Início: 22 de Julho de 2026 às 00:00:00.000
+ * - Fechamento: 21 de Agosto de 2026 às 23:59:59.999
+ * - Compras em 21/08 entram na fatura de Agosto.
+ * - Compras em 22/08 entram na fatura de Setembro (início 22/08 a 21/09).
  */
 export function getInvoiceCycle(
   monthKey: string,
@@ -51,23 +64,30 @@ export function getInvoiceCycle(
   const month = parseInt(monthStr, 10)
   const monthIdx = month - 1
 
-  // Fechamento no mês de referência
-  const maxDayInMonth = getDaysInMonth(new Date(year, monthIdx, 1))
-  const safeClosingDay = Math.min(closingDay, maxDayInMonth)
-  const closingDate = new Date(year, monthIdx, safeClosingDay, 23, 59, 59, 999)
+  const refMonthDate = new Date(year, monthIdx, 1)
+  const maxDayInMonth = getDaysInMonth(refMonthDate)
 
-  // Início = dia seguinte ao fechamento do mês anterior
-  const prevMonthDate = subMonths(new Date(year, monthIdx, 1), 1)
+  // Fechamento da fatura: dia anterior ao closingDay no mês de referência
+  let closingDate: Date
+  if (closingDay <= 1) {
+    // Se closingDay for 1, a fatura fecha no último dia do mês anterior
+    const prevMonthDate = subMonths(refMonthDate, 1)
+    const prevYear = prevMonthDate.getFullYear()
+    const prevMonthIdx = prevMonthDate.getMonth()
+    const lastDayPrevMonth = getDaysInMonth(prevMonthDate)
+    closingDate = new Date(prevYear, prevMonthIdx, lastDayPrevMonth, 23, 59, 59, 999)
+  } else {
+    const safeClosingDay = Math.min(closingDay - 1, maxDayInMonth)
+    closingDate = new Date(year, monthIdx, safeClosingDay, 23, 59, 59, 999)
+  }
+
+  // Início da fatura: dia closingDay do mês anterior
+  const prevMonthDate = subMonths(refMonthDate, 1)
   const prevYear = prevMonthDate.getFullYear()
   const prevMonthIdx = prevMonthDate.getMonth()
-  const maxDayPrevMonth = getDaysInMonth(new Date(prevYear, prevMonthIdx, 1))
-  
-  let startDate: Date
-  if (closingDay >= maxDayPrevMonth) {
-    startDate = new Date(year, monthIdx, 1, 0, 0, 0, 0)
-  } else {
-    startDate = new Date(prevYear, prevMonthIdx, closingDay + 1, 0, 0, 0, 0)
-  }
+  const maxDayPrevMonth = getDaysInMonth(prevMonthDate)
+  const safeStartDay = Math.min(closingDay, maxDayPrevMonth)
+  const startDate = new Date(prevYear, prevMonthIdx, safeStartDay, 0, 0, 0, 0)
 
   // Vencimento
   let dueDate: Date
@@ -76,7 +96,7 @@ export function getInvoiceCycle(
       const safeDueDay = Math.min(dueDay, maxDayInMonth)
       dueDate = new Date(year, monthIdx, safeDueDay, 23, 59, 59, 999)
     } else {
-      const nextMonthDate = addMonths(new Date(year, monthIdx, 1), 1)
+      const nextMonthDate = addMonths(refMonthDate, 1)
       const nextYear = nextMonthDate.getFullYear()
       const nextMonthIdx = nextMonthDate.getMonth()
       const safeDueDay = Math.min(dueDay, getDaysInMonth(nextMonthDate))
@@ -99,7 +119,7 @@ export function getInvoiceCycle(
 
   return {
     monthKey,
-    label: format(closingDate, 'MMM yyyy', { locale: ptBR }),
+    label: format(refMonthDate, 'MMM yyyy', { locale: ptBR }),
     startDate,
     closingDate,
     dueDate,
