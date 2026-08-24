@@ -5,7 +5,6 @@ import {
   Trash2,
   MoreHorizontal,
   ArrowDownLeft,
-  CreditCard,
   Layers,
   Receipt,
   TrendingUp,
@@ -568,10 +567,10 @@ export default function BudgetPage() {
             </button>
           </div>
 
-          {/* Grid detalhado de 4 cards (quando expandido) */}
+          {/* Grid detalhado de 3 cards (quando expandido) */}
           {isSummaryExpanded && (
             <div className="px-3 pb-3 sm:px-6 sm:pb-3 pt-1 animate-in fade-in duration-200">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5">
                 {summary.isFutureMonth ? (
                   <>
                     {/* Sobra Projetada do Mês Anterior */}
@@ -635,22 +634,6 @@ export default function BudgetPage() {
                     </div>
                   </>
                 )}
-
-                {/* Faturas do Mês */}
-                <div
-                  className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
-                  title="Faturas de cartão de crédito com vencimento neste mês (já provisionadas nas categorias orçadas)"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-rose-950/70 border border-rose-800/60 flex items-center justify-center text-rose-400 flex-shrink-0">
-                    <CreditCard className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[10px] text-slate-500 font-medium truncate">Faturas a Vencer</p>
-                    <p className="text-xs sm:text-sm font-bold text-rose-400 tabular-nums truncate">
-                      {(summary.currentInvoicesDue ?? 0) > 0 ? formatCurrency(summary.currentInvoicesDue ?? 0) : <span className="text-slate-600">—</span>}
-                    </p>
-                  </div>
-                </div>
 
                 {/* Orçado em Categorias */}
                 <div
