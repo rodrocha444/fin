@@ -134,7 +134,17 @@ export function calculateActivityByCategory(
     : undefined
 
   for (const tx of transactions) {
-    if (tx.type !== 'expense') continue
+    let isExpense = tx.type === 'expense'
+    if (tx.type === 'transfer' && accountMap) {
+      const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
+      const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
+      // Saída do orçamento para conta off-budget conta como despesa no orçamento
+      if (fromAcc?.type !== 'off_budget' && toAcc?.type === 'off_budget') {
+        isExpense = true
+      }
+    }
+    if (!isExpense) continue
+
     const effectiveMonth = accountMap
       ? getTransactionEffectiveMonth(tx, accountMap)
       : toMonthKey(new Date(tx.date))
@@ -146,10 +156,28 @@ export function calculateActivityByCategory(
   return map
 }
 
-export function calculateIncomeByCategory(transactions: Transaction[], month: string): Map<string, number> {
+export function calculateIncomeByCategory(
+  transactions: Transaction[],
+  month: string,
+  accounts?: Account[] | Map<string, Account>
+): Map<string, number> {
   const map = new Map<string, number>()
+  const accountMap = accounts
+    ? (Array.isArray(accounts) ? new Map(accounts.map(a => [a.id!, a])) : accounts)
+    : undefined
+
   for (const tx of transactions) {
-    if (tx.type !== 'income') continue
+    let isIncome = tx.type === 'income'
+    if (tx.type === 'transfer' && accountMap) {
+      const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
+      const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
+      // Entrada no orçamento vinda de conta off-budget conta como renda no orçamento
+      if (fromAcc?.type === 'off_budget' && toAcc?.type !== 'off_budget') {
+        isIncome = true
+      }
+    }
+    if (!isIncome) continue
+
     const txMonth = toMonthKey(new Date(tx.date))
     if (txMonth !== month) continue
     if (tx.categoryId) {
@@ -214,9 +242,10 @@ export function calculateIncomeBudgetRows(
   categoryGroups: CategoryGroup[],
   categories: Category[],
   budgetMonths: BudgetMonth[],
-  transactions: Transaction[]
+  transactions: Transaction[],
+  accounts?: Account[]
 ): IncomeGroupBudgetRow[] {
-  const incomeMap = calculateIncomeByCategory(transactions, month)
+  const incomeMap = calculateIncomeByCategory(transactions, month, accounts)
   const budgetByCategory = new Map(
     budgetMonths.filter(b => b.month === month).map(b => [b.categoryId, b])
   )
@@ -264,7 +293,6 @@ export function calculateBudgetSummary(
   
   // Filtra apenas transações dentro do período contábil ativo
   const validTxs = transactions.filter(t => !isDateBeforeAccountingStart(t.date))
-  const allIncomeTxs = validTxs.filter(t => t.type === 'income' && accountMap.get(t.accountId)?.type !== 'off_budget')
   const ccAccounts = accounts.filter(a => a.type === 'credit_card')
 
   const groupMap = new Map(categoryGroups.map(g => [g.id!, g]))
@@ -278,12 +306,19 @@ export function calculateBudgetSummary(
     }
   }
 
-  // Receitas do mês selecionado
+  // Receitas do mês selecionado (inclui transações de renda em contas on-budget e transferências de off-budget para on-budget)
   let totalIncome = 0
-  for (const tx of allIncomeTxs) {
+  for (const tx of validTxs) {
     const txMonth = toMonthKey(new Date(tx.date))
-    if (txMonth === month) {
+    if (txMonth !== month) continue
+    if (tx.type === 'income' && accountMap.get(tx.accountId)?.type !== 'off_budget') {
       totalIncome += tx.amount
+    } else if (tx.type === 'transfer') {
+      const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
+      const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
+      if (fromAcc?.type === 'off_budget' && toAcc?.type !== 'off_budget') {
+        totalIncome += tx.amount
+      }
     }
   }
 
@@ -313,15 +348,22 @@ export function calculateBudgetSummary(
       if (acc?.type === 'checking' && acc.isActive !== false) {
         totalIncomeFunds += Number(tx.amount || 0)
       }
+    } else if (tx.type === 'transfer') {
+      const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
+      const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
+      if (fromAcc?.type === 'off_budget' && toAcc?.type === 'checking' && toAcc?.isActive !== false) {
+        totalIncomeFunds += Number(tx.amount || 0)
+      }
     }
   }
 
-  // 3. Transferências líquidas para contas Off-Budget até o mês selecionado
+  // 3. Transferências líquidas para contas Off-Budget sem categoria até o mês selecionado
+  // (transferências categorizadas já entram na atividade e total orçado das categorias, sem duplicidade)
   let netOffBudgetTransfers = 0
   for (const tx of validTxs) {
     const txMonth = toMonthKey(new Date(tx.date))
     if (txMonth > month) continue
-    if (tx.type === 'transfer') {
+    if (tx.type === 'transfer' && !tx.categoryId) {
       const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
       const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
       if (fromAcc?.type === 'checking' && toAcc?.type === 'off_budget') {
@@ -370,14 +412,17 @@ export function calculateBudgetSummary(
         if (acc?.type === 'checking' && acc.isActive !== false) {
           totalIncomeFundsNow += Number(tx.amount || 0)
         }
-      }
-      if (tx.type === 'transfer') {
+      } else if (tx.type === 'transfer') {
         const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
         const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
-        if (fromAcc?.type === 'checking' && toAcc?.type === 'off_budget') {
-          netOffBudgetTransfersNow += Number(tx.amount || 0)
-        } else if (fromAcc?.type === 'off_budget' && toAcc?.type === 'checking') {
-          netOffBudgetTransfersNow -= Number(tx.amount || 0)
+        if (fromAcc?.type === 'off_budget' && toAcc?.type === 'checking' && toAcc?.isActive !== false) {
+          totalIncomeFundsNow += Number(tx.amount || 0)
+        } else if (!tx.categoryId) {
+          if (fromAcc?.type === 'checking' && toAcc?.type === 'off_budget') {
+            netOffBudgetTransfersNow += Number(tx.amount || 0)
+          } else if (fromAcc?.type === 'off_budget' && toAcc?.type === 'checking') {
+            netOffBudgetTransfersNow -= Number(tx.amount || 0)
+          }
         }
       }
     }
@@ -394,7 +439,7 @@ export function calculateBudgetSummary(
     const availableFundsNow = initialFunds + totalIncomeFundsNow - netOffBudgetTransfersNow - priorBudgetedToNow
     const toBeBudgetedNow = availableFundsNow - nowBudgeted
 
-    const nowIncomeMap = calculateIncomeByCategory(transactions, curMonth)
+    const nowIncomeMap = calculateIncomeByCategory(transactions, curMonth, accounts)
     const nowBudgetMap = new Map(
       budgetMonths.filter(b => b.month === curMonth).map(b => [b.categoryId, b])
     )
@@ -421,7 +466,7 @@ export function calculateBudgetSummary(
       const cursorBudgetMap = new Map(
         budgetMonths.filter(b => b.month === mCursor).map(b => [b.categoryId, b])
       )
-      const cursorIncomeMap = calculateIncomeByCategory(transactions, mCursor)
+      const cursorIncomeMap = calculateIncomeByCategory(transactions, mCursor, accounts)
 
       let cursorExpectedIncome = 0
       for (const cat of categories) {
@@ -465,7 +510,7 @@ export function calculateBudgetSummary(
 
   // ── MODO CAIXA REAL (MÊS ATUAL OU PASSADO) ─────────────────────
   // Previsão de receitas orçadas para o mês selecionado
-  const incomeMap = calculateIncomeByCategory(transactions, month)
+  const incomeMap = calculateIncomeByCategory(transactions, month, accounts)
   const budgetMap = new Map(
     budgetMonths.filter(b => b.month === month).map(b => [b.categoryId, b])
   )

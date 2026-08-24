@@ -19,9 +19,24 @@ export function computePendingIssues(
 ): PendingIssue[] {
   const issues: PendingIssue[] = []
 
-  // Regra 1: Transações sem categoria
+  const accountMap = accounts ? new Map(accounts.map(a => [a.id!, a])) : undefined
+
+  // Regra 1: Transações sem categoria (inclui receitas, despesas e transferências entre contas on-budget e off-budget)
   const uncategorized = transactions
-    .filter(t => t.type !== 'transfer' && !t.categoryId)
+    .filter(t => {
+      if (t.categoryId) return false
+      if (t.type === 'transfer') {
+        if (!accountMap) return false
+        const fromAcc = t.accountId ? accountMap.get(t.accountId) : undefined
+        const toAcc = t.transferAccountId ? accountMap.get(t.transferAccountId) : undefined
+        const isFromOnBudget = fromAcc && fromAcc.type !== 'off_budget'
+        const isToOnBudget = toAcc && toAcc.type !== 'off_budget'
+        // Transferência entre on-budget e off-budget afeta o orçamento e requer categoria
+        const affectsBudget = (isFromOnBudget && !isToOnBudget) || (!isFromOnBudget && isToOnBudget)
+        return affectsBudget
+      }
+      return true
+    })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
   if (uncategorized.length > 0) {
@@ -34,7 +49,7 @@ export function computePendingIssues(
       count: uncategorized.length,
       items: uncategorized.map(t => ({
         id: t.id!,
-        title: t.payee || (t.type === 'income' ? 'Renda' : 'Despesa'),
+        title: t.payee || (t.type === 'transfer' ? 'Transferência' : t.type === 'income' ? 'Renda' : 'Despesa'),
         subtitle: new Date(t.date).toLocaleDateString('pt-BR'),
         amount: t.amount,
         type: t.type,

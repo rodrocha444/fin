@@ -180,8 +180,6 @@ export default function TransactionForm({
   })
 
   const accounts = useAccounts() ?? []
-  const categoryType = mode === 'income' ? 'income' : 'expense'
-  const { categories, groups } = useCategoriesWithGroups(categoryType) ?? { categories: [], groups: [] }
 
   // Se for transferência com conta destino definida e nenhuma conta de origem, sugere a primeira checking
   const initialAccountId = transaction
@@ -214,6 +212,23 @@ export default function TransactionForm({
       installmentCount: transaction?.installmentTotal ?? 2,
     },
   })
+
+  const watchAccountId = watch('accountId')
+  const watchTransferAccountId = watch('transferAccountId')
+
+  const fromAccount = accounts.find(a => a.id === watchAccountId)
+  const toAccount = accounts.find(a => a.id === watchTransferAccountId)
+
+  const isFromOnBudget = fromAccount ? fromAccount.type !== 'off_budget' : true
+  const isToOnBudget = toAccount ? toAccount.type !== 'off_budget' : true
+
+  const isOffBudgetOutflow = mode === 'transfer' && isFromOnBudget && !isToOnBudget
+  const isOffBudgetInflow = mode === 'transfer' && !isFromOnBudget && isToOnBudget
+  const isTransferRequiringCategory = isOffBudgetOutflow || isOffBudgetInflow
+
+  const categoryType: 'expense' | 'income' =
+    mode === 'income' || isOffBudgetInflow ? 'income' : 'expense'
+  const { categories, groups } = useCategoriesWithGroups(categoryType) ?? { categories: [], groups: [] }
 
   // Popula os dados consolidados da compra parcelada completa (valor total, contagem, data de início)
   // ou da transação dividida (carrega todas as fatias de categorias e a soma total)
@@ -464,10 +479,72 @@ export default function TransactionForm({
           payee: finalPayee,
           notes: data.notes,
         })
-      } else if (isEdit && transaction?.id) {
-        if (mode !== 'transfer') {
-          await getOrCreatePayee(finalPayee, catId)
+      } else if (mode === 'transfer') {
+        if (!data.transferAccountId) {
+          await showAlert({
+            title: 'Conta destino obrigatória',
+            message: 'Selecione a conta de destino da transferência.',
+            variant: 'warning',
+          })
+          return
         }
+        if (data.accountId === data.transferAccountId) {
+          await showAlert({
+            title: 'Contas iguais',
+            message: 'A conta de origem e a conta de destino não podem ser a mesma.',
+            variant: 'warning',
+          })
+          return
+        }
+
+        if (isOffBudgetOutflow && !catId) {
+          await showAlert({
+            title: 'Categoria obrigatória',
+            message: 'Transferências para contas fora do orçamento retiram dinheiro do orçamento e exigem uma categoria de despesa.',
+            variant: 'warning',
+          })
+          return
+        }
+
+        if (isOffBudgetInflow && !catId) {
+          await showAlert({
+            title: 'Categoria obrigatória',
+            message: 'Transferências vindas de contas fora do orçamento adicionam dinheiro ao orçamento e exigem uma categoria de renda.',
+            variant: 'warning',
+          })
+          return
+        }
+
+        const transferCatId = isTransferRequiringCategory ? catId : undefined
+
+        if (isEdit && transaction?.id) {
+          await updateTransaction(transaction.id, {
+            accountId: data.accountId,
+            date: txDate,
+            amount: data.amount,
+            payee: finalPayee,
+            categoryId: transferCatId,
+            notes: data.notes,
+            type: 'transfer',
+            transferAccountId: data.transferAccountId,
+            splitGroupId: undefined,
+          })
+        } else {
+          await createTransfer({
+            fromAccountId: data.accountId,
+            toAccountId: data.transferAccountId,
+            amount: data.amount,
+            date: txDate,
+            notes: data.notes,
+            payee: finalPayee,
+            categoryId: transferCatId,
+          })
+        }
+        onSuccess?.()
+        onClose()
+        return
+      } else if (isEdit && transaction?.id) {
+        await getOrCreatePayee(finalPayee, catId)
         // Se estava em split e virou única, remove o split_group_id
         await updateTransaction(transaction.id, {
           accountId: data.accountId,
@@ -476,19 +553,9 @@ export default function TransactionForm({
           payee: finalPayee,
           categoryId: catId,
           notes: data.notes,
-          type: mode === 'income' ? 'income' : mode === 'transfer' ? 'transfer' : 'expense',
-          transferAccountId: mode === 'transfer' ? (data.transferAccountId || undefined) : undefined,
+          type: mode === 'income' ? 'income' : 'expense',
+          transferAccountId: undefined,
           splitGroupId: undefined,
-        })
-      } else if (mode === 'transfer') {
-        if (!data.transferAccountId) return
-        await createTransfer({
-          fromAccountId: data.accountId,
-          toAccountId: data.transferAccountId,
-          amount: data.amount,
-          date: txDate,
-          notes: data.notes,
-          payee: finalPayee,
         })
       } else if (isInstallment) {
         if (!data.installmentCount) return
@@ -843,7 +910,7 @@ export default function TransactionForm({
           )}
 
           {/* Categoria / Rateio em Múltiplas Categorias */}
-          {mode !== 'transfer' && (
+          {mode !== 'transfer' ? (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="label mb-0">Categoria</label>
@@ -999,6 +1066,66 @@ export default function TransactionForm({
                   </div>
                 </div>
               )}
+            </div>
+          ) : isTransferRequiringCategory ? (
+            <div className="space-y-2 p-3.5 bg-slate-950/60 rounded-2xl border border-sky-900/50 shadow-inner">
+              <div className="flex items-center justify-between">
+                <label className="label !mb-0 flex items-center gap-1.5 font-semibold text-slate-200">
+                  <span>Categoria</span>
+                  <span className="text-[10px] font-bold text-amber-300 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30">
+                    Obrigatória
+                  </span>
+                </label>
+                <span className={`text-[11px] font-semibold ${isOffBudgetOutflow ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  {isOffBudgetOutflow ? 'Saída do Orçamento' : 'Entrada no Orçamento'}
+                </span>
+              </div>
+
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                {isOffBudgetOutflow
+                  ? 'Esta transferência retira recursos do orçamento para uma conta externa (ex: investimentos). Selecione uma categoria de despesa para registrar o gasto.'
+                  : 'Esta transferência traz recursos externos para o orçamento. Selecione uma categoria de renda para registrar a entrada dos fundos.'}
+              </p>
+
+              <Controller
+                name="categoryId"
+                control={control}
+                render={({ field }) => (
+                  <select
+                    value={field.value ?? ''}
+                    onChange={e => field.onChange(e.target.value || undefined)}
+                    onBlur={field.onBlur}
+                    style={{ colorScheme: 'dark' }}
+                    className="input-base"
+                  >
+                    <option value="" className="text-slate-400 bg-slate-900">
+                      Selecione uma categoria…
+                    </option>
+                    {groupedCategories.map(({ group: g, cats }) => (
+                      <optgroup key={g.id} label={g.name} className="bg-slate-950 text-indigo-300 font-semibold">
+                        {cats.map(c => (
+                          <option key={c.id} value={c.id} className="bg-slate-900 text-slate-100 py-1">
+                            {c.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                )}
+              />
+            </div>
+          ) : (
+            <div className="p-3 bg-slate-900/40 rounded-xl border border-slate-800 text-xs text-slate-400 space-y-1">
+              <p className="font-medium text-slate-300">
+                {fromAccount?.type === 'off_budget' && toAccount?.type === 'off_budget'
+                  ? 'Transferência entre contas fora do orçamento'
+                  : 'Transferência interna no orçamento'}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                {fromAccount?.type === 'off_budget' && toAccount?.type === 'off_budget'
+                  ? 'Movimentação entre contas externas. Não altera o saldo do orçamento e não requer categoria.'
+                  : 'O dinheiro permanece dentro das contas do orçamento (ex: conta corrente ou pagamento de fatura). Não altera o total global do orçamento e não requer categoria.'}
+              </p>
             </div>
           )}
 

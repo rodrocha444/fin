@@ -103,7 +103,15 @@ export function calculateReportExpensesByCategory(
   const accountMap = accounts ? new Map(accounts.map(a => [a.id!, a])) : undefined
 
   for (const tx of transactions) {
-    if (tx.type !== 'expense') continue
+    let isExpense = tx.type === 'expense'
+    if (tx.type === 'transfer' && accountMap) {
+      const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
+      const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
+      if (fromAcc?.type !== 'off_budget' && toAcc?.type === 'off_budget') {
+        isExpense = true
+      }
+    }
+    if (!isExpense) continue
     if (tx.categoryId && hiddenSet?.has(tx.categoryId)) continue
     if (!tx.categoryId && hiddenSet?.has('uncategorized_expense')) continue
 
@@ -138,14 +146,24 @@ export function calculateReportIncomeByCategory(
   installmentGroups: InstallmentGroup[],
   month: string,
   regime: AccountingRegime,
-  hiddenCategoryIds?: Set<string> | string[]
+  hiddenCategoryIds?: Set<string> | string[],
+  accounts?: Account[]
 ): Map<string, number> {
   const map = new Map<string, number>()
   const groupMonthMap = buildGroupPurchaseMonthMap(transactions, installmentGroups)
   const hiddenSet = hiddenCategoryIds ? new Set(hiddenCategoryIds) : null
+  const accountMap = accounts ? new Map(accounts.map(a => [a.id!, a])) : undefined
 
   for (const tx of transactions) {
-    if (tx.type !== 'income') continue
+    let isIncome = tx.type === 'income'
+    if (tx.type === 'transfer' && accountMap) {
+      const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
+      const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
+      if (fromAcc?.type === 'off_budget' && toAcc?.type !== 'off_budget') {
+        isIncome = true
+      }
+    }
+    if (!isIncome) continue
     if (tx.categoryId && hiddenSet?.has(tx.categoryId)) continue
     if (
       !tx.categoryId &&
@@ -203,7 +221,8 @@ export function calculateReportSummary(
     installmentGroups,
     month,
     regime,
-    hiddenCategoryIds
+    hiddenCategoryIds,
+    accounts
   )
 
   let expense = 0
@@ -366,20 +385,33 @@ export function getReportTransactionsForMonth(
 
   return transactions
     .filter(tx => {
+      let isExp = tx.type === 'expense'
+      let isInc = tx.type === 'income'
+      if (tx.type === 'transfer' && accountMap) {
+        const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
+        const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
+        if (fromAcc?.type !== 'off_budget' && toAcc?.type === 'off_budget') {
+          isExp = true
+        } else if (fromAcc?.type === 'off_budget' && toAcc?.type !== 'off_budget') {
+          isInc = true
+        }
+      }
+
       // Filtragem por tipo
-      if (options?.type && tx.type !== options.type) return false
-      if (!options?.type && tx.type !== 'expense' && tx.type !== 'income') return false
+      if (options?.type === 'expense' && !isExp) return false
+      if (options?.type === 'income' && !isInc) return false
+      if (!options?.type && !isExp && !isInc) return false
 
       // Filtragem por categorias selecionadas especificamente no gráfico
       if (selectedSet && selectedSet.size > 0) {
         let matchesSelected = false
         if (tx.categoryId && selectedSet.has(tx.categoryId)) matchesSelected = true
-        if (!tx.categoryId && tx.type === 'expense' && selectedSet.has('uncategorized_expense')) {
+        if (!tx.categoryId && isExp && selectedSet.has('uncategorized_expense')) {
           matchesSelected = true
         }
         if (
           !tx.categoryId &&
-          tx.type === 'income' &&
+          isInc &&
           (selectedSet.has('uncategorized_income') || (tx.payee && selectedSet.has(`payee_${tx.payee}`)))
         ) {
           matchesSelected = true
@@ -390,12 +422,12 @@ export function getReportTransactionsForMonth(
       // Filtragem de categorias ocultas nos relatórios (se não for busca de categoria explícita)
       if (!options?.categoryId && !selectedSet && hiddenSet) {
         if (tx.categoryId && hiddenSet.has(tx.categoryId)) return false
-        if (!tx.categoryId && tx.type === 'expense' && hiddenSet.has('uncategorized_expense')) {
+        if (!tx.categoryId && isExp && hiddenSet.has('uncategorized_expense')) {
           return false
         }
         if (
           !tx.categoryId &&
-          tx.type === 'income' &&
+          isInc &&
           (hiddenSet.has('uncategorized_income') || (tx.payee && hiddenSet.has(`payee_${tx.payee}`)))
         ) {
           return false
@@ -422,9 +454,9 @@ export function getReportTransactionsForMonth(
       if (options?.categoryId) {
         const catId = options.categoryId
         if (catId === 'uncategorized_expense') {
-          if (tx.categoryId || tx.type !== 'expense') return false
+          if (tx.categoryId || !isExp) return false
         } else if (catId === 'uncategorized_income') {
-          if (tx.categoryId || tx.type !== 'income') return false
+          if (tx.categoryId || !isInc) return false
         } else if (catId.startsWith('payee_')) {
           const payeeName = catId.replace(/^payee_/, '')
           if (tx.payee !== payeeName) return false

@@ -136,6 +136,7 @@ export async function createTransfer(data: {
   date: Date
   amount: number
   payee?: string
+  categoryId?: string
   notes?: string
   cleared?: boolean
 }): Promise<string> {
@@ -145,6 +146,7 @@ export async function createTransfer(data: {
     id,
     accountId: data.fromAccountId,
     transferAccountId: data.toAccountId,
+    categoryId: data.categoryId,
     date: data.date,
     amount: data.amount,
     payee: data.payee || 'Transferência',

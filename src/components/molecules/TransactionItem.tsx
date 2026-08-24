@@ -92,9 +92,19 @@ export default function TransactionItem({
           </span>
           <span className="text-[10px] text-slate-600">·</span>
           {isTransfer ? (
-            <span className="text-[10px] text-sky-400/90 font-medium truncate">
-              {transferDetail}
-            </span>
+            <>
+              <span className="text-[10px] text-sky-400/90 font-medium truncate">
+                {transferDetail}
+              </span>
+              {categoryName && (
+                <>
+                  <span className="text-[10px] text-slate-600">·</span>
+                  <span className="text-[10px] text-slate-400 truncate font-medium">
+                    {categoryName}
+                  </span>
+                </>
+              )}
+            </>
           ) : (
             <>
               <span className="text-[10px] text-slate-500 truncate">
