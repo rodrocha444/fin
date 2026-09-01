@@ -103,7 +103,7 @@ export function calculateReportExpensesByCategory(
   const accountMap = accounts ? new Map(accounts.map(a => [a.id!, a])) : undefined
 
   for (const tx of transactions) {
-    let isExpense = tx.type === 'expense'
+    let isExpense = tx.type === 'expense' && (accountMap && tx.accountId ? accountMap.get(tx.accountId)?.type !== 'off_budget' : true)
     if (tx.type === 'transfer' && accountMap) {
       const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
       const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
@@ -155,7 +155,7 @@ export function calculateReportIncomeByCategory(
   const accountMap = accounts ? new Map(accounts.map(a => [a.id!, a])) : undefined
 
   for (const tx of transactions) {
-    let isIncome = tx.type === 'income'
+    let isIncome = tx.type === 'income' && (accountMap && tx.accountId ? accountMap.get(tx.accountId)?.type !== 'off_budget' : true)
     if (tx.type === 'transfer' && accountMap) {
       const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
       const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
@@ -385,8 +385,8 @@ export function getReportTransactionsForMonth(
 
   return transactions
     .filter(tx => {
-      let isExp = tx.type === 'expense'
-      let isInc = tx.type === 'income'
+      let isExp = tx.type === 'expense' && (accountMap && tx.accountId ? accountMap.get(tx.accountId)?.type !== 'off_budget' : true)
+      let isInc = tx.type === 'income' && (accountMap && tx.accountId ? accountMap.get(tx.accountId)?.type !== 'off_budget' : true)
       if (tx.type === 'transfer' && accountMap) {
         const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
         const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined

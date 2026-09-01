@@ -165,10 +165,11 @@ export default function ReportsPage() {
       installmentGroups,
       month,
       regime,
-      hiddenCategoryIds
+      hiddenCategoryIds,
+      accounts
     )
     return buildIncomePieItems(incomeMap, categoryGroups, categories)
-  }, [transactions, installmentGroups, month, regime, hiddenCategoryIds, categoryGroups, categories])
+  }, [transactions, installmentGroups, month, regime, hiddenCategoryIds, categoryGroups, categories, accounts])
 
   // ── 3. Abertura do Modal de Transações por Categoria ─────────────────────────
   const handleCategorySelect = (item: CategoryPieItem, type: 'expense' | 'income') => {

@@ -35,6 +35,13 @@ export function computePendingIssues(
         const affectsBudget = (isFromOnBudget && !isToOnBudget) || (!isFromOnBudget && isToOnBudget)
         return affectsBudget
       }
+      // Se for receita ou despesa em conta off-budget, NÃO requer categoria (apenas rastreamento patrimonial)
+      if (accountMap && t.accountId) {
+        const acc = accountMap.get(t.accountId)
+        if (acc?.type === 'off_budget') {
+          return false
+        }
+      }
       return true
     })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())

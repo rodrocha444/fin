@@ -366,9 +366,12 @@ export default function TransactionForm({
     try {
       saveLastTxDate(data.date)
       const txDate = new Date(data.date + 'T12:00:00')
+      const isOffBudgetAccount = fromAccount?.type === 'off_budget'
       const selectedCat = categories?.find(c => c.id === data.categoryId)
       const finalPayee = data.payee?.trim() || selectedCat?.name || (mode === 'transfer' ? 'Transferência' : mode === 'income' ? 'Renda' : 'Despesa')
-      const catId = data.categoryId && data.categoryId.trim() !== '' ? data.categoryId : undefined
+      const catId = (mode !== 'transfer' && isOffBudgetAccount)
+        ? undefined
+        : (data.categoryId && data.categoryId.trim() !== '' ? data.categoryId : undefined)
 
       const finalTotalAmount = isInstallment && installmentAmountType === 'parcel'
         ? parseFloat((data.amount * (data.installmentCount || 2)).toFixed(2))
@@ -911,22 +914,32 @@ export default function TransactionForm({
 
           {/* Categoria / Rateio em Múltiplas Categorias */}
           {mode !== 'transfer' ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="label mb-0">Categoria</label>
-                <button
-                  type="button"
-                  onClick={handleToggleSplit}
-                  className={`text-xs font-semibold px-2 py-1 rounded-lg border transition-all flex items-center gap-1.5 ${
-                    isSplit
-                      ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40 shadow-sm'
-                      : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200 hover:border-slate-600'
-                  }`}
-                >
-                  <Split className="w-3.5 h-3.5" />
-                  {isSplit ? 'Dividindo em categorias' : 'Dividir em categorias'}
-                </button>
+            fromAccount?.type === 'off_budget' ? (
+              <div className="p-3 bg-slate-900/50 rounded-xl border border-slate-800 text-xs text-slate-400 space-y-1">
+                <p className="font-medium text-slate-300">
+                  Conta Fora do Orçamento
+                </p>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Esta conta é de rastreamento patrimonial. Lançamentos aqui ajustam diretamente o saldo da conta e não utilizam categorias do orçamento operacional.
+                </p>
               </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="label mb-0">Categoria</label>
+                  <button
+                    type="button"
+                    onClick={handleToggleSplit}
+                    className={`text-xs font-semibold px-2 py-1 rounded-lg border transition-all flex items-center gap-1.5 ${
+                      isSplit
+                        ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40 shadow-sm'
+                        : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200 hover:border-slate-600'
+                    }`}
+                  >
+                    <Split className="w-3.5 h-3.5" />
+                    {isSplit ? 'Dividindo em categorias' : 'Dividir em categorias'}
+                  </button>
+                </div>
 
               {!isSplit ? (
                 <Controller
@@ -1067,6 +1080,7 @@ export default function TransactionForm({
                 </div>
               )}
             </div>
+            )
           ) : isTransferRequiringCategory ? (
             <div className="space-y-2 p-3.5 bg-slate-950/60 rounded-2xl border border-sky-900/50 shadow-inner">
               <div className="flex items-center justify-between">
