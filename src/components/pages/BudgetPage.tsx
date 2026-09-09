@@ -455,22 +455,35 @@ export default function BudgetPage() {
                   <div className="text-right min-w-0">
                     <div className="flex items-center justify-end gap-1.5 flex-wrap">
                       <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate">
-                        Disponível a Orçar
+                        {summary.isFutureMonth ? 'Projeção a Orçar' : 'Disponível a Orçar'}
                       </span>
+                      {/* Carryover do mês atual para meses futuros */}
+                      {summary.isFutureMonth && (summary.rolloverFromPreviousMonth ?? 0) !== 0 && (
+                        <span
+                          className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60 flex-shrink-0"
+                          title={`Sobra real do mês atual que seria levada para este mês: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
+                        >
+                          Carryover: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
+                        </span>
+                      )}
+                      {/* Fatura CC descontada */}
                       {(summary.currentInvoicesDue ?? 0) > 0.005 && (
                         <span
                           className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-800/60 flex-shrink-0"
-                          title={`Fatura(s) de cartão de crédito que fecha(m) este mês: ${formatCurrency(summary.currentInvoicesDue!)} já descontado do valor a orçar`}
+                          title={`Fatura(s) de cartão que fecha(m) neste mês: ${formatCurrency(summary.currentInvoicesDue!)} já descontado do valor a orçar`}
                         >
                           −{formatCurrency(summary.currentInvoicesDue!)} faturas
                         </span>
                       )}
+                      {/* Projeção com renda prevista */}
                       {(summary.pendingExpectedIncome ?? 0) > 0 && (
                         <span
                           className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60 flex-shrink-0"
-                          title="Saldo projetado a orçar considerando receitas previstas que faltam entrar no mês"
+                          title={summary.isFutureMonth
+                            ? `Se toda a renda planejada para os meses até aqui entrar, o valor a orçar seria ${formatCurrency(summary.projectedToBeBudgeted)}`
+                            : 'Saldo projetado incluindo receitas previstas que ainda não entraram'}
                         >
-                          Previsto: {formatCurrency(summary.projectedToBeBudgeted)}
+                          {summary.isFutureMonth ? 'Otimista:' : 'Previsto:'} {formatCurrency(summary.projectedToBeBudgeted)}
                         </span>
                       )}
                     </div>
@@ -484,6 +497,7 @@ export default function BudgetPage() {
                 </div>
               </div>
             )}
+
 
             {/* Direita: Status de Sync + Menu de Ações (Unificado para todas as telas) */}
             <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
@@ -554,12 +568,20 @@ export default function BudgetPage() {
                 <div className="text-left min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                      Disponível a Orçar
+                      {summary.isFutureMonth ? 'Projeção a Orçar' : 'Disponível a Orçar'}
                     </span>
+                    {summary.isFutureMonth && (summary.rolloverFromPreviousMonth ?? 0) !== 0 && (
+                      <span
+                        className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60"
+                        title={`Sobra real do mês atual: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
+                      >
+                        Carryover: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
+                      </span>
+                    )}
                     {(summary.currentInvoicesDue ?? 0) > 0.005 && (
                       <span
                         className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-800/60"
-                        title={`Fatura(s) de cartão que fecha(m) este mês: ${formatCurrency(summary.currentInvoicesDue!)} descontado`}
+                        title={`Fatura(s) de cartão que fecha(m) neste mês: ${formatCurrency(summary.currentInvoicesDue!)} descontado`}
                       >
                         −{formatCurrency(summary.currentInvoicesDue!)} faturas
                       </span>
@@ -567,14 +589,18 @@ export default function BudgetPage() {
                     {(summary.pendingExpectedIncome ?? 0) > 0 && (
                       <span
                         className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60"
-                        title="Saldo projetado a orçar considerando receitas previstas que faltam entrar no mês"
+                        title={summary.isFutureMonth
+                          ? `Se toda a renda planejada entrar, o valor seria ${formatCurrency(summary.projectedToBeBudgeted)}`
+                          : 'Saldo projetado incluindo receitas previstas'}
                       >
-                        Previsto: {formatCurrency(summary.projectedToBeBudgeted)}
+                        {summary.isFutureMonth ? 'Otimista:' : 'Previsto:'} {formatCurrency(summary.projectedToBeBudgeted)}
                       </span>
                     )}
                   </div>
                   <p className="text-[10px] text-slate-500 truncate">
-                    {summary.toBeBudgeted > 0.005
+                    {summary.isFutureMonth
+                      ? `Carryover: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)} · Pessimista (sem renda futura)`
+                      : summary.toBeBudgeted > 0.005
                       ? 'Disponível para distribuir'
                       : summary.toBeBudgeted < -0.005
                       ? 'Orçamento excedeu receitas'
