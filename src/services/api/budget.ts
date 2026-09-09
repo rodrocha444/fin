@@ -3,8 +3,7 @@ import { rowToTransaction, rowToBudgetMonth, rowToAccount, rowToInstallmentGroup
 import { createId } from '@/utils/id'
 import { format, subMonths } from 'date-fns'
 import { isInitialSetupCategory, currentMonth } from '@/utils/format'
-import { getInvoiceForBudgetMonth, getTransactionEffectiveMonth } from '@/utils/invoices'
-import { getPaidInvoicesMap } from '@/services/api/invoices'
+
 import { isDateBeforeAccountingStart, isMonthBeforeAccountingStart } from '@/utils/accountingPeriod'
 import { buildGroupPurchaseMonthMap, type AccountingRegime } from '@/utils/accountingRegime'
 import { notifyDataChanged } from './events'
@@ -183,10 +182,57 @@ export async function coverMonthSpent(
   notifyDataChanged('budget_months', 'upsert')
 }
 
-/**
- * Funções puras de cálculo de orçamento (instantâneas com dados em memória)
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// Funções puras de cálculo (em memória)
+// ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Determina o mês orçamentário efetivo de uma transação de despesa.
+ *
+ * - Regime de Caixa (cash):
+ *   • Conta corrente → mês da data da transação
+ *   • Cartão de crédito → mês de **fechamento da fatura** em que a compra caiu
+ *     (ex: fechamento dia 22; compra em 15/ago → fatura de ago; compra em 23/ago → fatura de set)
+ *
+ * - Regime de Competência (accrual):
+ *   • Parcelas → mês de início do grupo
+ *   • Outros → mês da data da transação
+ */
+function getExpenseEffectiveMonth(
+  tx: Transaction,
+  accountMap: Map<string, Account>,
+  regime: AccountingRegime,
+  groupMonthMap?: Map<string, string>
+): string | null {
+  const txDate = new Date(tx.date)
+
+  if (regime === 'accrual') {
+    if (tx.installmentGroupId && groupMonthMap) {
+      return groupMonthMap.get(tx.installmentGroupId) ?? null
+    }
+    return toMonthKey(txDate)
+  }
+
+  // Regime de Caixa
+  const account = tx.accountId ? accountMap.get(tx.accountId) : undefined
+  if (account?.type === 'credit_card' && account.statementClosingDay) {
+    // A fatura em que a compra cai é determinada pelo dia de fechamento:
+    // compra no dia < closingDay → fatura do próprio mês da compra
+    // compra no dia >= closingDay → fatura do mês seguinte
+    const closingDay = account.statementClosingDay
+    const txDay = txDate.getDate()
+    const cycleMonthDate = txDay < closingDay ? txDate : new Date(txDate.getFullYear(), txDate.getMonth() + 1, 1)
+    // Mês orçamentário = mês do fechamento da fatura (não o de vencimento)
+    return toMonthKey(cycleMonthDate)
+  }
+
+  return toMonthKey(txDate)
+}
+
+/**
+ * Calcula o mapa de atividade (gastos) por categoria para o mês selecionado.
+ * Considera o regime contábil e o tipo de conta (cartão usa dia de fechamento).
+ */
 export function calculateActivityByCategory(
   transactions: Transaction[],
   month: string,
@@ -197,7 +243,7 @@ export function calculateActivityByCategory(
   const map = new Map<string, number>()
   const accountMap = accounts
     ? (Array.isArray(accounts) ? new Map(accounts.map(a => [a.id!, a])) : accounts)
-    : undefined
+    : new Map<string, Account>()
   const groupMonthMap = regime === 'accrual'
     ? buildGroupPurchaseMonthMap(transactions, installmentGroups)
     : undefined
@@ -205,71 +251,65 @@ export function calculateActivityByCategory(
   for (const tx of transactions) {
     if (isDateBeforeAccountingStart(tx.date)) continue
 
-    let isExpense = tx.type === 'expense' && (accountMap && tx.accountId ? accountMap.get(tx.accountId)?.type !== 'off_budget' : true)
-    if (tx.type === 'transfer' && accountMap) {
+    let isExpense = false
+    if (tx.type === 'expense') {
+      const acc = tx.accountId ? accountMap.get(tx.accountId) : undefined
+      isExpense = acc?.type !== 'off_budget'
+    } else if (tx.type === 'transfer') {
       const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
       const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
-      // Saída do orçamento para conta off-budget conta como despesa no orçamento
-      if (fromAcc?.type !== 'off_budget' && toAcc?.type === 'off_budget') {
-        isExpense = true
-      }
+      // On-budget → off-budget: conta como despesa (saída do orçamento)
+      isExpense = fromAcc?.type !== 'off_budget' && toAcc?.type === 'off_budget'
     }
     if (!isExpense) continue
 
-    if (regime === 'accrual') {
-      if (tx.installmentGroupId) {
-        const purchaseMonth = groupMonthMap?.get(tx.installmentGroupId)
-        if (purchaseMonth !== month) continue
-      } else {
-        const txMonth = toMonthKey(new Date(tx.date))
-        if (txMonth !== month) continue
-      }
-    } else {
-      const effectiveMonth = accountMap
-        ? getTransactionEffectiveMonth(tx, accountMap)
-        : toMonthKey(new Date(tx.date))
-      if (effectiveMonth !== month) continue
-    }
+    const effectiveMonth = getExpenseEffectiveMonth(tx, accountMap, regime, groupMonthMap)
+    if (effectiveMonth !== month) continue
 
     if (tx.categoryId) {
-      const current = map.get(tx.categoryId) || 0
-      const updated = Math.round((current + Number(tx.amount || 0)) * 100) / 100
+      const current = map.get(tx.categoryId) ?? 0
+      const updated = Math.round((current + tx.amount) * 100) / 100
       map.set(tx.categoryId, Math.abs(updated) < 0.005 ? 0 : updated)
     }
   }
   return map
 }
 
+/**
+ * Calcula o mapa de receitas recebidas por categoria para o mês selecionado.
+ * Receitas sempre usam a data real da transação (sem ajuste de fatura).
+ */
 export function calculateIncomeByCategory(
   transactions: Transaction[],
   month: string,
-  accounts?: Account[] | Map<string, Account>,
-  _regime: AccountingRegime = 'cash'
+  accounts?: Account[] | Map<string, Account>
 ): Map<string, number> {
   const map = new Map<string, number>()
   const accountMap = accounts
     ? (Array.isArray(accounts) ? new Map(accounts.map(a => [a.id!, a])) : accounts)
-    : undefined
+    : new Map<string, Account>()
 
   for (const tx of transactions) {
     if (isDateBeforeAccountingStart(tx.date)) continue
 
-    let isIncome = tx.type === 'income' && (accountMap && tx.accountId ? accountMap.get(tx.accountId)?.type !== 'off_budget' : true)
-    if (tx.type === 'transfer' && accountMap) {
+    let isIncome = false
+    if (tx.type === 'income') {
+      const acc = tx.accountId ? accountMap.get(tx.accountId) : undefined
+      isIncome = acc?.type !== 'off_budget'
+    } else if (tx.type === 'transfer') {
       const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
       const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
-      // Entrada no orçamento vinda de conta off-budget conta como renda no orçamento
-      if (fromAcc?.type === 'off_budget' && toAcc?.type !== 'off_budget') {
-        isIncome = true
-      }
+      // Off-budget → on-budget: conta como receita (entrada no orçamento)
+      isIncome = fromAcc?.type === 'off_budget' && toAcc?.type !== 'off_budget'
     }
     if (!isIncome) continue
 
     const txMonth = toMonthKey(new Date(tx.date))
     if (txMonth !== month) continue
+
     if (tx.categoryId) {
-      const current = map.get(tx.categoryId) || 0
-      const updated = Math.round((current + Number(tx.amount || 0)) * 100) / 100
+      const current = map.get(tx.categoryId) ?? 0
+      const updated = Math.round((current + tx.amount) * 100) / 100
       map.set(tx.categoryId, Math.abs(updated) < 0.005 ? 0 : updated)
     }
   }
@@ -293,10 +333,7 @@ export function calculateBudgetRows(
       .map(b => [b.categoryId, b])
   )
 
-  const expenseGroups = categoryGroups.filter(
-    g => g.type !== 'income'
-  )
-
+  const expenseGroups = categoryGroups.filter(g => g.type !== 'income')
   const rows: GroupBudgetRow[] = []
 
   for (const group of expenseGroups) {
@@ -314,8 +351,7 @@ export function calculateBudgetRows(
       const budgeted = Math.round(Number(budgetRec?.budgeted ?? 0) * 100) / 100
       const activity = Math.round(Number(activityMap.get(cat.id) ?? 0) * 100) / 100
       const rawAvailable = budgeted - activity
-      const roundedAvailable = Math.round(rawAvailable * 100) / 100
-      const available = Math.abs(roundedAvailable) < 0.005 ? 0 : roundedAvailable
+      const available = Math.abs(rawAvailable) < 0.005 ? 0 : Math.round(rawAvailable * 100) / 100
 
       catRows.push({
         category: cat,
@@ -325,20 +361,16 @@ export function calculateBudgetRows(
       })
     }
 
-    const rawTotalBudgeted = catRows.reduce((s, r) => s + r.budgeted, 0)
-    const rawTotalActivity = catRows.reduce((s, r) => s + r.activity, 0)
-    const rawTotalAvailable = catRows.reduce((s, r) => s + r.available, 0)
-
-    const roundedTotalBudgeted = Math.round(rawTotalBudgeted * 100) / 100
-    const roundedTotalActivity = Math.round(rawTotalActivity * 100) / 100
-    const roundedTotalAvailable = Math.round(rawTotalAvailable * 100) / 100
+    const totalBudgeted = Math.round(catRows.reduce((s, r) => s + r.budgeted, 0) * 100) / 100
+    const totalActivity = Math.round(catRows.reduce((s, r) => s + r.activity, 0) * 100) / 100
+    const totalAvailable = Math.round(catRows.reduce((s, r) => s + r.available, 0) * 100) / 100
 
     rows.push({
       group,
       categories: catRows,
-      totalBudgeted: Math.abs(roundedTotalBudgeted) < 0.005 ? 0 : roundedTotalBudgeted,
-      totalActivity: Math.abs(roundedTotalActivity) < 0.005 ? 0 : roundedTotalActivity,
-      totalAvailable: Math.abs(roundedTotalAvailable) < 0.005 ? 0 : roundedTotalAvailable,
+      totalBudgeted: Math.abs(totalBudgeted) < 0.005 ? 0 : totalBudgeted,
+      totalActivity: Math.abs(totalActivity) < 0.005 ? 0 : totalActivity,
+      totalAvailable: Math.abs(totalAvailable) < 0.005 ? 0 : totalAvailable,
     })
   }
 
@@ -354,7 +386,7 @@ export function calculateIncomeBudgetRows(
   accounts?: Account[],
   regime: AccountingRegime = 'cash'
 ): IncomeGroupBudgetRow[] {
-  const incomeMap = calculateIncomeByCategory(transactions, month, accounts, regime)
+  const incomeMap = calculateIncomeByCategory(transactions, month, accounts)
   const budgetByCategory = new Map(
     budgetMonths
       .filter(b => b.month === month && (b.budgetType || 'cash') === regime)
@@ -376,8 +408,7 @@ export function calculateIncomeBudgetRows(
       const expected = Math.round(Number(budgetRec?.budgeted ?? 0) * 100) / 100
       const received = Math.round(Number(incomeMap.get(cat.id) ?? 0) * 100) / 100
       const rawDiff = expected - received
-      const roundedDiff = Math.round(rawDiff * 100) / 100
-      const difference = Math.abs(roundedDiff) < 0.005 ? 0 : roundedDiff
+      const difference = Math.abs(rawDiff) < 0.005 ? 0 : Math.round(rawDiff * 100) / 100
 
       catRows.push({
         category: cat,
@@ -387,26 +418,37 @@ export function calculateIncomeBudgetRows(
       })
     }
 
-    const rawTotalExpected = catRows.reduce((s, r) => s + r.expected, 0)
-    const rawTotalReceived = catRows.reduce((s, r) => s + r.received, 0)
-    const rawTotalDiff = catRows.reduce((s, r) => s + r.difference, 0)
-
-    const roundedTotalExpected = Math.round(rawTotalExpected * 100) / 100
-    const roundedTotalReceived = Math.round(rawTotalReceived * 100) / 100
-    const roundedTotalDiff = Math.round(rawTotalDiff * 100) / 100
+    const totalExpected = Math.round(catRows.reduce((s, r) => s + r.expected, 0) * 100) / 100
+    const totalReceived = Math.round(catRows.reduce((s, r) => s + r.received, 0) * 100) / 100
+    const totalDiff = Math.round(catRows.reduce((s, r) => s + r.difference, 0) * 100) / 100
 
     rows.push({
       group,
       categories: catRows,
-      totalExpected: Math.abs(roundedTotalExpected) < 0.005 ? 0 : roundedTotalExpected,
-      totalReceived: Math.abs(roundedTotalReceived) < 0.005 ? 0 : roundedTotalReceived,
-      totalDifference: Math.abs(roundedTotalDiff) < 0.005 ? 0 : roundedTotalDiff,
+      totalExpected: Math.abs(totalExpected) < 0.005 ? 0 : totalExpected,
+      totalReceived: Math.abs(totalReceived) < 0.005 ? 0 : totalReceived,
+      totalDifference: Math.abs(totalDiff) < 0.005 ? 0 : totalDiff,
     })
   }
 
   return rows
 }
 
+/**
+ * Calcula o resumo "Disponível a Orçar" (TBB — To Be Budgeted) para o mês.
+ *
+ * Lógica Zero-Based Budget:
+ * TBB = Σ(saldo real das contas checking on-budget) − Σ(disponível positivo em todas as categorias de despesa)
+ *
+ * • Saldo de contas credit_card NÃO entra no TBB: o cartão é financiado pelo banco,
+ *   não por dinheiro próprio. O pagamento da fatura (checking → credit_card) é
+ *   que transfere dinheiro real para cobrir os gastos.
+ * • Faturas de cartão aparecem como "Gasto" nas categorias no mês em que a fatura fecha,
+ *   reduzindo o "Disponível" dessas categorias — o que naturalmente reduz o TBB.
+ *
+ * Receitas previstas (orçadas mas não recebidas) são exibidas como projeção
+ * mas não aumentam o TBB real.
+ */
 export function calculateBudgetSummary(
   month: string,
   accounts: Account[],
@@ -415,16 +457,16 @@ export function calculateBudgetSummary(
   budgetMonths: BudgetMonth[],
   transactions: Transaction[],
   regime: AccountingRegime = 'cash',
-  _installmentGroups: InstallmentGroup[] = []
+  installmentGroups: InstallmentGroup[] = []
 ): BudgetSummary {
   const accountMap = new Map(accounts.map(a => [a.id!, a]))
-  
-  // Filtra apenas transações dentro do período contábil ativo
+
+  // Filtra transações dentro do período contábil ativo
   const validTxs = transactions.filter(t => !isDateBeforeAccountingStart(t.date))
-  const ccAccounts = accounts.filter(a => a.type === 'credit_card')
 
   const groupMap = new Map(categoryGroups.map(g => [g.id!, g]))
 
+  // Categorias que não participam do orçamento de despesas (income e setup iniciais)
   const ignoredCategoryIds = new Set<string>()
   for (const cat of categories) {
     if (!cat.id) continue
@@ -434,13 +476,17 @@ export function calculateBudgetSummary(
     }
   }
 
-  // Receitas recebidas/realizadas única e exclusivamente no mês selecionado
+  const curMonth = currentMonth()
+  const isFutureMonth = month > curMonth
+
+  // ── 1. Receitas recebidas no mês selecionado ─────────────────────────────
   let totalIncome = 0
   for (const tx of validTxs) {
     const txMonth = toMonthKey(new Date(tx.date))
     if (txMonth !== month) continue
-    if (tx.type === 'income' && accountMap.get(tx.accountId)?.type !== 'off_budget') {
-      totalIncome += tx.amount
+    if (tx.type === 'income') {
+      const acc = accountMap.get(tx.accountId)
+      if (acc?.type !== 'off_budget') totalIncome += tx.amount
     } else if (tx.type === 'transfer') {
       const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
       const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
@@ -450,7 +496,7 @@ export function calculateBudgetSummary(
     }
   }
 
-  // Total orçado e gastos excedentes (overspent) única e exclusivamente no mês selecionado para o regime ativo
+  // ── 2. Total orçado nas categorias de despesa no mês selecionado ─────────
   const expenseBudgetMap = new Map<string, number>()
   let totalBudgeted = 0
   for (const b of budgetMonths) {
@@ -458,25 +504,19 @@ export function calculateBudgetSummary(
     if (isMonthBeforeAccountingStart(b.month)) continue
     if ((b.budgetType || 'cash') !== regime) continue
     if (ignoredCategoryIds.has(b.categoryId)) continue
-    const val = Number(b.budgeted || 0)
+    const val = Number(b.budgeted ?? 0)
     expenseBudgetMap.set(b.categoryId, val)
     totalBudgeted += val
   }
 
-  // Atividade/gastos por categoria no mês selecionado
-  const activityMap = calculateActivityByCategory(transactions, month, accounts, regime, _installmentGroups)
-  let totalOverspent = 0
-  for (const [catId, spent] of activityMap.entries()) {
-    if (ignoredCategoryIds.has(catId)) continue
-    const budgeted = expenseBudgetMap.get(catId) ?? 0
-    if (spent > budgeted + 0.005) {
-      totalOverspent += (spent - budgeted)
-    }
-  }
+  // ── 3. Atividade/gastos por categoria ────────────────────────────────────
+  const activityMap = calculateActivityByCategory(
+    transactions, month, accounts, regime, installmentGroups
+  )
 
-  // Receitas orçadas/esperadas única e exclusivamente para o mês selecionado
-  const incomeMap = calculateIncomeByCategory(transactions, month, accounts, regime)
-  const budgetMap = new Map(
+  // ── 4. Receitas previstas (orçadas) para o mês selecionado ───────────────
+  const incomeMap = calculateIncomeByCategory(transactions, month, accounts)
+  const incomeBudgetMap = new Map(
     budgetMonths
       .filter(b => b.month === month && (b.budgetType || 'cash') === regime)
       .map(b => [b.categoryId, b])
@@ -488,48 +528,39 @@ export function calculateBudgetSummary(
     if (!cat.id) continue
     const grp = groupMap.get(cat.groupId)
     if (grp?.type !== 'income') continue
-    const expected = budgetMap.get(cat.id)?.budgeted ?? 0
+    const expected = Number(incomeBudgetMap.get(cat.id)?.budgeted ?? 0)
     const received = incomeMap.get(cat.id) ?? 0
     totalExpectedIncome += expected
     if (expected > received) {
-      pendingExpectedIncome += (expected - received)
+      pendingExpectedIncome += expected - received
     }
   }
 
-  const paidMap = getPaidInvoicesMap()
-
-  // Faturas de cartão de crédito a vencer no mês selecionado (apenas as NÃO pagas)
-  let currentInvoicesDue = 0
-  for (const acc of ccAccounts) {
-    if (!acc.id || !acc.statementClosingDay) continue
-    const accTxs = transactions.filter(t => t.accountId === acc.id)
-    const currInvoiceAmt = getInvoiceForBudgetMonth(accTxs, acc, month, paidMap)
-    currentInvoicesDue += currInvoiceAmt
-  }
-
-  const curMonth = currentMonth()
-  const isFutureMonth = month > curMonth
-
-  // 1. Saldo em dinheiro de todas as contas On-Budget (checking ativas)
-  let totalOnBudgetFunds = 0
+  // ── 5. Saldo real das contas on-budget (apenas checking) ─────────────────
+  //    Contas credit_card são financiadas pelo banco — o dinheiro real que cobre
+  //    as compras no cartão só existe quando o usuário paga a fatura via checking.
+  //    Portanto, apenas o saldo em checking representa dinheiro disponível real.
+  let checkingBalance = 0
   for (const acc of accounts) {
-    if (acc.type === 'checking' && acc.isActive !== false && acc.id) {
-      let bal = Number(acc.initialBalance || 0)
-      for (const tx of validTxs) {
-        if (tx.accountId === acc.id) {
-          if (tx.type === 'income') bal += Number(tx.amount || 0)
-          else if (tx.type === 'expense' || tx.type === 'transfer') bal -= Number(tx.amount || 0)
-        }
-        if (tx.transferAccountId === acc.id && tx.type === 'transfer') {
-          bal += Number(tx.amount || 0)
-        }
+    if (acc.type !== 'checking' || acc.isActive === false || !acc.id) continue
+    let bal = Number(acc.initialBalance ?? 0)
+    for (const tx of validTxs) {
+      if (tx.accountId === acc.id) {
+        if (tx.type === 'income') bal += tx.amount
+        else if (tx.type === 'expense' || tx.type === 'transfer') bal -= tx.amount
       }
-      totalOnBudgetFunds += bal
+      if (tx.transferAccountId === acc.id && tx.type === 'transfer') {
+        bal += tx.amount
+      }
     }
+    checkingBalance += bal
   }
 
-  // 2. Total sobrando/disponível nas categorias de despesa do mês selecionado
-  let totalAvailableInCategories = 0
+  // ── 6. Total disponível positivo nas categorias de despesa ───────────────
+  //    Apenas valores positivos contam: categorias no negativo já indicam
+  //    que o usuário gastou mais do que orçou (overspent), o que já está
+  //    refletido no saldo bancário reduzido.
+  let totalPositiveAvailable = 0
   for (const cat of categories) {
     if (!cat.id) continue
     const grp = groupMap.get(cat.groupId)
@@ -537,45 +568,36 @@ export function calculateBudgetSummary(
     const budgeted = expenseBudgetMap.get(cat.id) ?? 0
     const spent = activityMap.get(cat.id) ?? 0
     const available = budgeted - spent
-    if (available > 0) {
-      totalAvailableInCategories += available
+    if (available > 0.005) {
+      totalPositiveAvailable += available
     }
   }
 
-  // 3. Disponível a Orçar: Saldo das contas on-budget menos o total ainda reservado nas categorias do mês
-  const rawToBeBudgeted = totalOnBudgetFunds - totalAvailableInCategories
-  const rawProjToBeBudgeted = rawToBeBudgeted + pendingExpectedIncome
+  // ── 7. TBB = saldo em caixa (checking) − o que já está reservado nas categorias
+  const rawTBB = checkingBalance - totalPositiveAvailable
+  const finalTBB = Math.abs(Math.round(rawTBB * 100) / 100) < 0.005
+    ? 0
+    : Math.round(rawTBB * 100) / 100
 
-  const roundedTBB = Math.round(rawToBeBudgeted * 100) / 100
-  const finalTBB = Math.abs(roundedTBB) < 0.005 ? 0 : roundedTBB
+  const rawProjTBB = rawTBB + pendingExpectedIncome
+  const finalProjTBB = Math.abs(Math.round(rawProjTBB * 100) / 100) < 0.005
+    ? 0
+    : Math.round(rawProjTBB * 100) / 100
 
-  const roundedProjTBB = Math.round(rawProjToBeBudgeted * 100) / 100
-  const finalProjTBB = Math.abs(roundedProjTBB) < 0.005 ? 0 : roundedProjTBB
-
-  const roundedIncome = Math.round(totalIncome * 100) / 100
-  const finalIncome = Math.abs(roundedIncome) < 0.005 ? 0 : roundedIncome
-
-  const roundedExpected = Math.round(totalExpectedIncome * 100) / 100
-  const finalExpected = Math.abs(roundedExpected) < 0.005 ? 0 : roundedExpected
-
-  const roundedPending = Math.round(pendingExpectedIncome * 100) / 100
-  const finalPending = Math.abs(roundedPending) < 0.005 ? 0 : roundedPending
-
-  const roundedBudgeted = Math.round(totalBudgeted * 100) / 100
-  const finalBudgeted = Math.abs(roundedBudgeted) < 0.005 ? 0 : roundedBudgeted
-
-  const roundedInvoices = Math.round(currentInvoicesDue * 100) / 100
-  const finalInvoices = Math.abs(roundedInvoices) < 0.005 ? 0 : roundedInvoices
+  const round = (v: number) => {
+    const r = Math.round(v * 100) / 100
+    return Math.abs(r) < 0.005 ? 0 : r
+  }
 
   return {
     month,
     isFutureMonth,
     rolloverFromPreviousMonth: 0,
-    totalIncome: finalIncome,
-    totalExpectedIncome: finalExpected,
-    pendingExpectedIncome: finalPending,
-    totalBudgeted: finalBudgeted,
-    currentInvoicesDue: finalInvoices,
+    totalIncome: round(totalIncome),
+    totalExpectedIncome: round(totalExpectedIncome),
+    pendingExpectedIncome: round(pendingExpectedIncome),
+    totalBudgeted: round(totalBudgeted),
+    currentInvoicesDue: 0, // não usado no TBB; mantido para compatibilidade do tipo
     toBeBudgeted: finalTBB,
     projectedToBeBudgeted: finalProjTBB,
   }
