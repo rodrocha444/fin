@@ -456,120 +456,221 @@ export default function BudgetPage() {
   return (
     <div className="flex flex-col h-full">
 
-      {/* ── Header ─────────────────────────────────────────── */}
+      {/* ── Header Principal Revitalizado ────────────────────── */}
       <div
-        className="flex items-center justify-between px-3 sm:px-6 pb-3 bg-slate-900 border-b border-slate-800 flex-shrink-0 gap-2 relative z-20"
+        className="bg-slate-900/95 backdrop-blur-sm border-b border-slate-800/90 flex-shrink-0 relative z-20"
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
       >
+        {/* Barra superior de navegação e status */}
+        <div className="px-3 sm:px-6 pb-3 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+          
+          {/* Lado Esquerdo: Navegação de Mês + Seletor de Regime */}
+          <div className="flex items-center justify-between md:justify-start gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <MonthNavigator month={month} onChangeMonth={setMonth} minMonth={startMonth} />
+              <BudgetRegimeSelector regime={budgetRegime} onChangeRegime={handleBudgetRegimeChange} />
+            </div>
 
-        {/* Navegação de mês e Seletor de Modelo de Orçamento */}
-        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-          <MonthNavigator month={month} onChangeMonth={setMonth} minMonth={startMonth} />
-          <BudgetRegimeSelector regime={budgetRegime} onChangeRegime={handleBudgetRegimeChange} />
-        </div>
-
-        {/* To Be Budgeted */}
-        {summary && (
-          <div className="text-center flex-1 min-w-0">
-            <div className="flex items-center justify-center gap-1.5 flex-wrap">
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
-                {summary.isFutureMonth
-                  ? 'A orçar (Projetado)'
-                  : (summary.totalExpectedIncome ?? 0) > 0
-                  ? 'A orçar (Caixa)'
-                  : 'A orçar'}
-              </p>
-              {summary.isFutureMonth ? (
-                <span
-                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-950/80 text-indigo-300 border border-indigo-800/50"
-                  title={`Sobra vinda do mês anterior: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)} | Receitas previstas: ${formatCurrency(summary.totalExpectedIncome ?? 0)}`}
+            {/* Ações no mobile alinhadas à direita da linha 1 */}
+            <div className="flex md:hidden items-center gap-1.5">
+              <SyncStatusBadge compact={true} />
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowMenu(s => !s)}
+                  className={`p-2 rounded-lg transition-all duration-150 border ${
+                    showMenu
+                      ? 'bg-slate-800 border-indigo-500/50 text-indigo-300'
+                      : 'bg-slate-800/70 hover:bg-slate-800 border-slate-700/70 text-slate-400 hover:text-slate-200'
+                  }`}
+                  aria-label="Opções do orçamento"
                 >
-                  Sobra: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
-                </span>
-              ) : (
-                (summary.pendingExpectedIncome ?? 0) > 0 && (
-                  <span
-                    className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-950/80 text-indigo-300 border border-indigo-800/50"
-                    title="Saldo projetado a orçar ao fim do mês considerando receitas previstas pendentes"
-                  >
-                    Previsto ao fim: {formatCurrency(summary.projectedToBeBudgeted)}
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+                {showMenu && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)} />
+                    <div className="absolute right-0 top-full mt-1.5 bg-slate-900/95 backdrop-blur-md border border-slate-700/90 rounded-xl shadow-2xl z-40 p-1.5 min-w-[210px] animate-in fade-in zoom-in-95 duration-150">
+                      <button
+                        onClick={handleCoverSpent}
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors"
+                      >
+                        <CheckCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                        <span>Cobrir gastos do mês</span>
+                      </button>
+                      <button
+                        onClick={handleCopy}
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
+                      >
+                        <Copy className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                        <span>Copiar mês anterior</span>
+                      </button>
+                      <button
+                        onClick={handleClear}
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-medium text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
+                      >
+                        <Trash2 className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                        <span>Zerar orçamento</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Centro / Destaque: Card Hero "Disponível a Orçar" (To Be Budgeted) */}
+          {summary && (
+            <div className="flex-1 max-w-md mx-auto md:mx-0 flex items-center justify-center">
+              <div
+                className={`w-full md:w-auto px-4 py-2 rounded-xl border flex items-center justify-between md:justify-center gap-3 sm:gap-4 shadow-sm transition-all duration-200 ${
+                  summary.toBeBudgeted > 0.005
+                    ? 'bg-emerald-950/30 border-emerald-800/50 shadow-emerald-950/20'
+                    : summary.toBeBudgeted < -0.005
+                    ? 'bg-rose-950/30 border-rose-800/50 shadow-rose-950/20'
+                    : 'bg-slate-800/50 border-slate-700/60'
+                }`}
+              >
+                <div className="text-left md:text-right">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                      {summary.isFutureMonth
+                        ? 'A Orçar (Projetado)'
+                        : (summary.totalExpectedIncome ?? 0) > 0
+                        ? 'A Orçar (Caixa)'
+                        : 'Disponível a Orçar'}
+                    </span>
+                    {summary.isFutureMonth ? (
+                      <span
+                        className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-950/90 text-indigo-300 border border-indigo-800/60"
+                        title={`Sobra vinda do mês anterior: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
+                      >
+                        Sobra: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
+                      </span>
+                    ) : (
+                      (summary.pendingExpectedIncome ?? 0) > 0 && (
+                        <span
+                          className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60"
+                          title="Saldo projetado a orçar ao fim do mês considerando receitas previstas pendentes"
+                        >
+                          Previsto: {formatCurrency(summary.projectedToBeBudgeted)}
+                        </span>
+                      )
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 hidden md:block">
+                    {summary.toBeBudgeted > 0.005
+                      ? 'Dinheiro disponível para distribuir'
+                      : summary.toBeBudgeted < -0.005
+                      ? 'Orçamento excedeu as receitas'
+                      : 'Orçamento 100% equilibrado'}
+                  </p>
+                </div>
+
+                <div className="text-right">
+                  <span className={`text-base sm:text-xl font-extrabold tabular-nums tracking-tight ${tbbColor}`}>
+                    {formatCurrency(summary.toBeBudgeted)}
                   </span>
-                )
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Lado Direito no Desktop: Menu de Ações e Status */}
+          <div className="hidden md:flex items-center gap-2 flex-shrink-0">
+            <div className="lg:hidden">
+              <SyncStatusBadge compact={true} />
+            </div>
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowMenu(s => !s)}
+                className={`p-2 rounded-lg transition-all duration-150 border ${
+                  showMenu
+                    ? 'bg-slate-800 border-indigo-500/50 text-indigo-300 shadow-sm'
+                    : 'bg-slate-800/70 hover:bg-slate-800 border-slate-700/70 text-slate-400 hover:text-slate-200'
+                }`}
+                title="Ações do orçamento do mês"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+
+              {showMenu && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)} />
+                  <div className="absolute right-0 top-full mt-1.5 bg-slate-900/95 backdrop-blur-md border border-slate-700/90 rounded-xl shadow-2xl z-40 p-1.5 min-w-[220px] animate-in fade-in zoom-in-95 duration-150">
+                    <button
+                      onClick={handleCoverSpent}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors"
+                    >
+                      <CheckCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                      <span>Cobrir gastos do mês</span>
+                    </button>
+                    <button
+                      onClick={handleCopy}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
+                    >
+                      <Copy className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                      <span>Copiar mês anterior</span>
+                    </button>
+                    <button
+                      onClick={handleClear}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
+                    >
+                      <Trash2 className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                      <span>Zerar orçamento</span>
+                    </button>
+                  </div>
+                </>
               )}
             </div>
-            <p className={`text-base sm:text-lg font-bold tabular-nums truncate ${tbbColor}`}>
-              {formatCurrency(summary.toBeBudgeted)}
-            </p>
           </div>
-        )}
 
-        {/* Menu de ações e status de sync */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <div className="lg:hidden">
-            <SyncStatusBadge compact={true} />
-          </div>
-          <div className="relative">
-            <button
-              onClick={() => setShowMenu(s => !s)}
-              className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 active:bg-slate-700 transition-colors"
-            >
-              <MoreHorizontal className="w-5 h-5" />
-            </button>
-            {showMenu && (
-              <>
-                <div className="fixed inset-0 z-20" onClick={() => setShowMenu(false)} />
-                <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-30 overflow-hidden min-w-[190px] fade-in">
-                  <button onClick={handleCoverSpent} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-200 hover:bg-slate-700 active:bg-slate-600 transition-colors">
-                    <CheckCheck className="w-4 h-4 text-emerald-400" />
-                    Cobrir gastos do mês
-                  </button>
-                  <button onClick={handleCopy} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-200 hover:bg-slate-700 active:bg-slate-600 transition-colors border-t border-slate-700">
-                    <Copy className="w-4 h-4 text-slate-400" />
-                    Copiar mês anterior
-                  </button>
-                  <button onClick={handleClear} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-rose-400 hover:bg-slate-700 active:bg-slate-600 transition-colors border-t border-slate-700">
-                    <Trash2 className="w-4 h-4" />
-                    Zerar orçamento
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
         </div>
       </div>
 
-      {/* ── Resumo dos valores que influenciam o orçamento do mês atual (Colapsável) ── */}
+      {/* ── Resumo Financeiro do Mês (Colapsável / KPIs) ────── */}
       {summary && (
         <div className="bg-slate-900/60 border-b border-slate-800/80 flex-shrink-0 select-none transition-all">
           {/* Barra de controle / Header colapsável */}
           <div
             onClick={toggleSummaryExpanded}
-            className="flex items-center justify-between px-3 sm:px-6 py-1.5 cursor-pointer hover:bg-slate-800/40 active:bg-slate-800/60 transition-colors group"
+            className="flex items-center justify-between px-3 sm:px-6 py-2 cursor-pointer hover:bg-slate-800/40 active:bg-slate-800/60 transition-colors group"
             title={isSummaryExpanded ? 'Clique para recolher o resumo financeiro' : 'Clique para expandir o resumo financeiro'}
           >
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider group-hover:text-slate-300 transition-colors">
+            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-slate-300 transition-colors flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
                 {summary.isFutureMonth ? 'Planejamento do Mês' : 'Resumo do Mês'}
               </span>
+
+              {/* Chips rápidos quando colapsado */}
               {!isSummaryExpanded && (
-                <div className="hidden sm:flex items-center gap-3 text-xs text-slate-400 truncate">
+                <div className="hidden sm:flex items-center gap-2 text-xs truncate ml-2">
                   {summary.isFutureMonth ? (
                     <>
-                      <span className="text-slate-600">•</span>
-                      <span>Sobra Anterior: <strong className="text-indigo-300 font-medium">+{formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}</strong></span>
-                      <span className="text-slate-600">•</span>
-                      <span>Previsto: <strong className="text-emerald-400 font-medium">+{formatCurrency(summary.totalExpectedIncome ?? 0)}</strong></span>
-                      <span className="text-slate-600">•</span>
-                      <span>Orçado: <strong className="text-indigo-300 font-medium">-{formatCurrency(summary.totalBudgeted)}</strong></span>
+                      <span className="bg-slate-800/60 border border-slate-700/50 px-2 py-0.5 rounded-md text-[11px] text-slate-400">
+                        Sobra: <strong className="text-indigo-300 font-semibold">+{formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}</strong>
+                      </span>
+                      <span className="bg-slate-800/60 border border-slate-700/50 px-2 py-0.5 rounded-md text-[11px] text-slate-400">
+                        Previsto: <strong className="text-emerald-400 font-semibold">+{formatCurrency(summary.totalExpectedIncome ?? 0)}</strong>
+                      </span>
+                      <span className="bg-slate-800/60 border border-slate-700/50 px-2 py-0.5 rounded-md text-[11px] text-slate-400">
+                        Orçado: <strong className="text-indigo-300 font-semibold">-{formatCurrency(summary.totalBudgeted)}</strong>
+                      </span>
                     </>
                   ) : (
                     <>
-                      <span className="text-slate-600">•</span>
-                      <span>Receitas: <strong className="text-emerald-400 font-medium">+{formatCurrency(summary.totalIncome)}</strong></span>
-                      <span className="text-slate-600">•</span>
-                      <span>Orçado: <strong className="text-indigo-300 font-medium">-{formatCurrency(summary.totalBudgeted)}</strong></span>
-                      <span className="text-slate-600">•</span>
-                      <span>Gastos: <strong className="text-amber-400 font-medium">{formatCurrency(totalSpent)}</strong></span>
+                      <span className="bg-slate-800/60 border border-slate-700/50 px-2 py-0.5 rounded-md text-[11px] text-slate-400">
+                        Receitas: <strong className="text-emerald-400 font-semibold">+{formatCurrency(summary.totalIncome)}</strong>
+                      </span>
+                      <span className="bg-slate-800/60 border border-slate-700/50 px-2 py-0.5 rounded-md text-[11px] text-slate-400">
+                        Orçado: <strong className="text-indigo-300 font-semibold">-{formatCurrency(summary.totalBudgeted)}</strong>
+                      </span>
+                      <span className="bg-slate-800/60 border border-slate-700/50 px-2 py-0.5 rounded-md text-[11px] text-slate-400">
+                        Gastos: <strong className="text-amber-400 font-semibold">{formatCurrency(totalSpent)}</strong>
+                      </span>
                     </>
                   )}
                 </div>
@@ -578,31 +679,31 @@ export default function BudgetPage() {
 
             <button
               type="button"
-              className="flex items-center gap-1 text-[11px] text-slate-400 group-hover:text-indigo-300 transition-colors px-1.5 py-0.5 rounded-md hover:bg-slate-800/60"
+              className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400 group-hover:text-indigo-300 transition-colors px-2 py-1 rounded-md hover:bg-slate-800/60 border border-transparent group-hover:border-slate-700/50"
               aria-expanded={isSummaryExpanded}
             >
-              <span className="hidden sm:inline">{isSummaryExpanded ? 'Recolher resumo' : 'Ver resumo completo'}</span>
+              <span>{isSummaryExpanded ? 'Recolher' : 'Expandir'}</span>
               {isSummaryExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
           </div>
 
-          {/* Grid detalhado de 3 cards (quando expandido) */}
+          {/* Grid detalhado de 3 cards KPIs (quando expandido) */}
           {isSummaryExpanded && (
-            <div className="px-3 pb-3 sm:px-6 sm:pb-3 pt-1 animate-in fade-in duration-200">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5">
+            <div className="px-3 pb-3 sm:px-6 sm:pb-3.5 pt-1 animate-in fade-in duration-200">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 {summary.isFutureMonth ? (
                   <>
                     {/* Sobra Projetada do Mês Anterior */}
                     <div
-                      className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
+                      className="bg-slate-900/90 hover:bg-slate-850/90 border border-slate-800/90 hover:border-slate-700/80 rounded-xl p-3 flex items-center gap-3 shadow-sm transition-all duration-150"
                       title="Sobra líquida projetada que transborda do planejamento do mês anterior"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-indigo-950/70 border border-indigo-800/60 flex items-center justify-center text-indigo-400 flex-shrink-0">
+                      <div className="w-9 h-9 rounded-xl bg-indigo-950/80 border border-indigo-800/60 flex items-center justify-center text-indigo-400 flex-shrink-0 shadow-sm">
                         <TrendingUp className="w-4 h-4" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[10px] text-slate-500 font-medium truncate">Sobra Anterior</p>
-                        <p className={`text-xs sm:text-sm font-bold tabular-nums truncate ${
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Sobra Anterior</p>
+                        <p className={`text-sm sm:text-base font-bold tabular-nums truncate ${
                           (summary.rolloverFromPreviousMonth ?? 0) >= 0 ? 'text-indigo-300' : 'text-rose-400'
                         }`}>
                           {(summary.rolloverFromPreviousMonth ?? 0) >= 0 ? '+' : ''}
@@ -613,15 +714,15 @@ export default function BudgetPage() {
 
                     {/* Receitas Previstas */}
                     <div
-                      className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
+                      className="bg-slate-900/90 hover:bg-slate-850/90 border border-slate-800/90 hover:border-slate-700/80 rounded-xl p-3 flex items-center gap-3 shadow-sm transition-all duration-150"
                       title="Receitas e rendas previstas/planejadas para este mês futuro"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-emerald-950/70 border border-emerald-800/60 flex items-center justify-center text-emerald-400 flex-shrink-0">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-950/80 border border-emerald-800/60 flex items-center justify-center text-emerald-400 flex-shrink-0 shadow-sm">
                         <ArrowDownLeft className="w-4 h-4" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[10px] text-slate-500 font-medium truncate">Receitas Previstas</p>
-                        <p className="text-xs sm:text-sm font-bold text-emerald-400 tabular-nums truncate">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Receitas Previstas</p>
+                        <p className="text-sm sm:text-base font-bold text-emerald-400 tabular-nums truncate">
                           +{(summary.totalExpectedIncome ?? 0) > 0 ? formatCurrency(summary.totalExpectedIncome ?? 0) : formatCurrency(0)}
                         </p>
                       </div>
@@ -631,22 +732,22 @@ export default function BudgetPage() {
                   <>
                     {/* Receitas do Mês */}
                     <div
-                      className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
+                      className="bg-slate-900/90 hover:bg-slate-850/90 border border-slate-800/90 hover:border-slate-700/80 rounded-xl p-3 flex items-center gap-3 shadow-sm transition-all duration-150"
                       title="Entradas registradas no mês e meta prevista"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-emerald-950/70 border border-emerald-800/60 flex items-center justify-center text-emerald-400 flex-shrink-0">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-950/80 border border-emerald-800/60 flex items-center justify-center text-emerald-400 flex-shrink-0 shadow-sm">
                         <ArrowDownLeft className="w-4 h-4" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
-                          <p className="text-[10px] text-slate-500 font-medium truncate">Receitas Mês</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Receitas do Mês</p>
                           {(summary.totalExpectedIncome ?? 0) > 0 && (
-                            <span className="text-[9px] text-indigo-400 font-medium truncate">
+                            <span className="text-[9px] text-indigo-300 font-semibold truncate bg-indigo-950/70 border border-indigo-800/40 px-1 py-0.2 rounded">
                               Meta: {formatCurrency(summary.totalExpectedIncome ?? 0)}
                             </span>
                           )}
                         </div>
-                        <p className="text-xs sm:text-sm font-bold text-emerald-400 tabular-nums truncate">
+                        <p className="text-sm sm:text-base font-bold text-emerald-400 tabular-nums truncate">
                           +{formatCurrency(summary.totalIncome)}
                         </p>
                       </div>
@@ -656,15 +757,15 @@ export default function BudgetPage() {
 
                 {/* Orçado em Categorias */}
                 <div
-                  className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
-                  title="Total alocado em envelopes/categorias de despesa no mês (- deduz do orçamento)"
+                  className="bg-slate-900/90 hover:bg-slate-850/90 border border-slate-800/90 hover:border-slate-700/80 rounded-xl p-3 flex items-center gap-3 shadow-sm transition-all duration-150"
+                  title="Total alocado em categorias de despesa no mês (- deduz do disponível)"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-indigo-950/70 border border-indigo-800/60 flex items-center justify-center text-indigo-400 flex-shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-950/80 border border-indigo-800/60 flex items-center justify-center text-indigo-400 flex-shrink-0 shadow-sm">
                     <Layers className="w-4 h-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10px] text-slate-500 font-medium truncate">Orçado Mês</p>
-                    <p className="text-xs sm:text-sm font-bold text-indigo-300 tabular-nums truncate">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Orçado no Mês</p>
+                    <p className="text-sm sm:text-base font-bold text-indigo-300 tabular-nums truncate">
                       {summary.totalBudgeted > 0 ? `-${formatCurrency(summary.totalBudgeted)}` : <span className="text-slate-600">—</span>}
                     </p>
                   </div>
@@ -673,15 +774,15 @@ export default function BudgetPage() {
                 {!summary.isFutureMonth && (
                   /* Gastos Realizados */
                   <div
-                    className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm"
+                    className="bg-slate-900/90 hover:bg-slate-850/90 border border-slate-800/90 hover:border-slate-700/80 rounded-xl p-3 flex items-center gap-3 shadow-sm transition-all duration-150"
                     title="Total de despesas efetivamente realizadas no mês nas categorias"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-amber-950/70 border border-amber-800/60 flex items-center justify-center text-amber-400 flex-shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-amber-950/80 border border-amber-800/60 flex items-center justify-center text-amber-400 flex-shrink-0 shadow-sm">
                       <Receipt className="w-4 h-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[10px] text-slate-500 font-medium truncate">Gastos Reais</p>
-                      <p className="text-xs sm:text-sm font-bold text-amber-400/90 tabular-nums truncate">
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Gastos Reais</p>
+                      <p className="text-sm sm:text-base font-bold text-amber-400/95 tabular-nums truncate">
                         {totalSpent > 0 ? formatCurrency(totalSpent) : <span className="text-slate-600">—</span>}
                       </p>
                     </div>
