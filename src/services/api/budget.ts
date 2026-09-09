@@ -510,29 +510,41 @@ export function calculateBudgetSummary(
   const curMonth = currentMonth()
   const isFutureMonth = month > curMonth
 
-  // Total de fundos comprometidos no mês = Orçado + Gastos não cobertos (estouros / sem orçamento)
-  const totalCommitted = totalBudgeted + totalOverspent
-
-  // Disponível a Orçar:
-  // Se for mês futuro e o usuário definiu receitas previstas (ou não recebeu renda ainda):
-  // o saldo a orçar baseia-se na renda prevista do próprio mês menos as despesas comprometidas do próprio mês.
-  // No mês atual/passado:
-  // toBeBudgeted = receitas recebidas no mês - despesas comprometidas no mês.
-  // projectedToBeBudgeted = (receitas recebidas + receitas previstas pendentes) - despesas comprometidas no mês.
-  
-  let rawToBeBudgeted: number
-  let rawProjToBeBudgeted: number
-
-  if (isFutureMonth) {
-    const plannedIncome = totalExpectedIncome > 0 ? totalExpectedIncome : totalIncome
-    rawToBeBudgeted = plannedIncome - totalCommitted
-    rawProjToBeBudgeted = (totalIncome + pendingExpectedIncome) > 0 
-      ? (totalIncome + pendingExpectedIncome) - totalCommitted 
-      : plannedIncome - totalCommitted
-  } else {
-    rawToBeBudgeted = totalIncome - totalCommitted
-    rawProjToBeBudgeted = (totalIncome + pendingExpectedIncome) - totalCommitted
+  // 1. Saldo em dinheiro de todas as contas On-Budget (checking ativas)
+  let totalOnBudgetFunds = 0
+  for (const acc of accounts) {
+    if (acc.type === 'checking' && acc.isActive !== false && acc.id) {
+      let bal = Number(acc.initialBalance || 0)
+      for (const tx of validTxs) {
+        if (tx.accountId === acc.id) {
+          if (tx.type === 'income') bal += Number(tx.amount || 0)
+          else if (tx.type === 'expense' || tx.type === 'transfer') bal -= Number(tx.amount || 0)
+        }
+        if (tx.transferAccountId === acc.id && tx.type === 'transfer') {
+          bal += Number(tx.amount || 0)
+        }
+      }
+      totalOnBudgetFunds += bal
+    }
   }
+
+  // 2. Total sobrando/disponível nas categorias de despesa do mês selecionado
+  let totalAvailableInCategories = 0
+  for (const cat of categories) {
+    if (!cat.id) continue
+    const grp = groupMap.get(cat.groupId)
+    if (grp?.type === 'income' || isInitialSetupCategory(cat.name, grp?.name)) continue
+    const budgeted = expenseBudgetMap.get(cat.id) ?? 0
+    const spent = activityMap.get(cat.id) ?? 0
+    const available = budgeted - spent
+    if (available > 0) {
+      totalAvailableInCategories += available
+    }
+  }
+
+  // 3. Disponível a Orçar: Saldo das contas on-budget menos o total ainda reservado nas categorias do mês
+  const rawToBeBudgeted = totalOnBudgetFunds - totalAvailableInCategories
+  const rawProjToBeBudgeted = rawToBeBudgeted + pendingExpectedIncome
 
   const roundedTBB = Math.round(rawToBeBudgeted * 100) / 100
   const finalTBB = Math.abs(roundedTBB) < 0.005 ? 0 : roundedTBB
