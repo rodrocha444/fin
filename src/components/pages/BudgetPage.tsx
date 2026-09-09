@@ -461,22 +461,13 @@ export default function BudgetPage() {
                           ? 'A Orçar (Caixa)'
                           : 'Disponível a Orçar'}
                       </span>
-                      {summary.isFutureMonth ? (
+                      {(summary.pendingExpectedIncome ?? 0) > 0 && (
                         <span
-                          className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-950/90 text-indigo-300 border border-indigo-800/60 flex-shrink-0"
-                          title={`Sobra vinda do mês anterior: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
+                          className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60 flex-shrink-0"
+                          title="Saldo projetado a orçar considerando receitas previstas que faltam entrar no mês"
                         >
-                          Sobra: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
+                          Previsto: {formatCurrency(summary.projectedToBeBudgeted)}
                         </span>
-                      ) : (
-                        (summary.pendingExpectedIncome ?? 0) > 0 && (
-                          <span
-                            className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60 flex-shrink-0"
-                            title="Saldo projetado a orçar ao fim do mês considerando receitas previstas pendentes"
-                          >
-                            Previsto: {formatCurrency(summary.projectedToBeBudgeted)}
-                          </span>
-                        )
                       )}
                     </div>
                   </div>
@@ -565,22 +556,13 @@ export default function BudgetPage() {
                         ? 'A Orçar (Caixa)'
                         : 'Disponível a Orçar'}
                     </span>
-                    {summary.isFutureMonth ? (
+                    {(summary.pendingExpectedIncome ?? 0) > 0 && (
                       <span
-                        className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-950/90 text-indigo-300 border border-indigo-800/60"
-                        title={`Sobra vinda do mês anterior: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
+                        className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60"
+                        title="Saldo projetado a orçar considerando receitas previstas que faltam entrar no mês"
                       >
-                        Sobra: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
+                        Previsto: {formatCurrency(summary.projectedToBeBudgeted)}
                       </span>
-                    ) : (
-                      (summary.pendingExpectedIncome ?? 0) > 0 && (
-                        <span
-                          className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60"
-                          title="Saldo projetado a orçar ao fim do mês considerando receitas previstas pendentes"
-                        >
-                          Previsto: {formatCurrency(summary.projectedToBeBudgeted)}
-                        </span>
-                      )
                     )}
                   </div>
                   <p className="text-[10px] text-slate-500 truncate">

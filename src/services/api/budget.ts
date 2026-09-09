@@ -2,7 +2,7 @@ import { getClient } from './client'
 import { rowToTransaction, rowToBudgetMonth, rowToAccount, rowToInstallmentGroup } from './types'
 import { createId } from '@/utils/id'
 import { format, subMonths } from 'date-fns'
-import { isInitialSetupCategory, currentMonth, shiftMonth } from '@/utils/format'
+import { isInitialSetupCategory, currentMonth } from '@/utils/format'
 import { getInvoiceForBudgetMonth, getTransactionEffectiveMonth } from '@/utils/invoices'
 import { getPaidInvoicesMap } from '@/services/api/invoices'
 import { isDateBeforeAccountingStart, isMonthBeforeAccountingStart } from '@/utils/accountingPeriod'
@@ -434,7 +434,7 @@ export function calculateBudgetSummary(
     }
   }
 
-  // Receitas do mês selecionado (inclui transações de renda em contas on-budget e transferências de off-budget para on-budget)
+  // Receitas recebidas/realizadas única e exclusivamente no mês selecionado
   let totalIncome = 0
   for (const tx of validTxs) {
     const txMonth = toMonthKey(new Date(tx.date))
@@ -450,225 +450,17 @@ export function calculateBudgetSummary(
     }
   }
 
-  // Mapa deduplicado de orçamento de despesas por chave (mês_categoria) para o regime ativo
-  const expenseBudgetByMonthAndCategory = new Map<string, number>()
+  // Total orçado nas categorias de despesa única e exclusivamente no mês selecionado para o regime ativo
+  let totalBudgeted = 0
   for (const b of budgetMonths) {
+    if (b.month !== month) continue
     if (isMonthBeforeAccountingStart(b.month)) continue
     if ((b.budgetType || 'cash') !== regime) continue
     if (ignoredCategoryIds.has(b.categoryId)) continue
-    expenseBudgetByMonthAndCategory.set(`${b.month}_${b.categoryId}`, Number(b.budgeted || 0))
+    totalBudgeted += Number(b.budgeted || 0)
   }
 
-  // Função auxiliar para somar total orçado em despesas de um mês específico
-  const getBudgetedForMonth = (m: string): number => {
-    let sum = 0
-    for (const [key, val] of expenseBudgetByMonthAndCategory.entries()) {
-      if (key.startsWith(`${m}_`)) {
-        sum += val
-      }
-    }
-    return sum
-  }
-
-  // Função auxiliar para somar total orçado em despesas de meses anteriores a um mês específico
-  const getBudgetedPriorToMonth = (m: string): number => {
-    let sum = 0
-    for (const [key, val] of expenseBudgetByMonthAndCategory.entries()) {
-      const entryMonth = key.split('_')[0]
-      if (entryMonth < m) {
-        sum += val
-      }
-    }
-    return sum
-  }
-
-  // Total orçado nas categorias de despesa no mês selecionado (filtrado pelo regime)
-  const totalBudgeted = getBudgetedForMonth(month)
-
-  // 1. Saldos iniciais das contas on-budget (checking)
-  let initialFunds = 0
-  for (const acc of accounts) {
-    if (acc.type === 'checking' && acc.isActive !== false) {
-      initialFunds += Number(acc.initialBalance || 0)
-    }
-  }
-
-  // 2. Total de receitas recebidas nas contas checking até o mês
-  let totalIncomeFunds = 0
-  for (const tx of validTxs) {
-    const txMonth = toMonthKey(new Date(tx.date))
-    if (txMonth > month) continue
-    if (tx.type === 'income' && tx.accountId) {
-      const acc = accountMap.get(tx.accountId)
-      if (acc?.type === 'checking' && acc.isActive !== false) {
-        totalIncomeFunds += Number(tx.amount || 0)
-      }
-    } else if (tx.type === 'transfer') {
-      const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
-      const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
-      if (fromAcc?.type === 'off_budget' && toAcc?.type === 'checking' && toAcc?.isActive !== false) {
-        totalIncomeFunds += Number(tx.amount || 0)
-      }
-    }
-  }
-
-  // 3. Transferências líquidas para contas Off-Budget sem categoria até o mês selecionado
-  let netOffBudgetTransfers = 0
-  for (const tx of validTxs) {
-    const txMonth = toMonthKey(new Date(tx.date))
-    if (txMonth > month) continue
-    if (tx.type === 'transfer' && !tx.categoryId) {
-      const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
-      const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
-      if (fromAcc?.type === 'checking' && toAcc?.type === 'off_budget') {
-        netOffBudgetTransfers += Number(tx.amount || 0)
-      } else if (fromAcc?.type === 'off_budget' && toAcc?.type === 'checking') {
-        netOffBudgetTransfers -= Number(tx.amount || 0)
-      }
-    }
-  }
-
-  // 4. Total orçado em meses anteriores ao mês selecionado (filtrado pelo regime)
-  const priorBudgeted = getBudgetedPriorToMonth(month)
-
-  // Fundos disponíveis para o mês selecionado
-  const availableFundsForMonth = initialFunds + totalIncomeFunds - netOffBudgetTransfers - priorBudgeted
-
-  const paidMap = getPaidInvoicesMap()
-
-  // Faturas de cartão de crédito a vencer no mês selecionado (apenas as NÃO pagas)
-  let currentInvoicesDue = 0
-  for (const acc of ccAccounts) {
-    if (!acc.id || !acc.statementClosingDay) continue
-    const accTxs = transactions.filter(t => t.accountId === acc.id)
-    const currInvoiceAmt = getInvoiceForBudgetMonth(accTxs, acc, month, paidMap)
-    currentInvoicesDue += currInvoiceAmt
-  }
-
-  const curMonth = currentMonth()
-  const isFutureMonth = month > curMonth
-
-  // ── MODO PROJEÇÃO EM CASCATA PARA MESES FUTUROS ──────────────
-  if (isFutureMonth) {
-    // 1. Fundos disponíveis e orçado do mês atual
-    let totalIncomeFundsNow = 0
-    let netOffBudgetTransfersNow = 0
-    for (const tx of validTxs) {
-      const txMonth = toMonthKey(new Date(tx.date))
-      if (txMonth > curMonth) continue
-      if (tx.type === 'income' && tx.accountId) {
-        const acc = accountMap.get(tx.accountId)
-        if (acc?.type === 'checking' && acc.isActive !== false) {
-          totalIncomeFundsNow += Number(tx.amount || 0)
-        }
-      } else if (tx.type === 'transfer') {
-        const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
-        const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
-        if (fromAcc?.type === 'off_budget' && toAcc?.type === 'checking' && toAcc?.isActive !== false) {
-          totalIncomeFundsNow += Number(tx.amount || 0)
-        } else if (!tx.categoryId) {
-          if (fromAcc?.type === 'checking' && toAcc?.type === 'off_budget') {
-            netOffBudgetTransfersNow += Number(tx.amount || 0)
-          } else if (fromAcc?.type === 'off_budget' && toAcc?.type === 'checking') {
-            netOffBudgetTransfersNow -= Number(tx.amount || 0)
-          }
-        }
-      }
-    }
-
-    const priorBudgetedToNow = getBudgetedPriorToMonth(curMonth)
-    const nowBudgeted = getBudgetedForMonth(curMonth)
-
-    const availableFundsNow = initialFunds + totalIncomeFundsNow - netOffBudgetTransfersNow - priorBudgetedToNow
-    const toBeBudgetedNow = availableFundsNow - nowBudgeted
-
-    const nowIncomeMap = calculateIncomeByCategory(transactions, curMonth, accounts, regime)
-    const nowBudgetMap = new Map(
-      budgetMonths
-        .filter(b => b.month === curMonth && (b.budgetType || 'cash') === regime)
-        .map(b => [b.categoryId, b])
-    )
-    let nowPendingIncome = 0
-    for (const cat of categories) {
-      if (!cat.id) continue
-      const grp = groupMap.get(cat.groupId)
-      if (grp?.type !== 'income') continue
-      const expected = nowBudgetMap.get(cat.id)?.budgeted ?? 0
-      const received = nowIncomeMap.get(cat.id) ?? 0
-      if (expected > received) {
-        nowPendingIncome += (expected - received)
-      }
-    }
-
-    // Sobra projetada do mês atual que transborda para o planejamento
-    let runningSurplus = toBeBudgetedNow + nowPendingIncome
-
-    // 3. Iterar pelos meses futuros intermediários até o mês selecionado
-    let mCursor = shiftMonth(curMonth, 1)
-    let rolloverForSelectedMonth = runningSurplus
-
-    while (mCursor <= month) {
-      const cursorBudgetMap = new Map(
-        budgetMonths
-          .filter(b => b.month === mCursor && (b.budgetType || 'cash') === regime)
-          .map(b => [b.categoryId, b])
-      )
-      const cursorIncomeMap = calculateIncomeByCategory(transactions, mCursor, accounts, regime)
-
-      let cursorExpectedIncome = 0
-      for (const cat of categories) {
-        if (!cat.id) continue
-        const grp = groupMap.get(cat.groupId)
-        if (grp?.type !== 'income') continue
-        const expected = cursorBudgetMap.get(cat.id)?.budgeted ?? 0
-        const received = cursorIncomeMap.get(cat.id) ?? 0
-        cursorExpectedIncome += Math.max(expected, received)
-      }
-
-      const cursorBudgetedExpenses = getBudgetedForMonth(mCursor)
-
-      if (mCursor === month) {
-        rolloverForSelectedMonth = runningSurplus
-        const rawFutureToBeBudgeted = rolloverForSelectedMonth + cursorExpectedIncome - cursorBudgetedExpenses
-        const roundedFutureTBB = Math.round(rawFutureToBeBudgeted * 100) / 100
-        const finalFutureTBB = Math.abs(roundedFutureTBB) < 0.005 ? 0 : roundedFutureTBB
-
-        const roundedRollover = Math.round(rolloverForSelectedMonth * 100) / 100
-        const finalRollover = Math.abs(roundedRollover) < 0.005 ? 0 : roundedRollover
-
-        const roundedTotalIncome = Math.round(totalIncome * 100) / 100
-        const finalTotalIncome = Math.abs(roundedTotalIncome) < 0.005 ? 0 : roundedTotalIncome
-
-        const roundedExpIncome = Math.round(cursorExpectedIncome * 100) / 100
-        const finalExpIncome = Math.abs(roundedExpIncome) < 0.005 ? 0 : roundedExpIncome
-
-        const roundedBudgeted = Math.round(cursorBudgetedExpenses * 100) / 100
-        const finalBudgeted = Math.abs(roundedBudgeted) < 0.005 ? 0 : roundedBudgeted
-
-        const roundedInvoices = Math.round(currentInvoicesDue * 100) / 100
-        const finalInvoices = Math.abs(roundedInvoices) < 0.005 ? 0 : roundedInvoices
-
-        return {
-          month,
-          isFutureMonth: true,
-          rolloverFromPreviousMonth: finalRollover,
-          totalIncome: finalTotalIncome,
-          totalExpectedIncome: finalExpIncome,
-          pendingExpectedIncome: finalExpIncome,
-          totalBudgeted: finalBudgeted,
-          currentInvoicesDue: finalInvoices,
-          toBeBudgeted: finalFutureTBB,
-          projectedToBeBudgeted: finalFutureTBB,
-        }
-      }
-
-      runningSurplus = runningSurplus + cursorExpectedIncome - cursorBudgetedExpenses
-      mCursor = shiftMonth(mCursor, 1)
-    }
-  }
-
-  // ── MODO CAIXA REAL / COMPETÊNCIA (MÊS ATUAL OU PASSADO) ──────
-  // Previsão de receitas orçadas para o mês selecionado
+  // Receitas orçadas/esperadas única e exclusivamente para o mês selecionado
   const incomeMap = calculateIncomeByCategory(transactions, month, accounts, regime)
   const budgetMap = new Map(
     budgetMonths
@@ -690,14 +482,45 @@ export function calculateBudgetSummary(
     }
   }
 
-  // Disponível a Orçar: Fundos disponíveis do mês menos o total alocado nas categorias do mês
-  const rawToBeBudgeted = availableFundsForMonth - totalBudgeted
+  const paidMap = getPaidInvoicesMap()
+
+  // Faturas de cartão de crédito a vencer no mês selecionado (apenas as NÃO pagas)
+  let currentInvoicesDue = 0
+  for (const acc of ccAccounts) {
+    if (!acc.id || !acc.statementClosingDay) continue
+    const accTxs = transactions.filter(t => t.accountId === acc.id)
+    const currInvoiceAmt = getInvoiceForBudgetMonth(accTxs, acc, month, paidMap)
+    currentInvoicesDue += currInvoiceAmt
+  }
+
+  const curMonth = currentMonth()
+  const isFutureMonth = month > curMonth
+
+  // Disponível a Orçar:
+  // Se for mês futuro e o usuário definiu receitas previstas (ou não recebeu renda ainda):
+  // o saldo a orçar baseia-se na renda prevista do próprio mês menos as despesas orçadas do próprio mês.
+  // No mês atual/passado:
+  // toBeBudgeted = receitas recebidas no mês - despesas orçadas no mês.
+  // projectedToBeBudgeted = (receitas recebidas + receitas previstas pendentes) - despesas orçadas no mês.
+  
+  let rawToBeBudgeted: number
+  let rawProjToBeBudgeted: number
+
+  if (isFutureMonth) {
+    const plannedIncome = totalExpectedIncome > 0 ? totalExpectedIncome : totalIncome
+    rawToBeBudgeted = plannedIncome - totalBudgeted
+    rawProjToBeBudgeted = (totalIncome + pendingExpectedIncome) > 0 
+      ? (totalIncome + pendingExpectedIncome) - totalBudgeted 
+      : plannedIncome - totalBudgeted
+  } else {
+    rawToBeBudgeted = totalIncome - totalBudgeted
+    rawProjToBeBudgeted = (totalIncome + pendingExpectedIncome) - totalBudgeted
+  }
+
   const roundedTBB = Math.round(rawToBeBudgeted * 100) / 100
   const finalTBB = Math.abs(roundedTBB) < 0.005 ? 0 : roundedTBB
 
-  // Disponível a Orçar Projetado: Saldo a orçar somado às receitas previstas que ainda faltam entrar
-  const rawProjTBB = finalTBB + pendingExpectedIncome
-  const roundedProjTBB = Math.round(rawProjTBB * 100) / 100
+  const roundedProjTBB = Math.round(rawProjToBeBudgeted * 100) / 100
   const finalProjTBB = Math.abs(roundedProjTBB) < 0.005 ? 0 : roundedProjTBB
 
   const roundedIncome = Math.round(totalIncome * 100) / 100
@@ -717,7 +540,7 @@ export function calculateBudgetSummary(
 
   return {
     month,
-    isFutureMonth: false,
+    isFutureMonth,
     rolloverFromPreviousMonth: 0,
     totalIncome: finalIncome,
     totalExpectedIncome: finalExpected,
