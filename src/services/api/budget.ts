@@ -51,7 +51,7 @@ export async function setBudget(
   const client = getClient()
   const { data: rows } = await client
     .from('budget_months')
-    .select('id, budget_type')
+    .select('*')
     .eq('month', month)
     .eq('category_id', categoryId)
 
@@ -75,8 +75,10 @@ export async function setBudget(
 
     // Deletar duplicatas excedentes se existirem
     if (matching.length > 1) {
-      const duplicateIds = matching.slice(1).map(r => r.id)
-      await client.from('budget_months').delete().in('id', duplicateIds)
+      const duplicateIds = matching.slice(1).map(r => r.id).filter(Boolean)
+      if (duplicateIds.length > 0) {
+        await client.from('budget_months').delete().in('id', duplicateIds)
+      }
     }
   } else {
     const id = createId()
@@ -104,7 +106,15 @@ export async function setBudget(
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
-      if (fbErr) throw new Error(`Erro ao criar orçamento: ${fbErr.message}`)
+      if (fbErr) {
+        // Se ainda falhar (ex: duplicate key por constraint unique antiga), tenta update
+        const { error: updErr } = await client
+          .from('budget_months')
+          .update({ budgeted, updated_at: new Date().toISOString() })
+          .eq('month', month)
+          .eq('category_id', categoryId)
+        if (updErr) throw new Error(`Erro ao salvar orçamento: ${updErr.message}`)
+      }
     }
   }
   if (notify) {
@@ -131,7 +141,7 @@ export async function copyFromPreviousMonth(targetMonth: string, budgetType: Bud
 
 export async function clearMonthBudgets(month: string, budgetType: BudgetType = 'cash'): Promise<void> {
   const client = getClient()
-  const { data: rows } = await client.from('budget_months').select('id, budget_type').eq('month', month)
+  const { data: rows } = await client.from('budget_months').select('*').eq('month', month)
   const toClear = (rows || []).filter(r => (r.budget_type || 'cash') === budgetType)
   for (const r of toClear) {
     await client.from('budget_months').update({ budgeted: 0, updated_at: new Date().toISOString() }).eq('id', r.id)
