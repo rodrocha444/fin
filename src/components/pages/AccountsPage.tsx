@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Plus,
   CreditCard,
   Landmark,
   HandCoins,
@@ -134,56 +133,86 @@ export default function AccountsPage() {
   const totalNetWorth = Math.abs(rawTotalNetWorth) < 0.005 ? 0 : Math.round(rawTotalNetWorth * 100) / 100
 
   return (
-    <div className="fade-in">
-      {/* Header */}
+    <div className="flex flex-col h-full">
+      {/* ── Header Compacto e Simplificado ───────────────────────── */}
       <div
-        className="px-3 sm:px-6 pb-4 border-b border-slate-800 bg-slate-900"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
+        className="px-3 sm:px-6 py-2.5 border-b border-slate-800 bg-slate-900/95 backdrop-blur-sm flex-shrink-0 relative z-20"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.6rem)' }}
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-lg sm:text-xl font-semibold text-slate-100">Contas</h1>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-slate-400">
-              <span>
-                Patrimônio Geral:{' '}
-                <strong className={`font-bold tabular-nums ${totalNetWorth > 0.005 ? 'text-emerald-400' : totalNetWorth < -0.005 ? 'text-rose-400' : 'text-slate-100'}`}>
-                  {formatCurrency(totalNetWorth)}
-                </strong>
+        <div className="flex items-center justify-between gap-2.5">
+          {/* Métricas Compactas em Chips / Linha */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0 flex-1">
+            {/* Patrimônio Geral */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-950/40 border border-indigo-500/25">
+              <span className="text-[10px] sm:text-xs font-semibold text-indigo-300 uppercase tracking-wider">
+                Patrimônio:
               </span>
-              <span className="text-slate-600 hidden sm:inline">•</span>
-              <span className="text-slate-400">
-                No Orçamento:{' '}
-                <span className={`font-medium tabular-nums ${onBudgetBalance < -0.005 ? 'text-rose-300' : 'text-slate-200'}`}>
-                  {formatCurrency(onBudgetBalance)}
-                </span>
+              <span
+                className={`text-xs sm:text-sm font-bold tabular-nums ${
+                  totalNetWorth > 0.005
+                    ? 'text-emerald-400'
+                    : totalNetWorth < -0.005
+                    ? 'text-rose-400'
+                    : 'text-slate-100'
+                }`}
+              >
+                {formatCurrency(totalNetWorth)}
               </span>
-              <span className="text-slate-600 hidden sm:inline">•</span>
-              <span className="text-slate-400">
-                Fora do Orçamento:{' '}
-                <span className={`font-medium tabular-nums ${totalOffBudget > 0.005 ? 'text-emerald-400' : totalOffBudget < -0.005 ? 'text-rose-400' : 'text-slate-200'}`}>
-                  {totalOffBudget > 0.005 ? '+' : ''}{formatCurrency(totalOffBudget)}
-                </span>
+            </div>
+
+            {/* No Orçamento */}
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60">
+              <span className="text-[10px] sm:text-xs font-medium text-slate-400">
+                No Orçamento:
+              </span>
+              <span
+                className={`text-xs sm:text-sm font-bold tabular-nums ${
+                  onBudgetBalance < -0.005 ? 'text-rose-400' : 'text-slate-200'
+                }`}
+              >
+                {formatCurrency(onBudgetBalance)}
+              </span>
+            </div>
+
+            {/* Fora do Orçamento */}
+            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60">
+              <span className="text-[10px] sm:text-xs font-medium text-slate-400">
+                Fora do Orçamento:
+              </span>
+              <span
+                className={`text-xs sm:text-sm font-bold tabular-nums ${
+                  totalOffBudget > 0.005
+                    ? 'text-emerald-400'
+                    : totalOffBudget < -0.005
+                    ? 'text-rose-400'
+                    : 'text-slate-200'
+                }`}
+              >
+                {totalOffBudget > 0.005 ? '+' : ''}
+                {formatCurrency(totalOffBudget)}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto">
+          {/* Ações (Sync + Botão Nova Conta) */}
+          <div className="flex items-center gap-2 flex-shrink-0">
             <div className="lg:hidden">
               <SyncStatusBadge compact={true} />
             </div>
             <button
               onClick={() => handleOpenNew('on_budget')}
-              className="btn-primary flex items-center gap-1.5 py-2 px-3.5 text-xs font-semibold shadow-md shadow-indigo-600/20"
-              title="Cadastrar nova conta"
+              className="btn-primary flex items-center justify-center py-1.5 px-3 sm:px-3.5 text-xs font-semibold shadow-sm transition-all rounded-lg"
+              title="Cadastrar nova conta ou cartão"
             >
-              <Plus className="w-4 h-4" />
               <span>Nova Conta</span>
             </button>
           </div>
         </div>
       </div>
 
-      <div className="p-3 sm:p-6 space-y-6 max-w-4xl mx-auto">
+      {/* ── Conteúdo com Scroll Independente ─────────────────────── */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-6 space-y-6">
+        <div className="max-w-4xl mx-auto space-y-6">
         {/* ════════════════════════════════════════════════════════════════
             1. SEÇÃO: DENTRO DO ORÇAMENTO (No Orçamento)
         ════════════════════════════════════════════════════════════════ */}
@@ -584,6 +613,7 @@ export default function AccountsPage() {
               )}
             </div>
           )}
+          </div>
         </div>
       </div>
 
