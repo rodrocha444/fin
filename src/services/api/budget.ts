@@ -4,6 +4,8 @@ import { createId } from '@/utils/id'
 import { format, subMonths } from 'date-fns'
 import { isInitialSetupCategory, currentMonth } from '@/utils/format'
 
+import { getInvoiceCycle, getInvoiceData } from '@/utils/invoices'
+import { getPaidInvoicesMap } from '@/services/api/invoices'
 import { isDateBeforeAccountingStart, isMonthBeforeAccountingStart } from '@/utils/accountingPeriod'
 import { buildGroupPurchaseMonthMap, type AccountingRegime } from '@/utils/accountingRegime'
 import { notifyDataChanged } from './events'
@@ -573,8 +575,28 @@ export function calculateBudgetSummary(
     }
   }
 
-  // ── 7. TBB = saldo em caixa (checking) − o que já está reservado nas categorias
-  const rawTBB = checkingBalance - totalPositiveAvailable
+  // ── 6b. Faturas de cartão cujo fechamento cai no mês selecionado ──────────
+  //    Essas faturas representam dinheiro já comprometido que ainda não saiu
+  //    do checking. Precisamos descontar do TBB para que o usuário não ache
+  //    que tem esse dinheiro disponível para orçar.
+  //    Apenas faturas NÃO marcadas como pagas são descontadas.
+  const paidMap = getPaidInvoicesMap()
+  let pendingCCInvoices = 0
+  const ccAccounts = accounts.filter(a => a.type === 'credit_card' && a.isActive !== false && a.id && a.statementClosingDay)
+
+  for (const acc of ccAccounts) {
+    const cycle = getInvoiceCycle(month, acc.statementClosingDay!, acc.paymentDueDay)
+    const isMarkedPaid = Boolean(paidMap[`${acc.id}_${month}`])
+    if (isMarkedPaid) continue
+    const ccTxs = transactions.filter(t => t.accountId === acc.id)
+    const invoiceData = getInvoiceData(ccTxs, cycle)
+    if (invoiceData.totalAmount > 0.005) {
+      pendingCCInvoices += invoiceData.totalAmount
+    }
+  }
+
+  // ── 7. TBB = saldo em caixa (checking) − reservado nas categorias − fatura CC pendente
+  const rawTBB = checkingBalance - totalPositiveAvailable - pendingCCInvoices
   const finalTBB = Math.abs(Math.round(rawTBB * 100) / 100) < 0.005
     ? 0
     : Math.round(rawTBB * 100) / 100
@@ -597,7 +619,7 @@ export function calculateBudgetSummary(
     totalExpectedIncome: round(totalExpectedIncome),
     pendingExpectedIncome: round(pendingExpectedIncome),
     totalBudgeted: round(totalBudgeted),
-    currentInvoicesDue: 0, // não usado no TBB; mantido para compatibilidade do tipo
+    currentInvoicesDue: round(pendingCCInvoices),
     toBeBudgeted: finalTBB,
     projectedToBeBudgeted: finalProjTBB,
   }

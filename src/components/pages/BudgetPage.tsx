@@ -455,12 +455,16 @@ export default function BudgetPage() {
                   <div className="text-right min-w-0">
                     <div className="flex items-center justify-end gap-1.5 flex-wrap">
                       <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate">
-                        {summary.isFutureMonth
-                          ? 'A Orçar (Projetado)'
-                          : (summary.totalExpectedIncome ?? 0) > 0
-                          ? 'A Orçar (Caixa)'
-                          : 'Disponível a Orçar'}
+                        Disponível a Orçar
                       </span>
+                      {(summary.currentInvoicesDue ?? 0) > 0.005 && (
+                        <span
+                          className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-800/60 flex-shrink-0"
+                          title={`Fatura(s) de cartão de crédito que fecha(m) este mês: ${formatCurrency(summary.currentInvoicesDue!)} já descontado do valor a orçar`}
+                        >
+                          −{formatCurrency(summary.currentInvoicesDue!)} faturas
+                        </span>
+                      )}
                       {(summary.pendingExpectedIncome ?? 0) > 0 && (
                         <span
                           className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60 flex-shrink-0"
@@ -550,12 +554,16 @@ export default function BudgetPage() {
                 <div className="text-left min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                      {summary.isFutureMonth
-                        ? 'A Orçar (Projetado)'
-                        : (summary.totalExpectedIncome ?? 0) > 0
-                        ? 'A Orçar (Caixa)'
-                        : 'Disponível a Orçar'}
+                      Disponível a Orçar
                     </span>
+                    {(summary.currentInvoicesDue ?? 0) > 0.005 && (
+                      <span
+                        className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-800/60"
+                        title={`Fatura(s) de cartão que fecha(m) este mês: ${formatCurrency(summary.currentInvoicesDue!)} descontado`}
+                      >
+                        −{formatCurrency(summary.currentInvoicesDue!)} faturas
+                      </span>
+                    )}
                     {(summary.pendingExpectedIncome ?? 0) > 0 && (
                       <span
                         className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60"
