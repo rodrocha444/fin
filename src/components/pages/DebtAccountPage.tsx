@@ -268,9 +268,9 @@ export default function DebtAccountPage() {
           <div>
             <p className="text-[10px] text-slate-500 font-medium">Saldo Líquido</p>
             <p className={`text-xs sm:text-base font-bold tabular-nums ${
-              balance > 0 ? 'text-emerald-400' : balance < 0 ? 'text-rose-400' : 'text-slate-300'
+              balance > 0.005 ? 'text-emerald-400' : balance < -0.005 ? 'text-rose-400' : 'text-slate-300'
             }`}>
-              {balance > 0 ? '+' : ''}{formatCurrency(balance)}
+              {balance > 0.005 ? '+' : ''}{formatCurrency(balance)}
             </p>
           </div>
         </div>

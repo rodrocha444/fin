@@ -113,7 +113,8 @@ export async function calculateAccountBalance(accountId: string): Promise<number
     }
   }
 
-  return balance
+  const rounded = Math.round(balance * 100) / 100
+  return Math.abs(rounded) < 0.005 ? 0 : rounded
 }
 
 export async function getAccountsSummary(): Promise<{
@@ -139,9 +140,18 @@ export async function getAccountsSummary(): Promise<{
     }
   }
 
+  const roundedBudget = Math.round(totalBudget * 100) / 100
+  const finalBudget = Math.abs(roundedBudget) < 0.005 ? 0 : roundedBudget
+
+  const roundedCC = Math.round(totalCreditCardDebt * 100) / 100
+  const finalCC = Math.abs(roundedCC) < 0.005 ? 0 : roundedCC
+
+  const roundedNet = Math.round((finalBudget + finalCC) * 100) / 100
+  const finalNet = Math.abs(roundedNet) < 0.005 ? 0 : roundedNet
+
   return {
-    totalBudget,
-    totalCreditCardDebt,
-    netWorth: totalBudget + totalCreditCardDebt,
+    totalBudget: finalBudget,
+    totalCreditCardDebt: finalCC,
+    netWorth: finalNet,
   }
 }

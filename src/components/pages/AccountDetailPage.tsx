@@ -113,7 +113,7 @@ export default function AccountDetailPage() {
     )
   }
 
-  const isNeg = balance < 0
+  const isNeg = balance < -0.005
 
   // Cálculo da fatura aberta para cartão de crédito
   const openInvoiceData = (() => {

@@ -14,6 +14,9 @@ const BRL = new Intl.NumberFormat('pt-BR', {
 
 /** Formata número como R$ 1.234,56 */
 export function formatCurrency(value: number): string {
+  if (!Number.isFinite(value) || Math.abs(value) < 0.005) {
+    return BRL.format(0)
+  }
   return BRL.format(value)
 }
 

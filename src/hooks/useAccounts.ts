@@ -54,7 +54,8 @@ export function useAccountBalance(accountId: string | undefined): number | undef
       }
     }
 
-    return balance
+    const rounded = Math.round(balance * 100) / 100
+    return Math.abs(rounded) < 0.005 ? 0 : rounded
   }, [accounts, transactions, accountId])
 }
 
@@ -100,7 +101,8 @@ export function useAllBalances(): Map<string, number> | undefined {
         }
       }
 
-      map.set(acc.id, balance)
+      const rounded = Math.round(balance * 100) / 100
+      map.set(acc.id, Math.abs(rounded) < 0.005 ? 0 : rounded)
     }
 
     return map

@@ -176,13 +176,13 @@ export default function DebtPrintModal({
               <div>
                 <p className="text-[10px] sm:text-xs text-slate-500 print:text-slate-600 font-medium">Saldo do Acerto</p>
                 <p className={`text-sm sm:text-lg font-bold tabular-nums ${
-                  balance > 0 ? 'text-rose-400 print:text-rose-700'
-                  : balance < 0 ? 'text-emerald-400 print:text-emerald-700'
+                  balance > 0.005 ? 'text-rose-400 print:text-rose-700'
+                  : balance < -0.005 ? 'text-emerald-400 print:text-emerald-700'
                   : 'text-slate-300 print:text-slate-700'
                 }`}>
-                  {balance > 0
+                  {balance > 0.005
                     ? `${formatCurrency(balance)} (a pagar)`
-                    : balance < 0
+                    : balance < -0.005
                     ? `${formatCurrency(Math.abs(balance))} (a seu favor)`
                     : 'Em dia (R$ 0,00)'}
                 </p>

@@ -117,15 +117,21 @@ export default function AccountsPage() {
   const onBudgetAccounts = [...checkingAccounts, ...creditCardAccounts]
   const offBudgetBankAccounts = accounts?.filter(a => a.type === 'off_budget') ?? []
 
-  const onBudgetBalance = onBudgetAccounts.reduce((s, a) => s + (balances?.get(a.id!) ?? 0), 0)
-  const offBudgetBankBalance = offBudgetBankAccounts.reduce((s, a) => s + (balances?.get(a.id!) ?? 0), 0)
+  const rawOnBudgetBalance = onBudgetAccounts.reduce((s, a) => s + (balances?.get(a.id!) ?? 0), 0)
+  const onBudgetBalance = Math.abs(rawOnBudgetBalance) < 0.005 ? 0 : Math.round(rawOnBudgetBalance * 100) / 100
+
+  const rawOffBudgetBankBalance = offBudgetBankAccounts.reduce((s, a) => s + (balances?.get(a.id!) ?? 0), 0)
+  const offBudgetBankBalance = Math.abs(rawOffBudgetBankBalance) < 0.005 ? 0 : Math.round(rawOffBudgetBankBalance * 100) / 100
 
   const offBudgetReceivable = debtSummary?.totalReceivable ?? 0
   const offBudgetPayable = debtSummary?.totalPayable ?? 0
   const offBudgetDebtNet = debtSummary?.netBalance ?? (offBudgetReceivable - offBudgetPayable)
 
-  const totalOffBudget = offBudgetBankBalance + offBudgetDebtNet
-  const totalNetWorth = onBudgetBalance + totalOffBudget
+  const rawTotalOffBudget = offBudgetBankBalance + offBudgetDebtNet
+  const totalOffBudget = Math.abs(rawTotalOffBudget) < 0.005 ? 0 : Math.round(rawTotalOffBudget * 100) / 100
+
+  const rawTotalNetWorth = onBudgetBalance + totalOffBudget
+  const totalNetWorth = Math.abs(rawTotalNetWorth) < 0.005 ? 0 : Math.round(rawTotalNetWorth * 100) / 100
 
   return (
     <div className="fade-in">
@@ -140,22 +146,22 @@ export default function AccountsPage() {
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-slate-400">
               <span>
                 Patrimônio Geral:{' '}
-                <strong className={`font-bold tabular-nums ${totalNetWorth >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                <strong className={`font-bold tabular-nums ${totalNetWorth > 0.005 ? 'text-emerald-400' : totalNetWorth < -0.005 ? 'text-rose-400' : 'text-slate-100'}`}>
                   {formatCurrency(totalNetWorth)}
                 </strong>
               </span>
               <span className="text-slate-600 hidden sm:inline">•</span>
               <span className="text-slate-400">
                 No Orçamento:{' '}
-                <span className={`font-medium tabular-nums ${onBudgetBalance >= 0 ? 'text-slate-200' : 'text-rose-300'}`}>
+                <span className={`font-medium tabular-nums ${onBudgetBalance < -0.005 ? 'text-rose-300' : 'text-slate-200'}`}>
                   {formatCurrency(onBudgetBalance)}
                 </span>
               </span>
               <span className="text-slate-600 hidden sm:inline">•</span>
               <span className="text-slate-400">
                 Fora do Orçamento:{' '}
-                <span className={`font-medium tabular-nums ${totalOffBudget >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {totalOffBudget > 0 ? '+' : ''}{formatCurrency(totalOffBudget)}
+                <span className={`font-medium tabular-nums ${totalOffBudget > 0.005 ? 'text-emerald-400' : totalOffBudget < -0.005 ? 'text-rose-400' : 'text-slate-200'}`}>
+                  {totalOffBudget > 0.005 ? '+' : ''}{formatCurrency(totalOffBudget)}
                 </span>
               </span>
             </div>
@@ -221,7 +227,7 @@ export default function AccountsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                     {checkingAccounts.map(acc => {
                       const balance = balances?.get(acc.id!) ?? 0
-                      const isNeg = balance < 0
+                      const isNeg = balance < -0.005
                       return (
                         <div
                           key={acc.id}
@@ -285,7 +291,7 @@ export default function AccountsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                     {creditCardAccounts.map(acc => {
                       const balance = balances?.get(acc.id!) ?? 0
-                      const isNeg = balance < 0
+                      const isNeg = balance < -0.005
                       return (
                         <div
                           key={acc.id}
@@ -433,7 +439,7 @@ export default function AccountsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                     {offBudgetBankAccounts.map(acc => {
                       const balance = balances?.get(acc.id!) ?? 0
-                      const isNeg = balance < 0
+                      const isNeg = balance < -0.005
                       return (
                         <div
                           key={acc.id}
@@ -497,8 +503,8 @@ export default function AccountsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                     {debtAccounts.map(acc => {
                       const balance = acc.balance
-                      const isPos = balance > 0
-                      const isNeg = balance < 0
+                      const isPos = balance > 0.005
+                      const isNeg = balance < -0.005
                       return (
                         <div
                           key={acc.id}

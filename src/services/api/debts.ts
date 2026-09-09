@@ -202,10 +202,20 @@ export async function getDebtSummary(): Promise<DebtSummary> {
     else if (item.type === 'payable') totalPayable += item.amount
   }
 
+  const roundedRec = Math.round(totalReceivable * 100) / 100
+  const finalRec = Math.abs(roundedRec) < 0.005 ? 0 : roundedRec
+
+  const roundedPay = Math.round(totalPayable * 100) / 100
+  const finalPay = Math.abs(roundedPay) < 0.005 ? 0 : roundedPay
+
+  const rawNet = finalRec - finalPay
+  const roundedNet = Math.round(rawNet * 100) / 100
+  const finalNet = Math.abs(roundedNet) < 0.005 ? 0 : roundedNet
+
   return {
-    totalReceivable,
-    totalPayable,
-    netBalance: totalReceivable - totalPayable,
+    totalReceivable: finalRec,
+    totalPayable: finalPay,
+    netBalance: finalNet,
     pendingCount: items.length,
   }
 }

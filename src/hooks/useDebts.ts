@@ -43,11 +43,21 @@ export function useDebtAccounts(): DebtAccountWithStats[] | undefined {
         }
       }
 
+      const roundedRec = Math.round(receivable * 100) / 100
+      const finalRec = Math.abs(roundedRec) < 0.005 ? 0 : roundedRec
+
+      const roundedPay = Math.round(payable * 100) / 100
+      const finalPay = Math.abs(roundedPay) < 0.005 ? 0 : roundedPay
+
+      const rawBal = finalRec - finalPay
+      const roundedBal = Math.round(rawBal * 100) / 100
+      const finalBal = Math.abs(roundedBal) < 0.005 ? 0 : roundedBal
+
       return {
         ...acc,
-        receivable,
-        payable,
-        balance: receivable - payable,
+        receivable: finalRec,
+        payable: finalPay,
+        balance: finalBal,
         pendingCount,
         totalCount: accItems.length,
       }
@@ -96,12 +106,22 @@ export function useDebtAccountWithItems(accountId: string | undefined): {
       }
     }
 
+    const roundedRec = Math.round(receivable * 100) / 100
+    const finalRec = Math.abs(roundedRec) < 0.005 ? 0 : roundedRec
+
+    const roundedPay = Math.round(payable * 100) / 100
+    const finalPay = Math.abs(roundedPay) < 0.005 ? 0 : roundedPay
+
+    const rawBal = finalRec - finalPay
+    const roundedBal = Math.round(rawBal * 100) / 100
+    const finalBal = Math.abs(roundedBal) < 0.005 ? 0 : roundedBal
+
     return {
       account,
       items,
-      receivable,
-      payable,
-      balance: receivable - payable,
+      receivable: finalRec,
+      payable: finalPay,
+      balance: finalBal,
       pendingCount,
       totalCount: items.length,
     }
@@ -124,10 +144,20 @@ export function useDebtsSummary(): DebtSummary | undefined {
       else if (item.type === 'payable') totalPayable += item.amount
     }
 
+    const roundedRec = Math.round(totalReceivable * 100) / 100
+    const finalRec = Math.abs(roundedRec) < 0.005 ? 0 : roundedRec
+
+    const roundedPay = Math.round(totalPayable * 100) / 100
+    const finalPay = Math.abs(roundedPay) < 0.005 ? 0 : roundedPay
+
+    const rawNet = finalRec - finalPay
+    const roundedNet = Math.round(rawNet * 100) / 100
+    const finalNet = Math.abs(roundedNet) < 0.005 ? 0 : roundedNet
+
     return {
-      totalReceivable,
-      totalPayable,
-      netBalance: totalReceivable - totalPayable,
+      totalReceivable: finalRec,
+      totalPayable: finalPay,
+      netBalance: finalNet,
       pendingCount: items.length,
     }
   }, [debtItems, isLoading])
