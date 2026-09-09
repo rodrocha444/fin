@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS public.budget_months (
   id TEXT PRIMARY KEY,
   month TEXT NOT NULL, -- Formato: YYYY-MM
   category_id TEXT NOT NULL,
+  budget_type TEXT NOT NULL DEFAULT 'cash', -- 'cash' (por fatura/parcelado) ou 'accrual' (por data da compra)
   budgeted NUMERIC NOT NULL DEFAULT 0,
   activity NUMERIC NOT NULL DEFAULT 0,
   available NUMERIC NOT NULL DEFAULT 0,
@@ -59,6 +60,7 @@ CREATE TABLE IF NOT EXISTS public.budget_months (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   deleted_at TIMESTAMPTZ
 );
+ALTER TABLE public.budget_months ADD COLUMN IF NOT EXISTS budget_type TEXT NOT NULL DEFAULT 'cash';
 
 -- 5. Transações
 CREATE TABLE IF NOT EXISTS public.transactions (

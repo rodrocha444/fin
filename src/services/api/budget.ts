@@ -1,18 +1,21 @@
 import { getClient } from './client'
-import { rowToTransaction, rowToBudgetMonth, rowToAccount } from './types'
+import { rowToTransaction, rowToBudgetMonth, rowToAccount, rowToInstallmentGroup } from './types'
 import { createId } from '@/utils/id'
 import { format, subMonths } from 'date-fns'
 import { isInitialSetupCategory, currentMonth, shiftMonth } from '@/utils/format'
 import { getInvoiceForBudgetMonth, getTransactionEffectiveMonth } from '@/utils/invoices'
 import { getPaidInvoicesMap } from '@/services/api/invoices'
 import { isDateBeforeAccountingStart, isMonthBeforeAccountingStart } from '@/utils/accountingPeriod'
+import { buildGroupPurchaseMonthMap, type AccountingRegime } from '@/utils/accountingRegime'
 import { notifyDataChanged } from './events'
 import type {
   Account,
   CategoryGroup,
   Category,
   BudgetMonth,
+  BudgetType,
   Transaction,
+  InstallmentGroup,
   GroupBudgetRow,
   CategoryBudgetRow,
   IncomeGroupBudgetRow,
@@ -38,41 +41,71 @@ export function toMonthKey(date: Date): string {
   return format(date, 'yyyy-MM')
 }
 
-export async function setBudget(month: string, categoryId: string, budgeted: number, notify: boolean = true): Promise<void> {
+export async function setBudget(
+  month: string,
+  categoryId: string,
+  budgeted: number,
+  notify: boolean = true,
+  budgetType: BudgetType = 'cash'
+): Promise<void> {
   const client = getClient()
-  const { data: existing } = await client
+  const { data: rows } = await client
     .from('budget_months')
-    .select('id')
+    .select('id, budget_type')
     .eq('month', month)
     .eq('category_id', categoryId)
-    .maybeSingle()
+
+  const existing = (rows || []).find(r => (r.budget_type || 'cash') === budgetType)
 
   if (existing?.id) {
     const { error } = await client
       .from('budget_months')
-      .update({ budgeted, updated_at: new Date().toISOString() })
+      .update({ budgeted, budget_type: budgetType, updated_at: new Date().toISOString() })
       .eq('id', existing.id)
-    if (error) throw new Error(`Erro ao salvar orçamento: ${error.message}`)
+
+    if (error) {
+      // Fallback se a coluna budget_type não existir no banco
+      const { error: fbErr } = await client
+        .from('budget_months')
+        .update({ budgeted, updated_at: new Date().toISOString() })
+        .eq('id', existing.id)
+      if (fbErr) throw new Error(`Erro ao salvar orçamento: ${fbErr.message}`)
+    }
   } else {
     const id = createId()
     const { error } = await client.from('budget_months').insert({
       id,
       month,
       category_id: categoryId,
+      budget_type: budgetType,
       budgeted,
       activity: 0,
       available: 0,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
-    if (error) throw new Error(`Erro ao criar orçamento: ${error.message}`)
+
+    if (error) {
+      // Fallback se a coluna budget_type não existir no banco
+      const { error: fbErr } = await client.from('budget_months').insert({
+        id,
+        month,
+        category_id: categoryId,
+        budgeted,
+        activity: 0,
+        available: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      if (fbErr) throw new Error(`Erro ao criar orçamento: ${fbErr.message}`)
+    }
   }
   if (notify) {
     notifyDataChanged('budget_months', 'upsert')
   }
 }
 
-export async function copyFromPreviousMonth(targetMonth: string): Promise<void> {
+export async function copyFromPreviousMonth(targetMonth: string, budgetType: BudgetType = 'cash'): Promise<void> {
   const client = getClient()
   const [year, mon] = targetMonth.split('-').map(Number)
   const prevDate = subMonths(new Date(year, mon - 1), 1)
@@ -81,24 +114,34 @@ export async function copyFromPreviousMonth(targetMonth: string): Promise<void> 
   const { data: prevBudgets } = await client.from('budget_months').select('*').eq('month', prevMonth)
   if (!prevBudgets || prevBudgets.length === 0) return
 
-  for (const prev of prevBudgets) {
-    await setBudget(targetMonth, prev.category_id, Number(prev.budgeted || 0), false)
+  const filtered = prevBudgets.filter(b => (b.budget_type || 'cash') === budgetType)
+
+  for (const prev of filtered) {
+    await setBudget(targetMonth, prev.category_id, Number(prev.budgeted || 0), false, budgetType)
   }
   notifyDataChanged('budget_months', 'upsert')
 }
 
-export async function clearMonthBudgets(month: string): Promise<void> {
+export async function clearMonthBudgets(month: string, budgetType: BudgetType = 'cash'): Promise<void> {
   const client = getClient()
-  await client.from('budget_months').update({ budgeted: 0, updated_at: new Date().toISOString() }).eq('month', month)
+  const { data: rows } = await client.from('budget_months').select('id, budget_type').eq('month', month)
+  const toClear = (rows || []).filter(r => (r.budget_type || 'cash') === budgetType)
+  for (const r of toClear) {
+    await client.from('budget_months').update({ budgeted: 0, updated_at: new Date().toISOString() }).eq('id', r.id)
+  }
   notifyDataChanged('budget_months', 'update')
 }
 
-export async function coverMonthSpent(month: string, rows?: GroupBudgetRow[]): Promise<void> {
+export async function coverMonthSpent(
+  month: string,
+  rows?: GroupBudgetRow[],
+  budgetType: BudgetType = 'cash'
+): Promise<void> {
   if (rows && rows.length > 0) {
     for (const groupRow of rows) {
       for (const catRow of groupRow.categories) {
         if (catRow.category.id) {
-          await setBudget(month, catRow.category.id, catRow.activity, false)
+          await setBudget(month, catRow.category.id, catRow.activity, false, budgetType)
         }
       }
     }
@@ -110,12 +153,14 @@ export async function coverMonthSpent(month: string, rows?: GroupBudgetRow[]): P
   const { data: txsData, error: txsErr } = await client.from('transactions').select('*')
   if (txsErr) throw new Error(`Erro ao buscar transações: ${txsErr.message}`)
   const { data: accsData } = await client.from('accounts').select('*')
+  const { data: grpData } = await client.from('installment_groups').select('*')
   const txs = (txsData || []).map(rowToTransaction)
   const accounts = (accsData || []).map(rowToAccount)
-  const activityMap = calculateActivityByCategory(txs, month, accounts)
+  const instGroups = (grpData || []).map(rowToInstallmentGroup)
+  const activityMap = calculateActivityByCategory(txs, month, accounts, budgetType, instGroups)
 
   for (const [catId, spent] of activityMap.entries()) {
-    await setBudget(month, catId, spent, false)
+    await setBudget(month, catId, spent, false, budgetType)
   }
 
   notifyDataChanged('budget_months', 'upsert')
@@ -128,11 +173,16 @@ export async function coverMonthSpent(month: string, rows?: GroupBudgetRow[]): P
 export function calculateActivityByCategory(
   transactions: Transaction[],
   month: string,
-  accounts?: Account[] | Map<string, Account>
+  accounts?: Account[] | Map<string, Account>,
+  regime: AccountingRegime = 'cash',
+  installmentGroups: InstallmentGroup[] = []
 ): Map<string, number> {
   const map = new Map<string, number>()
   const accountMap = accounts
     ? (Array.isArray(accounts) ? new Map(accounts.map(a => [a.id!, a])) : accounts)
+    : undefined
+  const groupMonthMap = regime === 'accrual'
+    ? buildGroupPurchaseMonthMap(transactions, installmentGroups)
     : undefined
 
   for (const tx of transactions) {
@@ -149,10 +199,21 @@ export function calculateActivityByCategory(
     }
     if (!isExpense) continue
 
-    const effectiveMonth = accountMap
-      ? getTransactionEffectiveMonth(tx, accountMap)
-      : toMonthKey(new Date(tx.date))
-    if (effectiveMonth !== month) continue
+    if (regime === 'accrual') {
+      if (tx.installmentGroupId) {
+        const purchaseMonth = groupMonthMap?.get(tx.installmentGroupId)
+        if (purchaseMonth !== month) continue
+      } else {
+        const txMonth = toMonthKey(new Date(tx.date))
+        if (txMonth !== month) continue
+      }
+    } else {
+      const effectiveMonth = accountMap
+        ? getTransactionEffectiveMonth(tx, accountMap)
+        : toMonthKey(new Date(tx.date))
+      if (effectiveMonth !== month) continue
+    }
+
     if (tx.categoryId) {
       const current = map.get(tx.categoryId) || 0
       const updated = Math.round((current + Number(tx.amount || 0)) * 100) / 100
@@ -165,7 +226,8 @@ export function calculateActivityByCategory(
 export function calculateIncomeByCategory(
   transactions: Transaction[],
   month: string,
-  accounts?: Account[] | Map<string, Account>
+  accounts?: Account[] | Map<string, Account>,
+  _regime: AccountingRegime = 'cash'
 ): Map<string, number> {
   const map = new Map<string, number>()
   const accountMap = accounts
@@ -203,11 +265,15 @@ export function calculateBudgetRows(
   categories: Category[],
   budgetMonths: BudgetMonth[],
   transactions: Transaction[],
-  accounts?: Account[]
+  accounts?: Account[],
+  regime: AccountingRegime = 'cash',
+  installmentGroups: InstallmentGroup[] = []
 ): GroupBudgetRow[] {
-  const activityMap = calculateActivityByCategory(transactions, month, accounts)
+  const activityMap = calculateActivityByCategory(transactions, month, accounts, regime, installmentGroups)
   const budgetByCategory = new Map(
-    budgetMonths.filter(b => b.month === month).map(b => [b.categoryId, b])
+    budgetMonths
+      .filter(b => b.month === month && (b.budgetType || 'cash') === regime)
+      .map(b => [b.categoryId, b])
   )
 
   const expenseGroups = categoryGroups.filter(
@@ -268,11 +334,14 @@ export function calculateIncomeBudgetRows(
   categories: Category[],
   budgetMonths: BudgetMonth[],
   transactions: Transaction[],
-  accounts?: Account[]
+  accounts?: Account[],
+  regime: AccountingRegime = 'cash'
 ): IncomeGroupBudgetRow[] {
-  const incomeMap = calculateIncomeByCategory(transactions, month, accounts)
+  const incomeMap = calculateIncomeByCategory(transactions, month, accounts, regime)
   const budgetByCategory = new Map(
-    budgetMonths.filter(b => b.month === month).map(b => [b.categoryId, b])
+    budgetMonths
+      .filter(b => b.month === month && (b.budgetType || 'cash') === regime)
+      .map(b => [b.categoryId, b])
   )
   const incomeGroups = categoryGroups.filter(g => g.type === 'income')
   const rows: IncomeGroupBudgetRow[] = []
@@ -327,7 +396,9 @@ export function calculateBudgetSummary(
   categoryGroups: CategoryGroup[],
   categories: Category[],
   budgetMonths: BudgetMonth[],
-  transactions: Transaction[]
+  transactions: Transaction[],
+  regime: AccountingRegime = 'cash',
+  _installmentGroups: InstallmentGroup[] = []
 ): BudgetSummary {
   const accountMap = new Map(accounts.map(a => [a.id!, a]))
   
@@ -362,10 +433,11 @@ export function calculateBudgetSummary(
     }
   }
 
-  // Total orçado nas categorias de despesa no mês selecionado
+  // Total orçado nas categorias de despesa no mês selecionado (filtrado pelo regime)
   let totalBudgeted = 0
   for (const b of budgetMonths) {
     if (isMonthBeforeAccountingStart(b.month)) continue
+    if ((b.budgetType || 'cash') !== regime) continue
     if (ignoredCategoryIds.has(b.categoryId)) continue
     if (b.month === month) totalBudgeted += b.budgeted
   }
@@ -398,7 +470,6 @@ export function calculateBudgetSummary(
   }
 
   // 3. Transferências líquidas para contas Off-Budget sem categoria até o mês selecionado
-  // (transferências categorizadas já entram na atividade e total orçado das categorias, sem duplicidade)
   let netOffBudgetTransfers = 0
   for (const tx of validTxs) {
     const txMonth = toMonthKey(new Date(tx.date))
@@ -414,10 +485,11 @@ export function calculateBudgetSummary(
     }
   }
 
-  // 4. Total orçado em meses anteriores ao mês selecionado
+  // 4. Total orçado em meses anteriores ao mês selecionado (filtrado pelo regime)
   let priorBudgeted = 0
   for (const b of budgetMonths) {
     if (isMonthBeforeAccountingStart(b.month)) continue
+    if ((b.budgetType || 'cash') !== regime) continue
     if (ignoredCategoryIds.has(b.categoryId)) continue
     if (b.month < month) priorBudgeted += b.budgeted
   }
@@ -471,6 +543,7 @@ export function calculateBudgetSummary(
     let nowBudgeted = 0
     for (const b of budgetMonths) {
       if (isMonthBeforeAccountingStart(b.month)) continue
+      if ((b.budgetType || 'cash') !== regime) continue
       if (ignoredCategoryIds.has(b.categoryId)) continue
       if (b.month < curMonth) priorBudgetedToNow += b.budgeted
       if (b.month === curMonth) nowBudgeted += b.budgeted
@@ -479,9 +552,11 @@ export function calculateBudgetSummary(
     const availableFundsNow = initialFunds + totalIncomeFundsNow - netOffBudgetTransfersNow - priorBudgetedToNow
     const toBeBudgetedNow = availableFundsNow - nowBudgeted
 
-    const nowIncomeMap = calculateIncomeByCategory(transactions, curMonth, accounts)
+    const nowIncomeMap = calculateIncomeByCategory(transactions, curMonth, accounts, regime)
     const nowBudgetMap = new Map(
-      budgetMonths.filter(b => b.month === curMonth).map(b => [b.categoryId, b])
+      budgetMonths
+        .filter(b => b.month === curMonth && (b.budgetType || 'cash') === regime)
+        .map(b => [b.categoryId, b])
     )
     let nowPendingIncome = 0
     for (const cat of categories) {
@@ -504,9 +579,11 @@ export function calculateBudgetSummary(
 
     while (mCursor <= month) {
       const cursorBudgetMap = new Map(
-        budgetMonths.filter(b => b.month === mCursor).map(b => [b.categoryId, b])
+        budgetMonths
+          .filter(b => b.month === mCursor && (b.budgetType || 'cash') === regime)
+          .map(b => [b.categoryId, b])
       )
-      const cursorIncomeMap = calculateIncomeByCategory(transactions, mCursor, accounts)
+      const cursorIncomeMap = calculateIncomeByCategory(transactions, mCursor, accounts, regime)
 
       let cursorExpectedIncome = 0
       for (const cat of categories) {
@@ -521,6 +598,7 @@ export function calculateBudgetSummary(
       let cursorBudgetedExpenses = 0
       for (const b of budgetMonths) {
         if (isMonthBeforeAccountingStart(b.month)) continue
+        if ((b.budgetType || 'cash') !== regime) continue
         if (ignoredCategoryIds.has(b.categoryId)) continue
         if (b.month === mCursor) cursorBudgetedExpenses += b.budgeted
       }
@@ -565,11 +643,13 @@ export function calculateBudgetSummary(
     }
   }
 
-  // ── MODO CAIXA REAL (MÊS ATUAL OU PASSADO) ─────────────────────
+  // ── MODO CAIXA REAL / COMPETÊNCIA (MÊS ATUAL OU PASSADO) ──────
   // Previsão de receitas orçadas para o mês selecionado
-  const incomeMap = calculateIncomeByCategory(transactions, month, accounts)
+  const incomeMap = calculateIncomeByCategory(transactions, month, accounts, regime)
   const budgetMap = new Map(
-    budgetMonths.filter(b => b.month === month).map(b => [b.categoryId, b])
+    budgetMonths
+      .filter(b => b.month === month && (b.budgetType || 'cash') === regime)
+      .map(b => [b.categoryId, b])
   )
   let totalExpectedIncome = 0
   let pendingExpectedIncome = 0
@@ -586,7 +666,7 @@ export function calculateBudgetSummary(
     }
   }
 
-  // Disponível a Orçar (Caixa Real): Fundos disponíveis do mês menos o total alocado nas categorias do mês
+  // Disponível a Orçar: Fundos disponíveis do mês menos o total alocado nas categorias do mês
   const rawToBeBudgeted = availableFundsForMonth - totalBudgeted
   const roundedTBB = Math.round(rawToBeBudgeted * 100) / 100
   const finalTBB = Math.abs(roundedTBB) < 0.005 ? 0 : roundedTBB

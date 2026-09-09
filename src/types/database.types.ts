@@ -132,6 +132,7 @@ export interface Database {
           id: string
           month: string
           category_id: string
+          budget_type?: string | null
           budgeted: number
           activity: number
           available: number
@@ -143,6 +144,7 @@ export interface Database {
           id: string
           month: string
           category_id: string
+          budget_type?: string | null
           budgeted?: number
           activity?: number
           available?: number
@@ -154,6 +156,7 @@ export interface Database {
           id?: string
           month?: string
           category_id?: string
+          budget_type?: string | null
           budgeted?: number
           activity?: number
           available?: number

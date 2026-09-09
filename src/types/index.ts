@@ -44,11 +44,15 @@ export interface Category {
 
 // ── Orçamento Mensal ─────────────────────────────────────────
 
+export type BudgetType = 'cash' | 'accrual'
+
 export interface BudgetMonth {
   id?: string
   /** Formato: YYYY-MM */
   month: string
   categoryId: string
+  /** Tipo de regime orçamentário: 'cash' (caixa/faturas) ou 'accrual' (competência/data da compra) */
+  budgetType?: BudgetType
   /** Valor orçado pelo usuário naquele mês */
   budgeted: number
   /** Calculado: soma das transações do mês nessa categoria */

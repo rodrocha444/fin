@@ -8,6 +8,8 @@ import {
 import { format, addMonths } from 'date-fns'
 import { getInvoiceCycle, getInvoiceData, getTransactionEffectiveMonth } from '@/utils/invoices'
 import { compareTransactionsByDate } from '@/utils/format'
+import { buildGroupPurchaseMonthMap, type AccountingRegime } from '@/utils/accountingRegime'
+import { toMonthKey } from '@/services/api/budget'
 import type { Transaction } from '@/types'
 
 export interface CreditCardPurchase {
@@ -92,10 +94,15 @@ export function useAccountTransactionsWithScheduled(accountId: string | undefine
 }
 
 /** Transações de uma categoria em um mês específico (não consolida para exibir a fatia exata da categoria) */
-export function useCategoryMonthTransactions(categoryId: string | undefined, month: string): Transaction[] | undefined {
+export function useCategoryMonthTransactions(
+  categoryId: string | undefined,
+  month: string,
+  regime: AccountingRegime = 'cash'
+): Transaction[] | undefined {
   const { data: transactions = [], isLoading: l1 } = useTransactionsQuery()
   const { data: accounts = [], isLoading: l2 } = useAccountsQuery()
-  const isLoading = l1 || l2
+  const { data: installmentGroups = [], isLoading: l3 } = useInstallmentGroupsQuery()
+  const isLoading = l1 || l2 || l3
 
   return useMemo(() => {
     if (isLoading && transactions.length === 0) return undefined
@@ -123,6 +130,21 @@ export function useCategoryMonthTransactions(categoryId: string | undefined, mon
       return []
     }
 
+    if (regime === 'accrual') {
+      const groupMonthMap = buildGroupPurchaseMonthMap(transactions, installmentGroups)
+      return transactions
+        .filter(t => {
+          if (t.categoryId !== categoryId) return false
+          if (t.installmentGroupId) {
+            const purchaseMonth = groupMonthMap.get(t.installmentGroupId)
+            return purchaseMonth === month
+          }
+          const txMonth = toMonthKey(new Date(t.date))
+          return txMonth === month
+        })
+        .sort(compareTransactionsByDate)
+    }
+
     const accountMap = new Map(accounts.map(a => [a.id!, a]))
 
     return transactions
@@ -132,7 +154,7 @@ export function useCategoryMonthTransactions(categoryId: string | undefined, mon
         return effMonth === month
       })
       .sort(compareTransactionsByDate)
-  }, [transactions, accounts, categoryId, month, isLoading])
+  }, [transactions, accounts, installmentGroups, categoryId, month, regime, isLoading])
 }
 
 /** Transações de um mês (YYYY-MM), consolidando rateios para o extrato */

@@ -8,6 +8,7 @@ import type { CategoryPieItem } from '@/components/molecules/CategoryPieCard'
 export type AccountingRegime = 'accrual' | 'cash'
 
 export const ACCOUNTING_REGIME_STORAGE_KEY = 'fin_accounting_regime'
+export const BUDGET_REGIME_STORAGE_KEY = 'fin_budget_regime'
 export const REPORT_HIDDEN_CATEGORIES_STORAGE_KEY = 'fin_report_hidden_categories'
 
 export function getSavedAccountingRegime(): AccountingRegime {
@@ -19,12 +20,32 @@ export function getSavedAccountingRegime(): AccountingRegime {
   } catch {
     // fallback
   }
-  return 'accrual' // Padrão: Competência (Data da Compra)
+  return 'accrual' // Padrão nos Relatórios: Competência (Data da Compra)
 }
 
 export function saveAccountingRegime(regime: AccountingRegime): void {
   try {
     localStorage.setItem(ACCOUNTING_REGIME_STORAGE_KEY, regime)
+  } catch {
+    // fallback
+  }
+}
+
+export function getSavedBudgetRegime(): AccountingRegime {
+  try {
+    const saved = localStorage.getItem(BUDGET_REGIME_STORAGE_KEY)
+    if (saved === 'cash' || saved === 'accrual') {
+      return saved
+    }
+  } catch {
+    // fallback
+  }
+  return 'cash' // Padrão no Orçamento: Caixa (Faturas / Parcelado)
+}
+
+export function saveBudgetRegime(regime: AccountingRegime): void {
+  try {
+    localStorage.setItem(BUDGET_REGIME_STORAGE_KEY, regime)
   } catch {
     // fallback
   }

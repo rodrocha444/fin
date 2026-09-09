@@ -156,6 +156,7 @@ export function rowToBudgetMonth(row: Tables<'budget_months'>): BudgetMonth {
     id: row.id,
     month: row.month,
     categoryId: row.category_id,
+    budgetType: (row.budget_type as BudgetMonth['budgetType']) || 'cash',
     budgeted: Number(row.budgeted ?? 0),
     activity: Number(row.activity ?? 0),
     available: Number(row.available ?? 0),
@@ -168,6 +169,7 @@ export function budgetMonthToRow(item: Partial<BudgetMonth>): Record<string, unk
     ...(item.id ? { id: item.id } : {}),
     month: item.month ?? '',
     category_id: item.categoryId ?? '',
+    budget_type: item.budgetType || 'cash',
     budgeted: item.budgeted ?? 0,
     activity: item.activity ?? 0,
     available: item.available ?? 0,
@@ -182,6 +184,7 @@ export function budgetMonthToUpdateRow(changes: Partial<BudgetMonth>): Record<st
   }
   if (changes.month !== undefined) row.month = changes.month
   if (changes.categoryId !== undefined) row.category_id = changes.categoryId
+  if (changes.budgetType !== undefined) row.budget_type = changes.budgetType
   if (changes.budgeted !== undefined) row.budgeted = changes.budgeted
   if (changes.activity !== undefined) row.activity = changes.activity
   if (changes.available !== undefined) row.available = changes.available

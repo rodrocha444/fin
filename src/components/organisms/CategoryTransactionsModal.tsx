@@ -79,7 +79,7 @@ export default function CategoryTransactionsModal({
   onClose,
 }: CategoryTransactionsModalProps) {
   const { accounts, installmentGroups = [], categories = [] } = useFinancialData()
-  const hookTxs = useCategoryMonthTransactions(category?.id, month) ?? []
+  const hookTxs = useCategoryMonthTransactions(category?.id, month, regime) ?? []
   const rawTransactions = customTransactions ?? hookTxs
   const confirm = useConfirm()
 

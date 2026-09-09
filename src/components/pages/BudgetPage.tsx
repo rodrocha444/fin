@@ -16,6 +16,7 @@ import { useBudgetRows, useIncomeBudgetRows, useBudgetSummary } from '@/hooks/us
 import { setBudget, copyFromPreviousMonth, clearMonthBudgets, coverMonthSpent } from '@/services/api/budget'
 import { formatCurrency, currentMonth } from '@/utils/format'
 import { useAccountingPeriod } from '@/utils/accountingPeriod'
+import { getSavedBudgetRegime, saveBudgetRegime, type AccountingRegime } from '@/utils/accountingRegime'
 import { useConfirm } from '@/context/ConfirmContext'
 import PriceInput from '@/components/atoms/PriceInput'
 import MonthNavigator from '@/components/atoms/MonthNavigator'
@@ -100,17 +101,19 @@ function BudgetCell({ value, onSave }: { value: number; onSave: (v: number) => v
 function IncomeCategoryRow({
   row,
   month,
+  budgetRegime = 'cash',
   onSelectCategory,
 }: {
   row: IncomeCategoryBudgetRow
   month: string
+  budgetRegime?: AccountingRegime
   onSelectCategory: (data: CategoryModalData) => void
 }) {
   const handleSave = useCallback(
     async (v: number) => {
-      if (row.category.id !== undefined) await setBudget(month, row.category.id, v)
+      if (row.category.id !== undefined) await setBudget(month, row.category.id, v, true, budgetRegime)
     },
-    [month, row.category.id]
+    [month, row.category.id, budgetRegime]
   )
 
   const diff = Math.round((row.expected - row.received) * 100) / 100
@@ -194,10 +197,12 @@ function IncomeCategoryRow({
 function IncomeGroupRow({
   row,
   month,
+  budgetRegime = 'cash',
   onSelectCategory,
 }: {
   row: IncomeGroupBudgetRow
   month: string
+  budgetRegime?: AccountingRegime
   onSelectCategory: (data: CategoryModalData) => void
 }) {
   const [open, setOpen] = useState(true)
@@ -236,7 +241,7 @@ function IncomeGroupRow({
         </td>
       </tr>
       {open && row.categories.map(c => (
-        <IncomeCategoryRow key={c.category.id} row={c} month={month} onSelectCategory={onSelectCategory} />
+        <IncomeCategoryRow key={c.category.id} row={c} month={month} budgetRegime={budgetRegime} onSelectCategory={onSelectCategory} />
       ))}
     </>
   )
@@ -247,17 +252,19 @@ function IncomeGroupRow({
 function CategoryRow({
   row,
   month,
+  budgetRegime = 'cash',
   onSelectCategory,
 }: {
   row: CategoryBudgetRow
   month: string
+  budgetRegime?: AccountingRegime
   onSelectCategory: (data: CategoryModalData) => void
 }) {
   const handleSave = useCallback(
     async (v: number) => {
-      if (row.category.id !== undefined) await setBudget(month, row.category.id, v)
+      if (row.category.id !== undefined) await setBudget(month, row.category.id, v, true, budgetRegime)
     },
-    [month, row.category.id]
+    [month, row.category.id, budgetRegime]
   )
 
   const availColor =
@@ -331,10 +338,12 @@ function CategoryRow({
 function GroupRow({
   row,
   month,
+  budgetRegime = 'cash',
   onSelectCategory,
 }: {
   row: GroupBudgetRow
   month: string
+  budgetRegime?: AccountingRegime
   onSelectCategory: (data: CategoryModalData) => void
 }) {
   const [open, setOpen] = useState(true)
@@ -364,7 +373,7 @@ function GroupRow({
         </td>
       </tr>
       {open && row.categories.map(cat => (
-        <CategoryRow key={cat.category.id} row={cat} month={month} onSelectCategory={onSelectCategory} />
+        <CategoryRow key={cat.category.id} row={cat} month={month} budgetRegime={budgetRegime} onSelectCategory={onSelectCategory} />
       ))}
     </>
   )
@@ -374,14 +383,20 @@ function GroupRow({
 
 export default function BudgetPage() {
   const [month, setMonth] = useState(currentMonth)
+  const [budgetRegime, setBudgetRegime] = useState<AccountingRegime>(getSavedBudgetRegime)
   const [showMenu, setShowMenu] = useState(false)
   const [selectedCategoryModal, setSelectedCategoryModal] = useState<CategoryModalData | null>(null)
 
   const { startMonth } = useAccountingPeriod()
 
-  const rows = useBudgetRows(month)
-  const incomeRows = useIncomeBudgetRows(month)
-  const summary = useBudgetSummary(month)
+  const rows = useBudgetRows(month, budgetRegime)
+  const incomeRows = useIncomeBudgetRows(month, budgetRegime)
+  const summary = useBudgetSummary(month, budgetRegime)
+
+  const handleBudgetRegimeChange = (newRegime: AccountingRegime) => {
+    setBudgetRegime(newRegime)
+    saveBudgetRegime(newRegime)
+  }
 
   const [isSummaryExpanded, setIsSummaryExpanded] = useState<boolean>(getInitialSummaryExpanded)
 
@@ -403,19 +418,19 @@ export default function BudgetPage() {
 
   const handleCopy = async () => {
     setShowMenu(false)
-    await copyFromPreviousMonth(month)
+    await copyFromPreviousMonth(month, budgetRegime)
   }
 
   const handleCoverSpent = async () => {
     setShowMenu(false)
     const ok = await confirm({
       title: 'Cobrir Gastos do Mês?',
-      message: 'Deseja ajustar o valor orçado de cada categoria para cobrir exatamente o que foi gasto neste mês?',
+      message: `Deseja ajustar o valor orçado de cada categoria para cobrir exatamente o que foi gasto neste mês (${budgetRegime === 'accrual' ? 'Regime de Competência' : 'Regime de Caixa'})?`,
       confirmText: 'Cobrir Gastos',
       variant: 'info',
     })
     if (ok) {
-      await coverMonthSpent(month, rows)
+      await coverMonthSpent(month, rows, budgetRegime)
     }
   }
 
@@ -423,12 +438,12 @@ export default function BudgetPage() {
     setShowMenu(false)
     const ok = await confirm({
       title: 'Zerar Orçamento?',
-      message: 'Deseja zerar todos os valores orçados deste mês?',
+      message: `Deseja zerar todos os valores orçados deste mês no modelo ${budgetRegime === 'accrual' ? 'de Competência' : 'de Caixa'}?`,
       confirmText: 'Zerar Orçamento',
       variant: 'warning',
     })
     if (ok) {
-      await clearMonthBudgets(month)
+      await clearMonthBudgets(month, budgetRegime)
     }
   }
 
@@ -446,8 +461,23 @@ export default function BudgetPage() {
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
       >
 
-        {/* Navegação de mês (Atom com trava de início contábil) */}
-        <MonthNavigator month={month} onChangeMonth={setMonth} minMonth={startMonth} />
+        {/* Navegação de mês e Seletor de Modelo de Orçamento */}
+        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+          <MonthNavigator month={month} onChangeMonth={setMonth} minMonth={startMonth} />
+
+          <div className="relative">
+            <select
+              value={budgetRegime}
+              onChange={e => handleBudgetRegimeChange(e.target.value as AccountingRegime)}
+              className="bg-slate-950/80 hover:bg-slate-800 text-slate-200 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer transition-colors pr-7 appearance-none shadow-sm"
+              title="Alternar entre Orçamento por Fatura (Caixa) e Orçamento por Data da Compra (Competência)"
+            >
+              <option value="cash" className="bg-slate-900 text-slate-200">Orçamento por Caixa (Faturas)</option>
+              <option value="accrual" className="bg-slate-900 text-slate-200">Orçamento por Competência (Compra)</option>
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+          </div>
+        </div>
 
         {/* To Be Budgeted */}
         {summary && (
@@ -709,7 +739,7 @@ export default function BudgetPage() {
                     <th className="py-2 pl-2 pr-3 sm:pr-6 text-right">Disponível</th>
                   </tr>
                   {rows.map(row => (
-                    <GroupRow key={row.group.id} row={row} month={month} onSelectCategory={setSelectedCategoryModal} />
+                    <GroupRow key={row.group.id} row={row} month={month} budgetRegime={budgetRegime} onSelectCategory={setSelectedCategoryModal} />
                   ))}
                 </>
               )}
@@ -724,7 +754,7 @@ export default function BudgetPage() {
                     <th className="py-2 pl-2 pr-3 sm:pr-6 text-right">A Receber</th>
                   </tr>
                   {incomeRows.map(row => (
-                    <IncomeGroupRow key={row.group.id} row={row} month={month} onSelectCategory={setSelectedCategoryModal} />
+                    <IncomeGroupRow key={row.group.id} row={row} month={month} budgetRegime={budgetRegime} onSelectCategory={setSelectedCategoryModal} />
                   ))}
                 </>
               )}
@@ -742,6 +772,7 @@ export default function BudgetPage() {
           activity={selectedCategoryModal.activity}
           available={selectedCategoryModal.available}
           isIncome={selectedCategoryModal.isIncome}
+          regime={budgetRegime}
           onClose={() => setSelectedCategoryModal(null)}
         />
       )}
