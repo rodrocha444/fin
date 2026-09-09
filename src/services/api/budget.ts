@@ -38,7 +38,7 @@ export function toMonthKey(date: Date): string {
   return format(date, 'yyyy-MM')
 }
 
-export async function setBudget(month: string, categoryId: string, budgeted: number): Promise<void> {
+export async function setBudget(month: string, categoryId: string, budgeted: number, notify: boolean = true): Promise<void> {
   const client = getClient()
   const { data: existing } = await client
     .from('budget_months')
@@ -67,7 +67,9 @@ export async function setBudget(month: string, categoryId: string, budgeted: num
     })
     if (error) throw new Error(`Erro ao criar orçamento: ${error.message}`)
   }
-  notifyDataChanged('budget_months', 'upsert')
+  if (notify) {
+    notifyDataChanged('budget_months', 'upsert')
+  }
 }
 
 export async function copyFromPreviousMonth(targetMonth: string): Promise<void> {
@@ -80,7 +82,7 @@ export async function copyFromPreviousMonth(targetMonth: string): Promise<void> 
   if (!prevBudgets || prevBudgets.length === 0) return
 
   for (const prev of prevBudgets) {
-    await setBudget(targetMonth, prev.category_id, Number(prev.budgeted || 0))
+    await setBudget(targetMonth, prev.category_id, Number(prev.budgeted || 0), false)
   }
   notifyDataChanged('budget_months', 'upsert')
 }
@@ -96,7 +98,7 @@ export async function coverMonthSpent(month: string, rows?: GroupBudgetRow[]): P
     for (const groupRow of rows) {
       for (const catRow of groupRow.categories) {
         if (catRow.category.id) {
-          await setBudget(month, catRow.category.id, catRow.activity)
+          await setBudget(month, catRow.category.id, catRow.activity, false)
         }
       }
     }
@@ -113,7 +115,7 @@ export async function coverMonthSpent(month: string, rows?: GroupBudgetRow[]): P
   const activityMap = calculateActivityByCategory(txs, month, accounts)
 
   for (const [catId, spent] of activityMap.entries()) {
-    await setBudget(month, catId, spent)
+    await setBudget(month, catId, spent, false)
   }
 
   notifyDataChanged('budget_months', 'upsert')
@@ -134,7 +136,9 @@ export function calculateActivityByCategory(
     : undefined
 
   for (const tx of transactions) {
-    let isExpense = tx.type === 'expense'
+    if (isDateBeforeAccountingStart(tx.date)) continue
+
+    let isExpense = tx.type === 'expense' && (accountMap && tx.accountId ? accountMap.get(tx.accountId)?.type !== 'off_budget' : true)
     if (tx.type === 'transfer' && accountMap) {
       const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
       const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
@@ -150,7 +154,9 @@ export function calculateActivityByCategory(
       : toMonthKey(new Date(tx.date))
     if (effectiveMonth !== month) continue
     if (tx.categoryId) {
-      map.set(tx.categoryId, (map.get(tx.categoryId) || 0) + tx.amount)
+      const current = map.get(tx.categoryId) || 0
+      const updated = Math.round((current + Number(tx.amount || 0)) * 100) / 100
+      map.set(tx.categoryId, Math.abs(updated) < 0.005 ? 0 : updated)
     }
   }
   return map
@@ -167,7 +173,9 @@ export function calculateIncomeByCategory(
     : undefined
 
   for (const tx of transactions) {
-    let isIncome = tx.type === 'income'
+    if (isDateBeforeAccountingStart(tx.date)) continue
+
+    let isIncome = tx.type === 'income' && (accountMap && tx.accountId ? accountMap.get(tx.accountId)?.type !== 'off_budget' : true)
     if (tx.type === 'transfer' && accountMap) {
       const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
       const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
@@ -181,7 +189,9 @@ export function calculateIncomeByCategory(
     const txMonth = toMonthKey(new Date(tx.date))
     if (txMonth !== month) continue
     if (tx.categoryId) {
-      map.set(tx.categoryId, (map.get(tx.categoryId) || 0) + tx.amount)
+      const current = map.get(tx.categoryId) || 0
+      const updated = Math.round((current + Number(tx.amount || 0)) * 100) / 100
+      map.set(tx.categoryId, Math.abs(updated) < 0.005 ? 0 : updated)
     }
   }
   return map
@@ -218,19 +228,34 @@ export function calculateBudgetRows(
     for (const cat of groupCategories) {
       if (!cat.id) continue
       const budgetRec = budgetByCategory.get(cat.id)
-      const budgeted = budgetRec?.budgeted ?? 0
-      const activity = activityMap.get(cat.id) ?? 0
-      const available = budgeted - activity
+      const budgeted = Math.round(Number(budgetRec?.budgeted ?? 0) * 100) / 100
+      const activity = Math.round(Number(activityMap.get(cat.id) ?? 0) * 100) / 100
+      const rawAvailable = budgeted - activity
+      const roundedAvailable = Math.round(rawAvailable * 100) / 100
+      const available = Math.abs(roundedAvailable) < 0.005 ? 0 : roundedAvailable
 
-      catRows.push({ category: cat, budgeted, activity, available })
+      catRows.push({
+        category: cat,
+        budgeted: Math.abs(budgeted) < 0.005 ? 0 : budgeted,
+        activity: Math.abs(activity) < 0.005 ? 0 : activity,
+        available,
+      })
     }
+
+    const rawTotalBudgeted = catRows.reduce((s, r) => s + r.budgeted, 0)
+    const rawTotalActivity = catRows.reduce((s, r) => s + r.activity, 0)
+    const rawTotalAvailable = catRows.reduce((s, r) => s + r.available, 0)
+
+    const roundedTotalBudgeted = Math.round(rawTotalBudgeted * 100) / 100
+    const roundedTotalActivity = Math.round(rawTotalActivity * 100) / 100
+    const roundedTotalAvailable = Math.round(rawTotalAvailable * 100) / 100
 
     rows.push({
       group,
       categories: catRows,
-      totalBudgeted: catRows.reduce((s, r) => s + r.budgeted, 0),
-      totalActivity: catRows.reduce((s, r) => s + r.activity, 0),
-      totalAvailable: catRows.reduce((s, r) => s + r.available, 0),
+      totalBudgeted: Math.abs(roundedTotalBudgeted) < 0.005 ? 0 : roundedTotalBudgeted,
+      totalActivity: Math.abs(roundedTotalActivity) < 0.005 ? 0 : roundedTotalActivity,
+      totalAvailable: Math.abs(roundedTotalAvailable) < 0.005 ? 0 : roundedTotalAvailable,
     })
   }
 
@@ -262,19 +287,34 @@ export function calculateIncomeBudgetRows(
     for (const cat of groupCategories) {
       if (!cat.id) continue
       const budgetRec = budgetByCategory.get(cat.id)
-      const expected = budgetRec?.budgeted ?? 0
-      const received = incomeMap.get(cat.id) ?? 0
-      const difference = expected - received
+      const expected = Math.round(Number(budgetRec?.budgeted ?? 0) * 100) / 100
+      const received = Math.round(Number(incomeMap.get(cat.id) ?? 0) * 100) / 100
+      const rawDiff = expected - received
+      const roundedDiff = Math.round(rawDiff * 100) / 100
+      const difference = Math.abs(roundedDiff) < 0.005 ? 0 : roundedDiff
 
-      catRows.push({ category: cat, expected, received, difference })
+      catRows.push({
+        category: cat,
+        expected: Math.abs(expected) < 0.005 ? 0 : expected,
+        received: Math.abs(received) < 0.005 ? 0 : received,
+        difference,
+      })
     }
+
+    const rawTotalExpected = catRows.reduce((s, r) => s + r.expected, 0)
+    const rawTotalReceived = catRows.reduce((s, r) => s + r.received, 0)
+    const rawTotalDiff = catRows.reduce((s, r) => s + r.difference, 0)
+
+    const roundedTotalExpected = Math.round(rawTotalExpected * 100) / 100
+    const roundedTotalReceived = Math.round(rawTotalReceived * 100) / 100
+    const roundedTotalDiff = Math.round(rawTotalDiff * 100) / 100
 
     rows.push({
       group,
       categories: catRows,
-      totalExpected: catRows.reduce((s, r) => s + r.expected, 0),
-      totalReceived: catRows.reduce((s, r) => s + r.received, 0),
-      totalDifference: catRows.reduce((s, r) => s + r.difference, 0),
+      totalExpected: Math.abs(roundedTotalExpected) < 0.005 ? 0 : roundedTotalExpected,
+      totalReceived: Math.abs(roundedTotalReceived) < 0.005 ? 0 : roundedTotalReceived,
+      totalDifference: Math.abs(roundedTotalDiff) < 0.005 ? 0 : roundedTotalDiff,
     })
   }
 
@@ -487,19 +527,36 @@ export function calculateBudgetSummary(
 
       if (mCursor === month) {
         rolloverForSelectedMonth = runningSurplus
-        const futureToBeBudgeted = rolloverForSelectedMonth + cursorExpectedIncome - cursorBudgetedExpenses
+        const rawFutureToBeBudgeted = rolloverForSelectedMonth + cursorExpectedIncome - cursorBudgetedExpenses
+        const roundedFutureTBB = Math.round(rawFutureToBeBudgeted * 100) / 100
+        const finalFutureTBB = Math.abs(roundedFutureTBB) < 0.005 ? 0 : roundedFutureTBB
+
+        const roundedRollover = Math.round(rolloverForSelectedMonth * 100) / 100
+        const finalRollover = Math.abs(roundedRollover) < 0.005 ? 0 : roundedRollover
+
+        const roundedTotalIncome = Math.round(totalIncome * 100) / 100
+        const finalTotalIncome = Math.abs(roundedTotalIncome) < 0.005 ? 0 : roundedTotalIncome
+
+        const roundedExpIncome = Math.round(cursorExpectedIncome * 100) / 100
+        const finalExpIncome = Math.abs(roundedExpIncome) < 0.005 ? 0 : roundedExpIncome
+
+        const roundedBudgeted = Math.round(cursorBudgetedExpenses * 100) / 100
+        const finalBudgeted = Math.abs(roundedBudgeted) < 0.005 ? 0 : roundedBudgeted
+
+        const roundedInvoices = Math.round(currentInvoicesDue * 100) / 100
+        const finalInvoices = Math.abs(roundedInvoices) < 0.005 ? 0 : roundedInvoices
 
         return {
           month,
           isFutureMonth: true,
-          rolloverFromPreviousMonth: rolloverForSelectedMonth,
-          totalIncome,
-          totalExpectedIncome: cursorExpectedIncome,
-          pendingExpectedIncome: cursorExpectedIncome,
-          totalBudgeted: cursorBudgetedExpenses,
-          currentInvoicesDue,
-          toBeBudgeted: futureToBeBudgeted,
-          projectedToBeBudgeted: futureToBeBudgeted,
+          rolloverFromPreviousMonth: finalRollover,
+          totalIncome: finalTotalIncome,
+          totalExpectedIncome: finalExpIncome,
+          pendingExpectedIncome: finalExpIncome,
+          totalBudgeted: finalBudgeted,
+          currentInvoicesDue: finalInvoices,
+          toBeBudgeted: finalFutureTBB,
+          projectedToBeBudgeted: finalFutureTBB,
         }
       }
 
@@ -530,20 +587,40 @@ export function calculateBudgetSummary(
   }
 
   // Disponível a Orçar (Caixa Real): Fundos disponíveis do mês menos o total alocado nas categorias do mês
-  const toBeBudgeted = availableFundsForMonth - totalBudgeted
+  const rawToBeBudgeted = availableFundsForMonth - totalBudgeted
+  const roundedTBB = Math.round(rawToBeBudgeted * 100) / 100
+  const finalTBB = Math.abs(roundedTBB) < 0.005 ? 0 : roundedTBB
+
   // Disponível a Orçar Projetado: Saldo a orçar somado às receitas previstas que ainda faltam entrar
-  const projectedToBeBudgeted = toBeBudgeted + pendingExpectedIncome
+  const rawProjTBB = finalTBB + pendingExpectedIncome
+  const roundedProjTBB = Math.round(rawProjTBB * 100) / 100
+  const finalProjTBB = Math.abs(roundedProjTBB) < 0.005 ? 0 : roundedProjTBB
+
+  const roundedIncome = Math.round(totalIncome * 100) / 100
+  const finalIncome = Math.abs(roundedIncome) < 0.005 ? 0 : roundedIncome
+
+  const roundedExpected = Math.round(totalExpectedIncome * 100) / 100
+  const finalExpected = Math.abs(roundedExpected) < 0.005 ? 0 : roundedExpected
+
+  const roundedPending = Math.round(pendingExpectedIncome * 100) / 100
+  const finalPending = Math.abs(roundedPending) < 0.005 ? 0 : roundedPending
+
+  const roundedBudgeted = Math.round(totalBudgeted * 100) / 100
+  const finalBudgeted = Math.abs(roundedBudgeted) < 0.005 ? 0 : roundedBudgeted
+
+  const roundedInvoices = Math.round(currentInvoicesDue * 100) / 100
+  const finalInvoices = Math.abs(roundedInvoices) < 0.005 ? 0 : roundedInvoices
 
   return {
     month,
     isFutureMonth: false,
     rolloverFromPreviousMonth: 0,
-    totalIncome,
-    totalExpectedIncome,
-    pendingExpectedIncome,
-    totalBudgeted,
-    currentInvoicesDue,
-    toBeBudgeted,
-    projectedToBeBudgeted,
+    totalIncome: finalIncome,
+    totalExpectedIncome: finalExpected,
+    pendingExpectedIncome: finalPending,
+    totalBudgeted: finalBudgeted,
+    currentInvoicesDue: finalInvoices,
+    toBeBudgeted: finalTBB,
+    projectedToBeBudgeted: finalProjTBB,
   }
 }

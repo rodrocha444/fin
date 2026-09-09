@@ -116,9 +116,9 @@ function IncomeCategoryRow({
   const diff = Math.round((row.expected - row.received) * 100) / 100
 
   const diffColor =
-    diff <= 0 && (row.received > 0 || row.expected > 0)
+    diff <= 0.005 && (row.received > 0.005 || row.expected > 0.005)
       ? 'text-emerald-400 font-medium'
-      : diff > 0
+      : diff > 0.005
       ? 'text-amber-400/90 font-medium'
       : 'text-slate-500 font-normal'
 
@@ -261,8 +261,8 @@ function CategoryRow({
   )
 
   const availColor =
-    row.available > 0 ? 'text-emerald-400 font-medium' :
-    row.available < 0 ? 'text-rose-400 font-medium' : 'text-slate-500 font-normal'
+    row.available > 0.005 ? 'text-emerald-400 font-medium' :
+    row.available < -0.005 ? 'text-rose-400 font-medium' : 'text-slate-500 font-normal'
 
   return (
     <tr className="group hover:bg-slate-800/30 transition-colors">
@@ -358,7 +358,7 @@ function GroupRow({
           {row.totalActivity > 0 ? formatCurrency(row.totalActivity) : <span className="text-slate-600">—</span>}
         </td>
         <td className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm font-semibold tabular-nums ${
-          row.totalAvailable >= 0 ? 'text-slate-300' : 'text-rose-400'
+          row.totalAvailable >= -0.005 ? 'text-slate-300' : 'text-rose-400'
         }`}>
           {formatCurrency(Math.abs(row.totalAvailable))}
         </td>
@@ -434,8 +434,8 @@ export default function BudgetPage() {
 
   const tbbColor =
     !summary ? 'text-slate-400' :
-    summary.toBeBudgeted > 0 ? 'text-emerald-400' :
-    summary.toBeBudgeted < 0 ? 'text-rose-400' : 'text-slate-400'
+    summary.toBeBudgeted > 0.005 ? 'text-emerald-400' :
+    summary.toBeBudgeted < -0.005 ? 'text-rose-400' : 'text-slate-400'
 
   return (
     <div className="flex flex-col h-full">
