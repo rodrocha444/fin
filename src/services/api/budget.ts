@@ -450,14 +450,28 @@ export function calculateBudgetSummary(
     }
   }
 
-  // Total orçado nas categorias de despesa única e exclusivamente no mês selecionado para o regime ativo
+  // Total orçado e gastos excedentes (overspent) única e exclusivamente no mês selecionado para o regime ativo
+  const expenseBudgetMap = new Map<string, number>()
   let totalBudgeted = 0
   for (const b of budgetMonths) {
     if (b.month !== month) continue
     if (isMonthBeforeAccountingStart(b.month)) continue
     if ((b.budgetType || 'cash') !== regime) continue
     if (ignoredCategoryIds.has(b.categoryId)) continue
-    totalBudgeted += Number(b.budgeted || 0)
+    const val = Number(b.budgeted || 0)
+    expenseBudgetMap.set(b.categoryId, val)
+    totalBudgeted += val
+  }
+
+  // Atividade/gastos por categoria no mês selecionado
+  const activityMap = calculateActivityByCategory(transactions, month, accounts, regime, _installmentGroups)
+  let totalOverspent = 0
+  for (const [catId, spent] of activityMap.entries()) {
+    if (ignoredCategoryIds.has(catId)) continue
+    const budgeted = expenseBudgetMap.get(catId) ?? 0
+    if (spent > budgeted + 0.005) {
+      totalOverspent += (spent - budgeted)
+    }
   }
 
   // Receitas orçadas/esperadas única e exclusivamente para o mês selecionado
@@ -496,25 +510,28 @@ export function calculateBudgetSummary(
   const curMonth = currentMonth()
   const isFutureMonth = month > curMonth
 
+  // Total de fundos comprometidos no mês = Orçado + Gastos não cobertos (estouros / sem orçamento)
+  const totalCommitted = totalBudgeted + totalOverspent
+
   // Disponível a Orçar:
   // Se for mês futuro e o usuário definiu receitas previstas (ou não recebeu renda ainda):
-  // o saldo a orçar baseia-se na renda prevista do próprio mês menos as despesas orçadas do próprio mês.
+  // o saldo a orçar baseia-se na renda prevista do próprio mês menos as despesas comprometidas do próprio mês.
   // No mês atual/passado:
-  // toBeBudgeted = receitas recebidas no mês - despesas orçadas no mês.
-  // projectedToBeBudgeted = (receitas recebidas + receitas previstas pendentes) - despesas orçadas no mês.
+  // toBeBudgeted = receitas recebidas no mês - despesas comprometidas no mês.
+  // projectedToBeBudgeted = (receitas recebidas + receitas previstas pendentes) - despesas comprometidas no mês.
   
   let rawToBeBudgeted: number
   let rawProjToBeBudgeted: number
 
   if (isFutureMonth) {
     const plannedIncome = totalExpectedIncome > 0 ? totalExpectedIncome : totalIncome
-    rawToBeBudgeted = plannedIncome - totalBudgeted
+    rawToBeBudgeted = plannedIncome - totalCommitted
     rawProjToBeBudgeted = (totalIncome + pendingExpectedIncome) > 0 
-      ? (totalIncome + pendingExpectedIncome) - totalBudgeted 
-      : plannedIncome - totalBudgeted
+      ? (totalIncome + pendingExpectedIncome) - totalCommitted 
+      : plannedIncome - totalCommitted
   } else {
-    rawToBeBudgeted = totalIncome - totalBudgeted
-    rawProjToBeBudgeted = (totalIncome + pendingExpectedIncome) - totalBudgeted
+    rawToBeBudgeted = totalIncome - totalCommitted
+    rawProjToBeBudgeted = (totalIncome + pendingExpectedIncome) - totalCommitted
   }
 
   const roundedTBB = Math.round(rawToBeBudgeted * 100) / 100
