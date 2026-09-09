@@ -420,58 +420,114 @@ export default function BudgetPage() {
   return (
     <div className="flex flex-col h-full">
 
-      {/* ── Header Principal Revitalizado ────────────────────── */}
+      {/* ── Header Principal ─────────────────────────────────── */}
       <div
         className="bg-slate-900/95 backdrop-blur-sm border-b border-slate-800/90 flex-shrink-0 relative z-20"
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
       >
-        {/* Barra superior de navegação e status */}
-        <div className="px-3 sm:px-6 pb-3 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+        <div className="px-3 sm:px-6 pb-3 space-y-2 sm:space-y-0">
           
-          {/* Lado Esquerdo: Navegação de Mês + Seletor de Regime */}
-          <div className="flex items-center justify-between md:justify-start gap-2 flex-wrap">
-            <div className="flex items-center gap-2">
+          {/* Barra Principal: Mês + Regime + Hero Card (sm+) + Sync & Menu */}
+          <div className="flex items-center justify-between gap-2">
+            
+            {/* Esquerda: Navegação de Mês + Seletor de Regime */}
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-shrink-0">
               <MonthNavigator month={month} onChangeMonth={setMonth} minMonth={startMonth} />
               <BudgetRegimeSelector regime={budgetRegime} onChangeRegime={handleBudgetRegimeChange} />
             </div>
 
-            {/* Ações no mobile alinhadas à direita da linha 1 */}
-            <div className="flex md:hidden items-center gap-1.5">
-              <SyncStatusBadge compact={true} />
+            {/* Centro no Desktop (sm+): Card Hero "Disponível a Orçar" */}
+            {summary && (
+              <div className="hidden sm:flex flex-1 items-center justify-center px-2 min-w-0">
+                <div
+                  className={`px-4 py-1.5 rounded-xl border flex items-center justify-center gap-3 shadow-sm transition-all duration-200 ${
+                    summary.toBeBudgeted > 0.005
+                      ? 'bg-emerald-950/30 border-emerald-800/50 shadow-emerald-950/20'
+                      : summary.toBeBudgeted < -0.005
+                      ? 'bg-rose-950/30 border-rose-800/50 shadow-rose-950/20'
+                      : 'bg-slate-800/50 border-slate-700/60'
+                  }`}
+                >
+                  <div className="text-right min-w-0">
+                    <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate">
+                        {summary.isFutureMonth
+                          ? 'A Orçar (Projetado)'
+                          : (summary.totalExpectedIncome ?? 0) > 0
+                          ? 'A Orçar (Caixa)'
+                          : 'Disponível a Orçar'}
+                      </span>
+                      {summary.isFutureMonth ? (
+                        <span
+                          className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-950/90 text-indigo-300 border border-indigo-800/60 flex-shrink-0"
+                          title={`Sobra vinda do mês anterior: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
+                        >
+                          Sobra: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
+                        </span>
+                      ) : (
+                        (summary.pendingExpectedIncome ?? 0) > 0 && (
+                          <span
+                            className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60 flex-shrink-0"
+                            title="Saldo projetado a orçar ao fim do mês considerando receitas previstas pendentes"
+                          >
+                            Previsto: {formatCurrency(summary.projectedToBeBudgeted)}
+                          </span>
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-right flex-shrink-0">
+                    <span className={`text-base lg:text-lg font-extrabold tabular-nums tracking-tight ${tbbColor}`}>
+                      {formatCurrency(summary.toBeBudgeted)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Direita: Status de Sync + Menu de Ações (Unificado para todas as telas) */}
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+              <div className="lg:hidden">
+                <SyncStatusBadge compact={true} />
+              </div>
+
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setShowMenu(s => !s)}
                   className={`p-2 rounded-lg transition-all duration-150 border ${
                     showMenu
-                      ? 'bg-slate-800 border-indigo-500/50 text-indigo-300'
+                      ? 'bg-slate-800 border-indigo-500/50 text-indigo-300 shadow-sm'
                       : 'bg-slate-800/70 hover:bg-slate-800 border-slate-700/70 text-slate-400 hover:text-slate-200'
                   }`}
+                  title="Ações do orçamento do mês"
                   aria-label="Opções do orçamento"
                 >
                   <MoreHorizontal className="w-4 h-4" />
                 </button>
+
                 {showMenu && (
                   <>
                     <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)} />
                     <div className="absolute right-0 top-full mt-1.5 bg-slate-900/95 backdrop-blur-md border border-slate-700/90 rounded-xl shadow-2xl z-40 p-1.5 min-w-[210px] animate-in fade-in zoom-in-95 duration-150">
                       <button
                         onClick={handleCoverSpent}
-                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors"
                       >
                         <CheckCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                         <span>Cobrir gastos do mês</span>
                       </button>
                       <button
                         onClick={handleCopy}
-                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
                       >
                         <Copy className="w-4 h-4 text-indigo-400 flex-shrink-0" />
                         <span>Copiar mês anterior</span>
                       </button>
                       <button
                         onClick={handleClear}
-                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-medium text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
                       >
                         <Trash2 className="w-4 h-4 text-rose-400 flex-shrink-0" />
                         <span>Zerar orçamento</span>
@@ -481,13 +537,14 @@ export default function BudgetPage() {
                 )}
               </div>
             </div>
+
           </div>
 
-          {/* Centro / Destaque: Card Hero "Disponível a Orçar" (To Be Budgeted) */}
+          {/* Mobile (< sm): Card Hero "Disponível a Orçar" posicionado logo abaixo */}
           {summary && (
-            <div className="flex-1 max-w-md mx-auto md:mx-0 flex items-center justify-center">
+            <div className="sm:hidden pt-0.5">
               <div
-                className={`w-full md:w-auto px-4 py-2 rounded-xl border flex items-center justify-between md:justify-center gap-3 sm:gap-4 shadow-sm transition-all duration-200 ${
+                className={`w-full px-3.5 py-2 rounded-xl border flex items-center justify-between gap-3 shadow-sm transition-all duration-200 ${
                   summary.toBeBudgeted > 0.005
                     ? 'bg-emerald-950/30 border-emerald-800/50 shadow-emerald-950/20'
                     : summary.toBeBudgeted < -0.005
@@ -495,7 +552,7 @@ export default function BudgetPage() {
                     : 'bg-slate-800/50 border-slate-700/60'
                 }`}
               >
-                <div className="text-left md:text-right">
+                <div className="text-left min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
                       {summary.isFutureMonth
@@ -522,74 +579,23 @@ export default function BudgetPage() {
                       )
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-500 hidden md:block">
+                  <p className="text-[10px] text-slate-500 truncate">
                     {summary.toBeBudgeted > 0.005
-                      ? 'Dinheiro disponível para distribuir'
+                      ? 'Disponível para distribuir'
                       : summary.toBeBudgeted < -0.005
-                      ? 'Orçamento excedeu as receitas'
+                      ? 'Orçamento excedeu receitas'
                       : 'Orçamento 100% equilibrado'}
                   </p>
                 </div>
 
-                <div className="text-right">
-                  <span className={`text-base sm:text-xl font-extrabold tabular-nums tracking-tight ${tbbColor}`}>
+                <div className="text-right flex-shrink-0">
+                  <span className={`text-base font-extrabold tabular-nums tracking-tight ${tbbColor}`}>
                     {formatCurrency(summary.toBeBudgeted)}
                   </span>
                 </div>
               </div>
             </div>
           )}
-
-          {/* Lado Direito no Desktop: Menu de Ações e Status */}
-          <div className="hidden md:flex items-center gap-2 flex-shrink-0">
-            <div className="lg:hidden">
-              <SyncStatusBadge compact={true} />
-            </div>
-
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowMenu(s => !s)}
-                className={`p-2 rounded-lg transition-all duration-150 border ${
-                  showMenu
-                    ? 'bg-slate-800 border-indigo-500/50 text-indigo-300 shadow-sm'
-                    : 'bg-slate-800/70 hover:bg-slate-800 border-slate-700/70 text-slate-400 hover:text-slate-200'
-                }`}
-                title="Ações do orçamento do mês"
-              >
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
-
-              {showMenu && (
-                <>
-                  <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)} />
-                  <div className="absolute right-0 top-full mt-1.5 bg-slate-900/95 backdrop-blur-md border border-slate-700/90 rounded-xl shadow-2xl z-40 p-1.5 min-w-[220px] animate-in fade-in zoom-in-95 duration-150">
-                    <button
-                      onClick={handleCoverSpent}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors"
-                    >
-                      <CheckCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                      <span>Cobrir gastos do mês</span>
-                    </button>
-                    <button
-                      onClick={handleCopy}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
-                    >
-                      <Copy className="w-4 h-4 text-indigo-400 flex-shrink-0" />
-                      <span>Copiar mês anterior</span>
-                    </button>
-                    <button
-                      onClick={handleClear}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
-                    >
-                      <Trash2 className="w-4 h-4 text-rose-400 flex-shrink-0" />
-                      <span>Zerar orçamento</span>
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
 
         </div>
       </div>

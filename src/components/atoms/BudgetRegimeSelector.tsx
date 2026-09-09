@@ -72,10 +72,10 @@ export default function BudgetRegimeSelector({
           <ActiveIcon className="w-3.5 h-3.5" />
         </div>
 
-        <div className="flex items-center gap-1.5 text-left">
+        <div className="flex items-center gap-1.5 text-left min-w-0">
           <span className="hidden sm:inline font-semibold">{activeOption.label}</span>
-          <span className="sm:hidden font-semibold">{activeOption.label.replace('Por ', '')}</span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
+          <span className="sm:hidden font-semibold truncate">{activeOption.label.replace('Por ', '')}</span>
+          <span className={`hidden sm:inline-block text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
             regime === 'accrual'
               ? 'bg-indigo-950/90 text-indigo-300 border border-indigo-800/60'
               : 'bg-sky-950/90 text-sky-300 border border-sky-800/60'
