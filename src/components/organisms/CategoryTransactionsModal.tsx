@@ -342,14 +342,14 @@ export default function CategoryTransactionsModal({
                     <p className="text-[10px] text-slate-500 font-medium">Disponível</p>
                     <p
                       className={`text-xs sm:text-base font-bold tabular-nums ${
-                        (available ?? 0) > 0
+                        (available ?? 0) > 0.005
                           ? 'text-emerald-400'
-                          : (available ?? 0) < 0
+                          : (available ?? 0) < -0.005
                           ? 'text-rose-400'
                           : 'text-slate-400'
                       }`}
                     >
-                      {formatCurrency(Math.abs(available ?? 0))}
+                      {(available ?? 0) < -0.005 ? `-${formatCurrency(Math.abs(available ?? 0))}` : formatCurrency(available ?? 0)}
                     </p>
                   </div>
                 )}

@@ -1,6 +1,6 @@
-// src/services/api/issues.ts — Detecção de pendências e regras de consistência
 import { toMonthKey, calculateActivityByCategory } from './budget'
-import { isInitialSetupCategory } from '@/utils/format'
+import { isInitialSetupCategory, formatCurrency } from '@/utils/format'
+import type { AccountingRegime } from '@/utils/accountingRegime'
 import type {
   Transaction,
   Category,
@@ -8,6 +8,7 @@ import type {
   BudgetMonth,
   PendingIssue,
   Account,
+  InstallmentGroup,
 } from '@/types'
 
 export function computePendingIssues(
@@ -15,7 +16,10 @@ export function computePendingIssues(
   categories: Category[],
   categoryGroups: CategoryGroup[],
   budgetMonths: BudgetMonth[],
-  accounts?: Account[]
+  accounts?: Account[],
+  targetMonth?: string,
+  regime: AccountingRegime = 'cash',
+  installmentGroups: InstallmentGroup[] = []
 ): PendingIssue[] {
   const issues: PendingIssue[] = []
 
@@ -65,11 +69,13 @@ export function computePendingIssues(
     })
   }
 
-  // Regra 2: Categorias estouradas no mês atual
-  const currentMonth = toMonthKey(new Date())
-  const activityMap = calculateActivityByCategory(transactions, currentMonth, accounts)
+  // Regra 2: Categorias estouradas / sem cobertura no mês ativo
+  const activeMonth = targetMonth || toMonthKey(new Date())
+  const activityMap = calculateActivityByCategory(transactions, activeMonth, accounts, regime, installmentGroups)
   const budgetByCategory = new Map(
-    budgetMonths.filter(b => b.month === currentMonth).map(b => [b.categoryId, b.budgeted])
+    budgetMonths
+      .filter(b => b.month === activeMonth && (b.budgetType || 'cash') === regime)
+      .map(b => [b.categoryId, b.budgeted])
   )
   const categoryMap = new Map(categories.map(c => [c.id!, c]))
   const groupMap = new Map(categoryGroups.map(g => [g.id!, g]))
@@ -81,12 +87,12 @@ export function computePendingIssues(
     const cat = categoryMap.get(catId)
     const grp = cat ? groupMap.get(cat.groupId) : undefined
     if (cat && isInitialSetupCategory(cat.name, grp?.name)) continue
-    if (spent > budgeted && cat && !cat.isHidden) {
-      const excess = spent - budgeted
+    if (spent > budgeted + 0.005 && cat && !cat.isHidden) {
+      const excess = Math.round((spent - budgeted) * 100) / 100
       overspent.push({
         id: catId,
         title: cat.name,
-        subtitle: `Orçado: R$ ${budgeted.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Gasto: R$ ${spent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        subtitle: `Orçado: ${formatCurrency(budgeted)} | Gasto: ${formatCurrency(spent)} (Falta cobrir ${formatCurrency(excess)})`,
         amount: excess,
       })
     }
@@ -97,7 +103,7 @@ export function computePendingIssues(
       id: 'overspent_categories',
       ruleId: 'overspent_categories',
       title: `${overspent.length} ${overspent.length === 1 ? 'categoria estourada' : 'categorias estouradas'} neste mês`,
-      description: 'Os gastos reais ultrapassaram o valor alocado no orçamento.',
+      description: `Os gastos da fatura/mês ultrapassaram o valor orçado (${regime === 'accrual' ? 'Competência' : 'Faturas/Caixa'}).`,
       severity: 'error',
       count: overspent.length,
       items: overspent,

@@ -7,10 +7,16 @@ import { useCategoriesWithGroups } from '@/hooks/useBudget'
 import { updateTransaction } from '@/services/api/transactions'
 import { formatCurrency } from '@/utils/format'
 import type { PendingIssue } from '@/types'
+import type { AccountingRegime } from '@/utils/accountingRegime'
 
-export default function PendingIssuesCard() {
+interface PendingIssuesCardProps {
+  month?: string
+  regime?: AccountingRegime
+}
+
+export default function PendingIssuesCard({ month, regime = 'cash' }: PendingIssuesCardProps = {}) {
   const navigate = useNavigate()
-  const issues = usePendingIssues() ?? []
+  const issues = usePendingIssues(month, regime) ?? []
   const [isExpanded, setIsExpanded] = useState(false)
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null)
   const { categories, groups } = useCategoriesWithGroups() ?? { categories: [], groups: [] }

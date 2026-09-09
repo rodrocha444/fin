@@ -250,7 +250,7 @@ function CategoryRow({
 
   const availColor =
     row.available > 0.005 ? 'text-emerald-400 font-medium' :
-    row.available < -0.005 ? 'text-rose-400 font-medium' : 'text-slate-500 font-normal'
+    row.available < -0.005 ? 'text-rose-400 font-semibold' : 'text-slate-500 font-normal'
 
   return (
     <tr className="group hover:bg-slate-800/30 transition-colors">
@@ -268,9 +268,19 @@ function CategoryRow({
         className="py-2.5 pl-6 sm:pl-10 pr-2 text-xs sm:text-sm text-slate-300 cursor-pointer"
         title="Clique para ver as transações desta categoria no mês"
       >
-        <span className="break-words leading-tight block group-hover:text-indigo-300 transition-colors" title={row.category.name}>
-          {row.category.name}
-        </span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="break-words leading-tight block group-hover:text-indigo-300 transition-colors truncate" title={row.category.name}>
+            {row.category.name}
+          </span>
+          {row.available < -0.005 && (
+            <span
+              className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-950 text-rose-300 border border-rose-800/80 flex-shrink-0"
+              title={`Falta cobrir ${formatCurrency(Math.abs(row.available))} nesta categoria`}
+            >
+              Descoberto
+            </span>
+          )}
+        </div>
       </td>
       {/* Orçado */}
       <td className="py-2.5 px-2 text-right">
@@ -306,9 +316,13 @@ function CategoryRow({
           })
         }
         className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums cursor-pointer hover:bg-slate-800/50 ${availColor}`}
-        title="Clique para ver as transações desta categoria no mês"
+        title={
+          row.available < -0.005
+            ? `Atenção: faltam ${formatCurrency(Math.abs(row.available))} para cobrir os gastos desta categoria`
+            : 'Clique para ver as transações desta categoria no mês'
+        }
       >
-        {formatCurrency(Math.abs(row.available))}
+        {row.available < -0.005 ? `-${formatCurrency(Math.abs(row.available))}` : formatCurrency(row.available)}
       </td>
     </tr>
   )
@@ -350,7 +364,7 @@ function GroupRow({
         <td className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm font-semibold tabular-nums ${
           row.totalAvailable >= -0.005 ? 'text-slate-300' : 'text-rose-400'
         }`}>
-          {formatCurrency(Math.abs(row.totalAvailable))}
+          {row.totalAvailable < -0.005 ? `-${formatCurrency(Math.abs(row.totalAvailable))}` : formatCurrency(row.totalAvailable)}
         </td>
       </tr>
       {open && row.categories.map(cat => (
@@ -604,7 +618,7 @@ export default function BudgetPage() {
       <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-3">
         {/* Banner de inconsistências / pendências */}
         <div className="px-3 sm:px-6 pt-3">
-          <PendingIssuesCard />
+          <PendingIssuesCard month={month} regime={budgetRegime} />
         </div>
 
         {!rows && !incomeRows ? (

@@ -55,21 +55,28 @@ export async function setBudget(
     .eq('month', month)
     .eq('category_id', categoryId)
 
-  const existing = (rows || []).find(r => (r.budget_type || 'cash') === budgetType)
+  const matching = (rows || []).filter(r => (r.budget_type || 'cash') === budgetType)
 
-  if (existing?.id) {
+  if (matching.length > 0) {
+    const primaryId = matching[0].id
     const { error } = await client
       .from('budget_months')
       .update({ budgeted, budget_type: budgetType, updated_at: new Date().toISOString() })
-      .eq('id', existing.id)
+      .eq('id', primaryId)
 
     if (error) {
       // Fallback se a coluna budget_type não existir no banco
       const { error: fbErr } = await client
         .from('budget_months')
         .update({ budgeted, updated_at: new Date().toISOString() })
-        .eq('id', existing.id)
+        .eq('id', primaryId)
       if (fbErr) throw new Error(`Erro ao salvar orçamento: ${fbErr.message}`)
+    }
+
+    // Deletar duplicatas excedentes se existirem
+    if (matching.length > 1) {
+      const duplicateIds = matching.slice(1).map(r => r.id)
+      await client.from('budget_months').delete().in('id', duplicateIds)
     }
   } else {
     const id = createId()
@@ -433,14 +440,40 @@ export function calculateBudgetSummary(
     }
   }
 
-  // Total orçado nas categorias de despesa no mês selecionado (filtrado pelo regime)
-  let totalBudgeted = 0
+  // Mapa deduplicado de orçamento de despesas por chave (mês_categoria) para o regime ativo
+  const expenseBudgetByMonthAndCategory = new Map<string, number>()
   for (const b of budgetMonths) {
     if (isMonthBeforeAccountingStart(b.month)) continue
     if ((b.budgetType || 'cash') !== regime) continue
     if (ignoredCategoryIds.has(b.categoryId)) continue
-    if (b.month === month) totalBudgeted += b.budgeted
+    expenseBudgetByMonthAndCategory.set(`${b.month}_${b.categoryId}`, Number(b.budgeted || 0))
   }
+
+  // Função auxiliar para somar total orçado em despesas de um mês específico
+  const getBudgetedForMonth = (m: string): number => {
+    let sum = 0
+    for (const [key, val] of expenseBudgetByMonthAndCategory.entries()) {
+      if (key.startsWith(`${m}_`)) {
+        sum += val
+      }
+    }
+    return sum
+  }
+
+  // Função auxiliar para somar total orçado em despesas de meses anteriores a um mês específico
+  const getBudgetedPriorToMonth = (m: string): number => {
+    let sum = 0
+    for (const [key, val] of expenseBudgetByMonthAndCategory.entries()) {
+      const entryMonth = key.split('_')[0]
+      if (entryMonth < m) {
+        sum += val
+      }
+    }
+    return sum
+  }
+
+  // Total orçado nas categorias de despesa no mês selecionado (filtrado pelo regime)
+  const totalBudgeted = getBudgetedForMonth(month)
 
   // 1. Saldos iniciais das contas on-budget (checking)
   let initialFunds = 0
@@ -486,13 +519,7 @@ export function calculateBudgetSummary(
   }
 
   // 4. Total orçado em meses anteriores ao mês selecionado (filtrado pelo regime)
-  let priorBudgeted = 0
-  for (const b of budgetMonths) {
-    if (isMonthBeforeAccountingStart(b.month)) continue
-    if ((b.budgetType || 'cash') !== regime) continue
-    if (ignoredCategoryIds.has(b.categoryId)) continue
-    if (b.month < month) priorBudgeted += b.budgeted
-  }
+  const priorBudgeted = getBudgetedPriorToMonth(month)
 
   // Fundos disponíveis para o mês selecionado
   const availableFundsForMonth = initialFunds + totalIncomeFunds - netOffBudgetTransfers - priorBudgeted
@@ -539,15 +566,8 @@ export function calculateBudgetSummary(
       }
     }
 
-    let priorBudgetedToNow = 0
-    let nowBudgeted = 0
-    for (const b of budgetMonths) {
-      if (isMonthBeforeAccountingStart(b.month)) continue
-      if ((b.budgetType || 'cash') !== regime) continue
-      if (ignoredCategoryIds.has(b.categoryId)) continue
-      if (b.month < curMonth) priorBudgetedToNow += b.budgeted
-      if (b.month === curMonth) nowBudgeted += b.budgeted
-    }
+    const priorBudgetedToNow = getBudgetedPriorToMonth(curMonth)
+    const nowBudgeted = getBudgetedForMonth(curMonth)
 
     const availableFundsNow = initialFunds + totalIncomeFundsNow - netOffBudgetTransfersNow - priorBudgetedToNow
     const toBeBudgetedNow = availableFundsNow - nowBudgeted
@@ -595,13 +615,7 @@ export function calculateBudgetSummary(
         cursorExpectedIncome += Math.max(expected, received)
       }
 
-      let cursorBudgetedExpenses = 0
-      for (const b of budgetMonths) {
-        if (isMonthBeforeAccountingStart(b.month)) continue
-        if ((b.budgetType || 'cash') !== regime) continue
-        if (ignoredCategoryIds.has(b.categoryId)) continue
-        if (b.month === mCursor) cursorBudgetedExpenses += b.budgeted
-      }
+      const cursorBudgetedExpenses = getBudgetedForMonth(mCursor)
 
       if (mCursor === month) {
         rolloverForSelectedMonth = runningSurplus
