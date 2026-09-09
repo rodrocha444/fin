@@ -20,6 +20,7 @@ import { getSavedBudgetRegime, saveBudgetRegime, type AccountingRegime } from '@
 import { useConfirm } from '@/context/ConfirmContext'
 import PriceInput from '@/components/atoms/PriceInput'
 import MonthNavigator from '@/components/atoms/MonthNavigator'
+import BudgetRegimeSelector from '@/components/atoms/BudgetRegimeSelector'
 import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
 import PendingIssuesCard from '@/components/organisms/PendingIssuesCard'
 import CategoryTransactionsModal from '@/components/organisms/CategoryTransactionsModal'
@@ -464,19 +465,7 @@ export default function BudgetPage() {
         {/* Navegação de mês e Seletor de Modelo de Orçamento */}
         <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
           <MonthNavigator month={month} onChangeMonth={setMonth} minMonth={startMonth} />
-
-          <div className="relative">
-            <select
-              value={budgetRegime}
-              onChange={e => handleBudgetRegimeChange(e.target.value as AccountingRegime)}
-              className="bg-slate-950/80 hover:bg-slate-800 text-slate-200 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer transition-colors pr-7 appearance-none shadow-sm"
-              title="Alternar entre Orçamento por Fatura (Caixa) e Orçamento por Data da Compra (Competência)"
-            >
-              <option value="cash" className="bg-slate-900 text-slate-200">Orçamento por Caixa (Faturas)</option>
-              <option value="accrual" className="bg-slate-900 text-slate-200">Orçamento por Competência (Compra)</option>
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
-          </div>
+          <BudgetRegimeSelector regime={budgetRegime} onChangeRegime={handleBudgetRegimeChange} />
         </div>
 
         {/* To Be Budgeted */}
