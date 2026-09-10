@@ -1,10 +1,11 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Copy,
   Trash2,
   MoreHorizontal,
   CheckCheck,
+  Loader2,
 } from 'lucide-react'
 import { useBudgetRows, useIncomeBudgetRows, useBudgetSummary } from '@/hooks/useBudget'
 import { setBudget, copyFromPreviousMonth, clearMonthBudgets, coverMonthSpent } from '@/services/api/budget'
@@ -36,18 +37,63 @@ export interface CategoryModalData {
 
 // ── Célula editável inline ────────────────────────────────────
 
-function BudgetCell({ value, onSave }: { value: number; onSave: (v: number) => void }) {
+function BudgetCell({
+  value,
+  onSave,
+}: {
+  value: number
+  onSave: (v: number) => Promise<void> | void
+}) {
   const [editing, setEditing] = useState(false)
   const [currentVal, setCurrentVal] = useState(value)
+  const [loading, setLoading] = useState(false)
+  const isSavingRef = useRef(false)
 
   const startEdit = () => {
+    if (loading) return
     setCurrentVal(value)
     setEditing(true)
   }
 
-  const commitEdit = () => {
-    onSave(currentVal)
+  const commitEdit = async () => {
+    if (isSavingRef.current) return
+    isSavingRef.current = true
     setEditing(false)
+
+    if (currentVal === value) {
+      isSavingRef.current = false
+      return
+    }
+
+    try {
+      setLoading(true)
+      await onSave(currentVal)
+    } catch (err) {
+      console.error('Erro ao salvar valor orçado:', err)
+    } finally {
+      setLoading(false)
+      isSavingRef.current = false
+    }
+  }
+
+  const cancelEdit = () => {
+    isSavingRef.current = true
+    setCurrentVal(value)
+    setEditing(false)
+    setTimeout(() => {
+      isSavingRef.current = false
+    }, 50)
+  }
+
+  if (loading) {
+    return (
+      <div className="w-full flex items-center justify-end px-2 py-1 min-h-[32px] text-xs sm:text-sm text-indigo-400 gap-1.5 animate-pulse">
+        <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0 text-indigo-400" />
+        <span className="tabular-nums font-medium">
+          {currentVal === 0 ? <span className="text-slate-600">—</span> : formatCurrency(currentVal)}
+        </span>
+      </div>
+    )
   }
 
   if (editing) {
@@ -60,7 +106,7 @@ function BudgetCell({ value, onSave }: { value: number; onSave: (v: number) => v
         onBlur={commitEdit}
         onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
           if (e.key === 'Enter') commitEdit()
-          if (e.key === 'Escape') setEditing(false)
+          if (e.key === 'Escape') cancelEdit()
         }}
         placeholder="0,00"
       />
