@@ -560,29 +560,35 @@ export default function BudgetPage() {
                         {heroValue > 0.005 ? `+${formatCurrency(heroValue)}` : formatCurrency(heroValue)}
                       </span>
                       <div className="flex items-center justify-end gap-1 text-[9px] truncate">
-                        <span
-                          className={`font-semibold ${
-                            heroValue > 0.005 ? 'text-emerald-400' : heroValue < -0.005 ? 'text-rose-400 font-bold' : 'text-slate-400'
-                          }`}
-                        >
-                          {heroValue > 0.005 ? 'Sobra' : heroValue < -0.005 ? 'Negativo' : 'Equilibrado'}
-                        </span>
-                        {!isFuture && hasExpectedIncome && (
-                          <>
-                            <span className="text-slate-600">·</span>
-                            <span
-                              className={`font-semibold ${
-                                (summary.plannedNetResult ?? 0) < -0.005
-                                  ? 'text-rose-400 font-bold'
-                                  : (summary.plannedNetResult ?? 0) > 0.005
-                                  ? 'text-emerald-400/90'
-                                  : 'text-slate-400'
-                              }`}
-                              title={`Meta planejada do orçamento: ${formatCurrency(summary.plannedNetResult ?? 0)}`}
-                            >
-                              Meta: {(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}{formatCurrency(summary.plannedNetResult ?? 0)}
-                            </span>
-                          </>
+                        {isFuture ? (
+                          <span
+                            className={`font-semibold ${
+                              heroValue > 0.005 ? 'text-emerald-400' : heroValue < -0.005 ? 'text-rose-400 font-bold' : 'text-slate-400'
+                            }`}
+                          >
+                            {heroValue > 0.005 ? 'Previsto: Positivo' : heroValue < -0.005 ? 'Previsto: Negativo' : 'Previsto: Equilibrado'}
+                          </span>
+                        ) : hasExpectedIncome ? (
+                          <span
+                            className={`font-semibold ${
+                              (summary.plannedNetResult ?? 0) < -0.005
+                                ? 'text-rose-400 font-bold'
+                                : (summary.plannedNetResult ?? 0) > 0.005
+                                ? 'text-emerald-400'
+                                : 'text-slate-400'
+                            }`}
+                            title={`Resultado Previsto do orçamento (Receitas Previstas − Despesas Orçadas): ${formatCurrency(summary.plannedNetResult ?? 0)}`}
+                          >
+                            Previsto: {(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}{formatCurrency(summary.plannedNetResult ?? 0)}
+                          </span>
+                        ) : (
+                          <span
+                            className={`font-semibold ${
+                              heroValue > 0.005 ? 'text-emerald-400' : heroValue < -0.005 ? 'text-rose-400 font-bold' : 'text-slate-400'
+                            }`}
+                          >
+                            {heroValue > 0.005 ? 'Positivo' : heroValue < -0.005 ? 'Negativo' : 'Equilibrado'}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -727,25 +733,34 @@ export default function BudgetPage() {
                       {heroValue > 0.005 ? `+${formatCurrency(heroValue)}` : formatCurrency(heroValue)}
                     </span>
                     <div className="flex items-center justify-center gap-1 text-[8.5px] truncate max-w-full">
-                      <span
-                        className={`font-semibold truncate ${
-                          heroValue > 0.005 ? 'text-emerald-400' : heroValue < -0.005 ? 'text-rose-400 font-bold' : 'text-slate-400'
-                        }`}
-                      >
-                        {heroValue > 0.005 ? 'Sobra' : heroValue < -0.005 ? 'Negativo' : 'Equil.'}
-                      </span>
-                      {!isFuture && hasExpectedIncome && (
+                      {isFuture ? (
                         <span
-                          className={`truncate ${
+                          className={`font-semibold truncate ${
+                            heroValue > 0.005 ? 'text-emerald-400' : heroValue < -0.005 ? 'text-rose-400 font-bold' : 'text-slate-400'
+                          }`}
+                        >
+                          {heroValue > 0.005 ? 'Positivo' : heroValue < -0.005 ? 'Negativo' : 'Equil.'}
+                        </span>
+                      ) : hasExpectedIncome ? (
+                        <span
+                          className={`font-semibold truncate ${
                             (summary.plannedNetResult ?? 0) < -0.005
                               ? 'text-rose-400 font-bold'
                               : (summary.plannedNetResult ?? 0) > 0.005
-                              ? 'text-emerald-400/90'
+                              ? 'text-emerald-400'
                               : 'text-slate-400'
                           }`}
-                          title={`Meta: ${formatCurrency(summary.plannedNetResult ?? 0)}`}
+                          title={`Resultado Previsto do orçamento: ${formatCurrency(summary.plannedNetResult ?? 0)}`}
                         >
-                          ({(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}{formatCurrency(summary.plannedNetResult ?? 0)})
+                          Prev: {(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}{formatCurrency(summary.plannedNetResult ?? 0)}
+                        </span>
+                      ) : (
+                        <span
+                          className={`font-semibold truncate ${
+                            heroValue > 0.005 ? 'text-emerald-400' : heroValue < -0.005 ? 'text-rose-400 font-bold' : 'text-slate-400'
+                          }`}
+                        >
+                          {heroValue > 0.005 ? 'Positivo' : heroValue < -0.005 ? 'Negativo' : 'Equil.'}
                         </span>
                       )}
                     </div>
