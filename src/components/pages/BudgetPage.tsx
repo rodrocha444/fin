@@ -553,7 +553,7 @@ export default function BudgetPage() {
 
                     {/* 3. Resultado Final */}
                     <div className="flex flex-col text-right pl-2 border-l border-slate-700/60 min-w-0">
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate">
+                      <span className={`text-[10px] uppercase font-bold tracking-wider truncate ${heroValue < -0.005 ? 'text-rose-400' : 'text-slate-400'}`}>
                         {isFuture ? 'Resultado Previsto' : 'Resultado Real'}
                       </span>
                       <span className={`text-sm sm:text-base font-extrabold tabular-nums tracking-tight ${heroColor}`}>
@@ -561,15 +561,15 @@ export default function BudgetPage() {
                       </span>
                       <span
                         className={`text-[9px] font-semibold truncate ${
-                          heroValue > 0.005 ? 'text-emerald-400/90' : heroValue < -0.005 ? 'text-rose-400/90' : 'text-slate-400'
+                          heroValue > 0.005 ? 'text-emerald-400/90' : heroValue < -0.005 ? 'text-rose-400 font-bold' : 'text-slate-400'
                         }`}
                         title={
                           isFuture
-                            ? 'Superávit ou Déficit planejado para o mês'
+                            ? 'Resultado planejado para o mês'
                             : `Resultado Real (Receitas − Despesas). Meta planejada: ${formatCurrency(summary.plannedNetResult ?? 0)}`
                         }
                       >
-                        {heroValue > 0.005 ? 'Superávit' : heroValue < -0.005 ? 'Déficit' : 'Equilibrado'}
+                        {heroValue > 0.005 ? 'Sobra' : heroValue < -0.005 ? 'Negativo' : 'Equilibrado'}
                         {!isFuture && hasExpectedIncome ? ` · Meta: ${(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}${formatCurrency(summary.plannedNetResult ?? 0)}` : ''}
                       </span>
                     </div>
@@ -707,7 +707,7 @@ export default function BudgetPage() {
 
                   {/* Coluna 3: Resultado */}
                   <div className="flex flex-col items-center justify-center text-center px-1 min-w-0">
-                    <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 truncate">
+                    <span className={`text-[9px] uppercase font-bold tracking-wider truncate ${heroValue < -0.005 ? 'text-rose-400' : 'text-slate-400'}`}>
                       {isFuture ? 'Previsto' : 'Resultado'}
                     </span>
                     <span className={`text-xs font-extrabold tabular-nums tracking-tight truncate ${heroColor}`}>
@@ -715,15 +715,15 @@ export default function BudgetPage() {
                     </span>
                     <span
                       className={`text-[8.5px] font-semibold truncate ${
-                        heroValue > 0.005 ? 'text-emerald-400/90' : heroValue < -0.005 ? 'text-rose-400/90' : 'text-slate-400'
+                        heroValue > 0.005 ? 'text-emerald-400/90' : heroValue < -0.005 ? 'text-rose-400 font-bold' : 'text-slate-400'
                       }`}
                       title={
                         isFuture
-                          ? 'Superávit ou Déficit planejado'
+                          ? 'Resultado planejado'
                           : `Resultado Real (Receitas − Despesas). Meta: ${formatCurrency(summary.plannedNetResult ?? 0)}`
                       }
                     >
-                      {heroValue > 0.005 ? 'Superávit' : heroValue < -0.005 ? 'Déficit' : 'Equil.'}
+                      {heroValue > 0.005 ? 'Sobra' : heroValue < -0.005 ? 'Negativo' : 'Equil.'}
                       {!isFuture && hasExpectedIncome ? ` (${(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}${formatCurrency(summary.plannedNetResult ?? 0)})` : ''}
                     </span>
                   </div>
