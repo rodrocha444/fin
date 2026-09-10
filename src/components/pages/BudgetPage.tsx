@@ -358,7 +358,7 @@ function CategoryRow({
             : 'Clique para ver as transações desta categoria no mês'
         }
       >
-        {row.available < -0.005 ? `-${formatCurrency(Math.abs(row.available))}` : formatCurrency(row.available)}
+        {formatCurrency(Math.abs(row.available))}
       </td>
     </tr>
   )
@@ -400,7 +400,7 @@ function GroupRow({
         <td className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm font-semibold tabular-nums ${
           row.totalAvailable >= -0.005 ? 'text-slate-300' : 'text-rose-400'
         }`}>
-          {row.totalAvailable < -0.005 ? `-${formatCurrency(Math.abs(row.totalAvailable))}` : formatCurrency(row.totalAvailable)}
+          {formatCurrency(Math.abs(row.totalAvailable))}
         </td>
       </tr>
       {open && row.categories.map(cat => (
