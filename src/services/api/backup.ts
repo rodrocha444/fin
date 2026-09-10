@@ -80,6 +80,7 @@ function normalizeRecordForTable(tableName: string, r: any): any {
         id,
         month: r.month,
         categoryId: r.categoryId || r.category_id,
+        budgetType: r.budgetType || r.budget_type || (id?.startsWith('accrual:') ? 'accrual' : 'cash'),
         budgeted: Number(r.budgeted ?? 0),
         activity: Number(r.activity ?? 0),
         available: Number(r.available ?? 0),

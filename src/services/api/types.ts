@@ -1,6 +1,7 @@
 // src/services/api/types.ts — Conversores de dados entre Supabase e Typescript
 // Tipado via src/types/database.types.ts (Supabase TypeGen)
 import type { Tables } from '@/types/database.types'
+import { createId } from '@/utils/id'
 import type {
   Account,
   CategoryGroup,
@@ -152,11 +153,12 @@ export function categoryToUpdateRow(changes: Partial<Category>): Record<string, 
 
 // 4. Orçamento Mensal
 export function rowToBudgetMonth(row: Tables<'budget_months'>): BudgetMonth {
+  const isAccrual = row.budget_type === 'accrual' || row.id?.startsWith('accrual:')
   return {
     id: row.id,
     month: row.month,
     categoryId: row.category_id,
-    budgetType: (row.budget_type as BudgetMonth['budgetType']) || 'cash',
+    budgetType: isAccrual ? 'accrual' : ((row.budget_type as BudgetMonth['budgetType']) || 'cash'),
     budgeted: Number(row.budgeted ?? 0),
     activity: Number(row.activity ?? 0),
     available: Number(row.available ?? 0),
@@ -165,11 +167,13 @@ export function rowToBudgetMonth(row: Tables<'budget_months'>): BudgetMonth {
 
 export function budgetMonthToRow(item: Partial<BudgetMonth>): Record<string, unknown> {
   const now = new Date().toISOString()
+  const isAccrual = item.budgetType === 'accrual'
+  const id = item.id || (isAccrual ? `accrual:${createId()}` : createId())
   return {
-    ...(item.id ? { id: item.id } : {}),
+    id,
     month: item.month ?? '',
     category_id: item.categoryId ?? '',
-    budget_type: item.budgetType || 'cash',
+    budget_type: item.budgetType || (isAccrual ? 'accrual' : 'cash'),
     budgeted: item.budgeted ?? 0,
     activity: item.activity ?? 0,
     available: item.available ?? 0,

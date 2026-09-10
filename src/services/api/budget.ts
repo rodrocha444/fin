@@ -42,6 +42,13 @@ export function toMonthKey(date: Date): string {
   return format(date, 'yyyy-MM')
 }
 
+export function getRowBudgetType(r: { id?: string; budget_type?: string | null; budgetType?: BudgetType }): BudgetType {
+  if (r.budget_type === 'accrual' || r.budgetType === 'accrual' || r.id?.startsWith('accrual:')) {
+    return 'accrual'
+  }
+  return (r.budget_type as BudgetType) || (r.budgetType as BudgetType) || 'cash'
+}
+
 export async function setBudget(
   month: string,
   categoryId: string,
@@ -56,7 +63,7 @@ export async function setBudget(
     .eq('month', month)
     .eq('category_id', categoryId)
 
-  const matching = (rows || []).filter(r => (r.budget_type || 'cash') === budgetType)
+  const matching = (rows || []).filter(r => getRowBudgetType(r) === budgetType)
 
   if (matching.length > 0) {
     const primaryId = matching[0].id
@@ -66,7 +73,7 @@ export async function setBudget(
       .eq('id', primaryId)
 
     if (error) {
-      // Fallback se a coluna budget_type não existir no banco
+      // Fallback se a coluna budget_type não existir no banco (o primaryId já identifica o regime)
       const { error: fbErr } = await client
         .from('budget_months')
         .update({ budgeted, updated_at: new Date().toISOString() })
@@ -82,7 +89,7 @@ export async function setBudget(
       }
     }
   } else {
-    const id = createId()
+    const id = budgetType === 'accrual' ? `accrual:${createId()}` : createId()
     const { error } = await client.from('budget_months').insert({
       id,
       month,
@@ -96,7 +103,7 @@ export async function setBudget(
     })
 
     if (error) {
-      // Fallback se a coluna budget_type não existir no banco
+      // Fallback se a coluna budget_type não existir no banco (o prefixo 'accrual:' no ID preserva o regime)
       const { error: fbErr } = await client.from('budget_months').insert({
         id,
         month,
@@ -108,12 +115,11 @@ export async function setBudget(
         updated_at: new Date().toISOString(),
       })
       if (fbErr) {
-        // Se ainda falhar (ex: duplicate key por constraint unique antiga), tenta update
+        // Se ainda falhar, tenta update pelo ID gerado
         const { error: updErr } = await client
           .from('budget_months')
           .update({ budgeted, updated_at: new Date().toISOString() })
-          .eq('month', month)
-          .eq('category_id', categoryId)
+          .eq('id', id)
         if (updErr) throw new Error(`Erro ao salvar orçamento: ${updErr.message}`)
       }
     }
@@ -132,7 +138,7 @@ export async function copyFromPreviousMonth(targetMonth: string, budgetType: Bud
   const { data: prevBudgets } = await client.from('budget_months').select('*').eq('month', prevMonth)
   if (!prevBudgets || prevBudgets.length === 0) return
 
-  const filtered = prevBudgets.filter(b => (b.budget_type || 'cash') === budgetType)
+  const filtered = prevBudgets.filter(b => getRowBudgetType(b) === budgetType)
 
   for (const prev of filtered) {
     await setBudget(targetMonth, prev.category_id, Number(prev.budgeted || 0), false, budgetType)
@@ -143,7 +149,7 @@ export async function copyFromPreviousMonth(targetMonth: string, budgetType: Bud
 export async function clearMonthBudgets(month: string, budgetType: BudgetType = 'cash'): Promise<void> {
   const client = getClient()
   const { data: rows } = await client.from('budget_months').select('*').eq('month', month)
-  const toClear = (rows || []).filter(r => (r.budget_type || 'cash') === budgetType)
+  const toClear = (rows || []).filter(r => getRowBudgetType(r) === budgetType)
   for (const r of toClear) {
     await client.from('budget_months').update({ budgeted: 0, updated_at: new Date().toISOString() }).eq('id', r.id)
   }
@@ -331,7 +337,7 @@ export function calculateBudgetRows(
   const activityMap = calculateActivityByCategory(transactions, month, accounts, regime, installmentGroups)
   const budgetByCategory = new Map(
     budgetMonths
-      .filter(b => b.month === month && (b.budgetType || 'cash') === regime)
+      .filter(b => b.month === month && getRowBudgetType(b) === regime)
       .map(b => [b.categoryId, b])
   )
 
@@ -391,7 +397,7 @@ export function calculateIncomeBudgetRows(
   const incomeMap = calculateIncomeByCategory(transactions, month, accounts)
   const budgetByCategory = new Map(
     budgetMonths
-      .filter(b => b.month === month && (b.budgetType || 'cash') === regime)
+      .filter(b => b.month === month && getRowBudgetType(b) === regime)
       .map(b => [b.categoryId, b])
   )
   const incomeGroups = categoryGroups.filter(g => g.type === 'income')
@@ -504,7 +510,7 @@ export function calculateBudgetSummary(
     const expMap = new Map<string, number>()
     for (const b of budgetMonths) {
       if (b.month !== m || isMonthBeforeAccountingStart(b.month)) continue
-      if ((b.budgetType || 'cash') !== regime || ignoredCategoryIds.has(b.categoryId)) continue
+      if (getRowBudgetType(b) !== regime || ignoredCategoryIds.has(b.categoryId)) continue
       expMap.set(b.categoryId, Number(b.budgeted ?? 0))
     }
     const actMap = calculateActivityByCategory(transactions, m, accounts, regime, installmentGroups)
@@ -536,7 +542,7 @@ export function calculateBudgetSummary(
   const computeIncomeStats = (m: string) => {
     const incomeMap = calculateIncomeByCategory(transactions, m, accounts)
     const incomeBudgetMap = new Map(
-      budgetMonths.filter(b => b.month === m && (b.budgetType || 'cash') === regime).map(b => [b.categoryId, b])
+      budgetMonths.filter(b => b.month === m && getRowBudgetType(b) === regime).map(b => [b.categoryId, b])
     )
     let totalExpected = 0
     let pending = 0
@@ -560,7 +566,7 @@ export function calculateBudgetSummary(
     let expense = 0
     for (const b of budgetMonths) {
       if (b.month !== m || isMonthBeforeAccountingStart(b.month)) continue
-      if ((b.budgetType || 'cash') !== regime) continue
+      if (getRowBudgetType(b) !== regime) continue
       const cat = catMap.get(b.categoryId)
       const grp = cat ? groupMap.get(cat.groupId) : undefined
       if (grp?.type === 'income') {
@@ -592,7 +598,7 @@ export function calculateBudgetSummary(
     let totalBudgeted = 0
     for (const b of budgetMonths) {
       if (b.month !== month || isMonthBeforeAccountingStart(b.month)) continue
-      if ((b.budgetType || 'cash') !== regime || ignoredCategoryIds.has(b.categoryId)) continue
+      if (getRowBudgetType(b) !== regime || ignoredCategoryIds.has(b.categoryId)) continue
       totalBudgeted += Number(b.budgeted ?? 0)
     }
 
