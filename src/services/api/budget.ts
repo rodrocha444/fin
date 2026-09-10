@@ -602,9 +602,40 @@ export function calculateBudgetSummary(
       totalBudgeted += Number(b.budgeted ?? 0)
     }
 
+    // Atividade/gastos reais do mês no regime ativo
+    const actMap = calculateActivityByCategory(transactions, month, accounts, regime, installmentGroups)
+    let totalSpent = 0
+    for (const [catId, spent] of actMap.entries()) {
+      if (ignoredCategoryIds.has(catId)) continue
+      totalSpent += spent
+    }
+
+    const { totalExpected, pending: pendingExpected } = computeIncomeStats(month)
+
+    // Regime de Competência: foco em resultado econômico (Receitas vs Despesas do período)
+    if (regime === 'accrual') {
+      const plannedNetResult = totalExpected > 0 ? totalExpected - totalBudgeted : totalIncome - totalBudgeted
+      const actualNetResult = totalIncome - totalSpent
+
+      return {
+        month,
+        isFutureMonth: false,
+        rolloverFromPreviousMonth: 0,
+        totalIncome: round(totalIncome),
+        totalExpectedIncome: round(totalExpected),
+        pendingExpectedIncome: round(pendingExpected),
+        totalBudgeted: round(totalBudgeted),
+        totalSpent: round(totalSpent),
+        currentInvoicesDue: 0,
+        toBeBudgeted: round(plannedNetResult),
+        projectedToBeBudgeted: round(plannedNetResult),
+        plannedNetResult: round(plannedNetResult),
+        actualNetResult: round(actualNetResult),
+      }
+    }
+
     const positiveAvailable = computePositiveAvailable(month)
     const ccInvoices = computeCCInvoices(month)
-    const { totalExpected, pending: pendingExpected } = computeIncomeStats(month)
 
     const rawTBB = checkingBalance - positiveAvailable - ccInvoices
 
@@ -616,9 +647,12 @@ export function calculateBudgetSummary(
       totalExpectedIncome: round(totalExpected),
       pendingExpectedIncome: round(pendingExpected),
       totalBudgeted: round(totalBudgeted),
+      totalSpent: round(totalSpent),
       currentInvoicesDue: round(ccInvoices),
       toBeBudgeted: round(rawTBB),
       projectedToBeBudgeted: round(rawTBB + pendingExpected),
+      plannedNetResult: round(totalExpected - totalBudgeted),
+      actualNetResult: round(totalIncome - totalSpent),
     }
   }
 
@@ -665,9 +699,12 @@ export function calculateBudgetSummary(
     totalExpectedIncome: round(selectedMonthTotalExpectedIncome),
     pendingExpectedIncome: round(selectedMonthTotalExpectedIncome), // nada recebido ainda
     totalBudgeted: round(selectedMonthTotalBudgeted),
+    totalSpent: 0,
     currentInvoicesDue: round(selectedMonthCC),
     toBeBudgeted: round(realSeed),
     projectedToBeBudgeted: round(projSeed),
+    plannedNetResult: round(selectedMonthTotalExpectedIncome - selectedMonthTotalBudgeted),
+    actualNetResult: 0,
   }
 }
 

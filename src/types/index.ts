@@ -130,12 +130,18 @@ export interface BudgetSummary {
   pendingExpectedIncome?: number
   /** Total orçado nas categorias de despesa no mês selecionado */
   totalBudgeted: number
+  /** Total gasto efetivo em despesas no mês selecionado */
+  totalSpent?: number
   /** Faturas de cartão com vencimento no mês selecionado */
   currentInvoicesDue?: number
   /** Quanto ainda está disponível para ser orçado no mês (saldo em caixa ou projetado) */
   toBeBudgeted: number
   /** Saldo projetado a orçar considerando as receitas previstas restantes */
   projectedToBeBudgeted: number
+  /** Resultado planejado/econômico (Receita Prevista - Despesa Orçada) */
+  plannedNetResult?: number
+  /** Resultado real operacional (Receita Real - Despesa Real) */
+  actualNetResult?: number
 }
 
 export interface CategoryBudgetRow {
