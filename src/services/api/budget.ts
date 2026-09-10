@@ -578,7 +578,60 @@ export function calculateBudgetSummary(
     return { income, expense }
   }
 
-  // ── Mês atual/passado: cálculo direto ────────────────────────────────────
+  // ── Regime de Competência: cálculo econômico direto para qualquer mês (passado, atual ou futuro) ──
+  if (regime === 'accrual') {
+    // Total orçado em despesas no mês
+    let totalBudgeted = 0
+    for (const b of budgetMonths) {
+      if (b.month !== month || isMonthBeforeAccountingStart(b.month)) continue
+      if (getRowBudgetType(b) !== 'accrual' || ignoredCategoryIds.has(b.categoryId)) continue
+      totalBudgeted += Number(b.budgeted ?? 0)
+    }
+
+    // Receitas reais do mês
+    let totalIncome = 0
+    for (const tx of validTxs) {
+      if (toMonthKey(new Date(tx.date)) !== month) continue
+      if (tx.type === 'income') {
+        const acc = accountMap.get(tx.accountId)
+        if (acc?.type !== 'off_budget') totalIncome += tx.amount
+      } else if (tx.type === 'transfer') {
+        const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
+        const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
+        if (fromAcc?.type === 'off_budget' && toAcc?.type !== 'off_budget') totalIncome += tx.amount
+      }
+    }
+
+    // Atividade/gastos reais do mês no regime de competência
+    const actMap = calculateActivityByCategory(transactions, month, accounts, 'accrual', installmentGroups)
+    let totalSpent = 0
+    for (const [catId, spent] of actMap.entries()) {
+      if (ignoredCategoryIds.has(catId)) continue
+      totalSpent += spent
+    }
+
+    const { totalExpected, pending: pendingExpected } = computeIncomeStats(month)
+    const plannedNetResult = totalExpected > 0 ? totalExpected - totalBudgeted : totalIncome - totalBudgeted
+    const actualNetResult = totalIncome - totalSpent
+
+    return {
+      month,
+      isFutureMonth,
+      rolloverFromPreviousMonth: 0,
+      totalIncome: round(totalIncome),
+      totalExpectedIncome: round(totalExpected),
+      pendingExpectedIncome: round(isFutureMonth ? totalExpected : pendingExpected),
+      totalBudgeted: round(totalBudgeted),
+      totalSpent: round(totalSpent),
+      currentInvoicesDue: 0,
+      toBeBudgeted: round(isFutureMonth ? plannedNetResult : actualNetResult),
+      projectedToBeBudgeted: round(plannedNetResult),
+      plannedNetResult: round(plannedNetResult),
+      actualNetResult: round(actualNetResult),
+    }
+  }
+
+  // ── Mês atual/passado (Regime de Caixa): cálculo direto ───────────────────
   if (!isFutureMonth) {
     // Receitas reais do mês
     let totalIncome = 0
@@ -611,28 +664,6 @@ export function calculateBudgetSummary(
     }
 
     const { totalExpected, pending: pendingExpected } = computeIncomeStats(month)
-
-    // Regime de Competência: foco em resultado econômico (Receitas vs Despesas do período)
-    if (regime === 'accrual') {
-      const plannedNetResult = totalExpected > 0 ? totalExpected - totalBudgeted : totalIncome - totalBudgeted
-      const actualNetResult = totalIncome - totalSpent
-
-      return {
-        month,
-        isFutureMonth: false,
-        rolloverFromPreviousMonth: 0,
-        totalIncome: round(totalIncome),
-        totalExpectedIncome: round(totalExpected),
-        pendingExpectedIncome: round(pendingExpected),
-        totalBudgeted: round(totalBudgeted),
-        totalSpent: round(totalSpent),
-        currentInvoicesDue: 0,
-        toBeBudgeted: round(actualNetResult),
-        projectedToBeBudgeted: round(plannedNetResult),
-        plannedNetResult: round(plannedNetResult),
-        actualNetResult: round(actualNetResult),
-      }
-    }
 
     const positiveAvailable = computePositiveAvailable(month)
     const ccInvoices = computeCCInvoices(month)

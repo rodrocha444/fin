@@ -427,16 +427,9 @@ export default function BudgetPage() {
   const handleBudgetRegimeChange = (newRegime: AccountingRegime) => {
     setBudgetRegime(newRegime)
     saveBudgetRegime(newRegime)
-    if (newRegime === 'accrual' && month > currentMonth()) {
-      setMonth(currentMonth())
-    }
   }
 
   const handleMonthChange = (newMonth: string) => {
-    if (budgetRegime === 'accrual' && newMonth > currentMonth()) {
-      setMonth(currentMonth())
-      return
-    }
     setMonth(newMonth)
   }
 
@@ -474,15 +467,17 @@ export default function BudgetPage() {
   }
 
   const isAccrual = budgetRegime === 'accrual'
+  const isFuture = Boolean(summary?.isFutureMonth)
   const hasExpectedIncome = (summary?.totalExpectedIncome ?? 0) > 0
 
   // Valor principal exibido no card Hero:
-  // - Competência: Resultado Realizado (Receitas Reais que entraram − Despesas Reais)
+  // - Competência mês futuro: Resultado Previsto (Receita Prevista − Despesa Orçada)
+  // - Competência mês atual/passado: Resultado Realizado (Receitas Reais que entraram − Despesas Reais)
   // - Caixa: Disponível a Orçar / Projeção a Orçar
   const heroValue = !summary
     ? 0
     : isAccrual
-    ? (summary.actualNetResult ?? 0)
+    ? (isFuture ? (summary.plannedNetResult ?? 0) : (summary.actualNetResult ?? 0))
     : summary.toBeBudgeted
 
   const heroColor =
@@ -515,17 +510,11 @@ export default function BudgetPage() {
                 month={month}
                 onChangeMonth={handleMonthChange}
                 minMonth={startMonth}
-                maxMonth={budgetRegime === 'accrual' ? currentMonth() : undefined}
-                nextDisabledTitle={
-                  budgetRegime === 'accrual'
-                    ? 'O Regime de Competência é restrito ao mês atual e meses passados'
-                    : undefined
-                }
               />
               <BudgetRegimeSelector regime={budgetRegime} onChangeRegime={handleBudgetRegimeChange} />
             </div>
 
-            {/* Centro no Desktop (sm+): Card Hero ("Disponível a Orçar" no Caixa / "Resultado Realizado" na Competência) */}
+            {/* Centro no Desktop (sm+): Card Hero ("Disponível a Orçar" no Caixa / "Resultado" na Competência) */}
             {summary && (
               <div className="hidden sm:flex flex-1 items-center justify-center px-2 min-w-0">
                 <div
@@ -536,29 +525,48 @@ export default function BudgetPage() {
                       {isAccrual ? (
                         <>
                           <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate">
-                            Resultado Realizado
+                            {isFuture ? 'Resultado Previsto' : 'Resultado Realizado'}
                           </span>
                           <div className="flex items-center gap-1.5">
-                            {hasExpectedIncome && (
-                              <span
-                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0 ${
-                                  (summary.plannedNetResult ?? 0) > 0.005
-                                    ? 'bg-sky-950/90 text-sky-300 border-sky-800/60'
-                                    : (summary.plannedNetResult ?? 0) < -0.005
-                                    ? 'bg-amber-950/90 text-amber-300 border-amber-800/60'
-                                    : 'bg-slate-800 text-slate-300 border-slate-700'
-                                }`}
-                                title={`Meta Prevista do mês: Receitas Previstas (${formatCurrency(summary.totalExpectedIncome ?? 0)}) − Despesas Orçadas (${formatCurrency(summary.totalBudgeted)})`}
-                              >
-                                Meta: {(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}{formatCurrency(summary.plannedNetResult ?? 0)}
-                              </span>
+                            {isFuture ? (
+                              <>
+                                <span
+                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60 flex-shrink-0"
+                                  title={`Receitas Previstas planejadas para o mês: ${formatCurrency(summary.totalExpectedIncome ?? 0)}`}
+                                >
+                                  Receitas: {formatCurrency(summary.totalExpectedIncome ?? 0)}
+                                </span>
+                                <span
+                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60 flex-shrink-0"
+                                  title={`Total orçado em despesas para o mês: ${formatCurrency(summary.totalBudgeted)}`}
+                                >
+                                  Orçado: {formatCurrency(summary.totalBudgeted)}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                {hasExpectedIncome && (
+                                  <span
+                                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0 ${
+                                      (summary.plannedNetResult ?? 0) > 0.005
+                                        ? 'bg-sky-950/90 text-sky-300 border-sky-800/60'
+                                        : (summary.plannedNetResult ?? 0) < -0.005
+                                        ? 'bg-amber-950/90 text-amber-300 border-amber-800/60'
+                                        : 'bg-slate-800 text-slate-300 border-slate-700'
+                                    }`}
+                                    title={`Meta Prevista do mês: Receitas Previstas (${formatCurrency(summary.totalExpectedIncome ?? 0)}) − Despesas Orçadas (${formatCurrency(summary.totalBudgeted)})`}
+                                  >
+                                    Meta: {(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}{formatCurrency(summary.plannedNetResult ?? 0)}
+                                  </span>
+                                )}
+                                <span
+                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60 flex-shrink-0"
+                                  title={`Gasto realizado: ${formatCurrency(summary.totalSpent ?? 0)} de ${formatCurrency(summary.totalBudgeted)} orçado`}
+                                >
+                                  Gasto: {formatCurrency(summary.totalSpent ?? 0)} / {formatCurrency(summary.totalBudgeted)}
+                                </span>
+                              </>
                             )}
-                            <span
-                              className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60 flex-shrink-0"
-                              title={`Gasto realizado: ${formatCurrency(summary.totalSpent ?? 0)} de ${formatCurrency(summary.totalBudgeted)} orçado`}
-                            >
-                              Gasto: {formatCurrency(summary.totalSpent ?? 0)} / {formatCurrency(summary.totalBudgeted)}
-                            </span>
                           </div>
                         </>
                       ) : (
@@ -667,29 +675,48 @@ export default function BudgetPage() {
                     {isAccrual ? (
                       <>
                         <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                          Resultado Realizado
+                          {isFuture ? 'Resultado Previsto' : 'Resultado Realizado'}
                         </span>
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          {hasExpectedIncome && (
-                            <span
-                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                                (summary.plannedNetResult ?? 0) > 0.005
-                                  ? 'bg-sky-950/90 text-sky-300 border-sky-800/60'
-                                  : (summary.plannedNetResult ?? 0) < -0.005
-                                  ? 'bg-amber-950/90 text-amber-300 border-amber-800/60'
-                                  : 'bg-slate-800 text-slate-300 border-slate-700'
-                              }`}
-                              title={`Meta Prevista do mês: Receitas Previstas (${formatCurrency(summary.totalExpectedIncome ?? 0)}) − Despesas Orçadas (${formatCurrency(summary.totalBudgeted)})`}
-                            >
-                              Meta: {(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}{formatCurrency(summary.plannedNetResult ?? 0)}
-                            </span>
+                          {isFuture ? (
+                            <>
+                              <span
+                                className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60"
+                                title={`Receitas Previstas planejadas: ${formatCurrency(summary.totalExpectedIncome ?? 0)}`}
+                              >
+                                Receitas: {formatCurrency(summary.totalExpectedIncome ?? 0)}
+                              </span>
+                              <span
+                                className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60"
+                                title={`Total orçado em despesas: ${formatCurrency(summary.totalBudgeted)}`}
+                              >
+                                Orçado: {formatCurrency(summary.totalBudgeted)}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              {hasExpectedIncome && (
+                                <span
+                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                                    (summary.plannedNetResult ?? 0) > 0.005
+                                      ? 'bg-sky-950/90 text-sky-300 border-sky-800/60'
+                                      : (summary.plannedNetResult ?? 0) < -0.005
+                                      ? 'bg-amber-950/90 text-amber-300 border-amber-800/60'
+                                      : 'bg-slate-800 text-slate-300 border-slate-700'
+                                  }`}
+                                  title={`Meta Prevista do mês: Receitas Previstas (${formatCurrency(summary.totalExpectedIncome ?? 0)}) − Despesas Orçadas (${formatCurrency(summary.totalBudgeted)})`}
+                                >
+                                  Meta: {(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}{formatCurrency(summary.plannedNetResult ?? 0)}
+                                </span>
+                              )}
+                              <span
+                                className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60"
+                                title={`Gasto realizado: ${formatCurrency(summary.totalSpent ?? 0)} de ${formatCurrency(summary.totalBudgeted)} orçado`}
+                              >
+                                Gasto: {formatCurrency(summary.totalSpent ?? 0)} / {formatCurrency(summary.totalBudgeted)}
+                              </span>
+                            </>
                           )}
-                          <span
-                            className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60"
-                            title={`Gasto realizado: ${formatCurrency(summary.totalSpent ?? 0)} de ${formatCurrency(summary.totalBudgeted)} orçado`}
-                          >
-                            Gasto: {formatCurrency(summary.totalSpent ?? 0)} / {formatCurrency(summary.totalBudgeted)}
-                          </span>
                         </div>
                       </>
                     ) : (
@@ -721,16 +748,22 @@ export default function BudgetPage() {
                   </div>
                   <p className="text-[10px] text-slate-500 truncate">
                     {isAccrual ? (
-                      hasExpectedIncome
+                      isFuture
                         ? heroValue > 0.005
-                          ? 'Superávit planejado (receitas > despesas)'
+                          ? 'Superávit planejado para o mês'
                           : heroValue < -0.005
-                          ? 'Déficit planejado (despesas > receitas)'
+                          ? 'Déficit planejado para o mês'
                           : 'Orçamento equilibrado (zero a zero)'
+                        : hasExpectedIncome
+                        ? heroValue > 0.005
+                          ? 'Superávit realizado (receitas > gastos)'
+                          : heroValue < -0.005
+                          ? 'Déficit realizado (gastos > receitas)'
+                          : 'Zero a zero no mês'
                         : heroValue > 0.005
-                        ? 'Superávit operacional (receitas > gastos)'
+                        ? `Superávit de ${formatCurrency(heroValue)} (Receitas: ${formatCurrency(summary.totalIncome)} − Gastos: ${formatCurrency(summary.totalSpent ?? 0)})`
                         : heroValue < -0.005
-                        ? 'Déficit operacional (gastos > receitas)'
+                        ? `Déficit de ${formatCurrency(Math.abs(heroValue))} (Gastos superaram receitas)`
                         : 'Zero a zero no mês'
                     ) : (
                       summary.isFutureMonth
