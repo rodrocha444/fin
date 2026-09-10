@@ -22,7 +22,7 @@ const REGIME_OPTIONS = [
     id: 'accrual' as const,
     label: 'Por Competência',
     badge: 'Compra Total',
-    description: 'Valor total integral lançado no mês em que a compra ocorreu',
+    description: 'Valor total integral na data da compra (mês atual e passados)',
     icon: CalendarDays,
     iconColor: 'text-indigo-400',
     iconBg: 'bg-indigo-950/80 border-indigo-800/60 text-indigo-400',

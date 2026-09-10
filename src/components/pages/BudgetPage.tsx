@@ -427,6 +427,17 @@ export default function BudgetPage() {
   const handleBudgetRegimeChange = (newRegime: AccountingRegime) => {
     setBudgetRegime(newRegime)
     saveBudgetRegime(newRegime)
+    if (newRegime === 'accrual' && month > currentMonth()) {
+      setMonth(currentMonth())
+    }
+  }
+
+  const handleMonthChange = (newMonth: string) => {
+    if (budgetRegime === 'accrual' && newMonth > currentMonth()) {
+      setMonth(currentMonth())
+      return
+    }
+    setMonth(newMonth)
   }
 
   const confirm = useConfirm()
@@ -482,7 +493,17 @@ export default function BudgetPage() {
             
             {/* Esquerda: Navegação de Mês + Seletor de Regime */}
             <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-shrink-0">
-              <MonthNavigator month={month} onChangeMonth={setMonth} minMonth={startMonth} />
+              <MonthNavigator
+                month={month}
+                onChangeMonth={handleMonthChange}
+                minMonth={startMonth}
+                maxMonth={budgetRegime === 'accrual' ? currentMonth() : undefined}
+                nextDisabledTitle={
+                  budgetRegime === 'accrual'
+                    ? 'O Regime de Competência é restrito ao mês atual e meses passados'
+                    : undefined
+                }
+              />
               <BudgetRegimeSelector regime={budgetRegime} onChangeRegime={handleBudgetRegimeChange} />
             </div>
 

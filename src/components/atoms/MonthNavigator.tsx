@@ -7,6 +7,7 @@ interface MonthNavigatorProps {
   onChangeMonth: (month: string) => void
   minMonth?: string | null
   maxMonth?: string | null
+  nextDisabledTitle?: string
 }
 
 export default function MonthNavigator({
@@ -14,6 +15,7 @@ export default function MonthNavigator({
   onChangeMonth,
   minMonth,
   maxMonth,
+  nextDisabledTitle,
 }: MonthNavigatorProps) {
   const isPrevDisabled = Boolean(minMonth && month <= minMonth)
   const isNextDisabled = Boolean(maxMonth && month >= maxMonth)
@@ -43,7 +45,7 @@ export default function MonthNavigator({
             ? 'text-slate-600 cursor-not-allowed opacity-40'
             : 'text-slate-400 hover:text-slate-200 active:bg-slate-700'
         }`}
-        title={isNextDisabled ? 'Limite de período atingido' : 'Próximo mês'}
+        title={isNextDisabled ? (nextDisabledTitle || 'Limite de período atingido') : 'Próximo mês'}
       >
         <ChevronRight className="w-4 h-4" />
       </button>
