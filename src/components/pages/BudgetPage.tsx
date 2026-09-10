@@ -453,7 +453,7 @@ export default function BudgetPage() {
                   }`}
                 >
                   <div className="text-right min-w-0">
-                    <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                    <div className="flex flex-col items-end gap-1">
                       <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate">
                         {summary.isFutureMonth ? 'Projeção a Orçar' : 'Disponível a Orçar'}
                       </span>
@@ -566,7 +566,7 @@ export default function BudgetPage() {
                 }`}
               >
                 <div className="text-left min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="flex flex-col items-start gap-1">
                     <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
                       {summary.isFutureMonth ? 'Projeção a Orçar' : 'Disponível a Orçar'}
                     </span>
