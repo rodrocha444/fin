@@ -627,7 +627,7 @@ export function calculateBudgetSummary(
         totalBudgeted: round(totalBudgeted),
         totalSpent: round(totalSpent),
         currentInvoicesDue: 0,
-        toBeBudgeted: round(plannedNetResult),
+        toBeBudgeted: round(actualNetResult),
         projectedToBeBudgeted: round(plannedNetResult),
         plannedNetResult: round(plannedNetResult),
         actualNetResult: round(actualNetResult),

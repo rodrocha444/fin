@@ -477,13 +477,12 @@ export default function BudgetPage() {
   const hasExpectedIncome = (summary?.totalExpectedIncome ?? 0) > 0
 
   // Valor principal exibido no card Hero:
-  // - Competência com receita prevista: Resultado Previsto (Receita Prevista − Despesa Orçada)
-  // - Competência sem receita prevista: Resultado Realizado (Receitas Reais − Despesas Reais)
+  // - Competência: Resultado Realizado (Receitas Reais que entraram − Despesas Reais)
   // - Caixa: Disponível a Orçar / Projeção a Orçar
   const heroValue = !summary
     ? 0
     : isAccrual
-    ? (hasExpectedIncome ? (summary.plannedNetResult ?? 0) : (summary.actualNetResult ?? 0))
+    ? (summary.actualNetResult ?? 0)
     : summary.toBeBudgeted
 
   const heroColor =
@@ -526,7 +525,7 @@ export default function BudgetPage() {
               <BudgetRegimeSelector regime={budgetRegime} onChangeRegime={handleBudgetRegimeChange} />
             </div>
 
-            {/* Centro no Desktop (sm+): Card Hero ("Disponível a Orçar" no Caixa / "Resultado" na Competência) */}
+            {/* Centro no Desktop (sm+): Card Hero ("Disponível a Orçar" no Caixa / "Resultado Realizado" na Competência) */}
             {summary && (
               <div className="hidden sm:flex flex-1 items-center justify-center px-2 min-w-0">
                 <div
@@ -537,45 +536,30 @@ export default function BudgetPage() {
                       {isAccrual ? (
                         <>
                           <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate">
-                            {hasExpectedIncome ? 'Resultado Previsto' : 'Resultado do Mês'}
+                            Resultado Realizado
                           </span>
-                          {hasExpectedIncome ? (
-                            <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5">
+                            {hasExpectedIncome && (
                               <span
                                 className={`text-[9px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0 ${
-                                  (summary.actualNetResult ?? 0) > 0.005
-                                    ? 'bg-emerald-950/90 text-emerald-300 border-emerald-800/60'
-                                    : (summary.actualNetResult ?? 0) < -0.005
-                                    ? 'bg-rose-950/90 text-rose-300 border-rose-800/60'
+                                  (summary.plannedNetResult ?? 0) > 0.005
+                                    ? 'bg-sky-950/90 text-sky-300 border-sky-800/60'
+                                    : (summary.plannedNetResult ?? 0) < -0.005
+                                    ? 'bg-amber-950/90 text-amber-300 border-amber-800/60'
                                     : 'bg-slate-800 text-slate-300 border-slate-700'
                                 }`}
-                                title={`Receitas Reais (${formatCurrency(summary.totalIncome)}) − Despesas Reais (${formatCurrency(summary.totalSpent ?? 0)})`}
+                                title={`Meta Prevista do mês: Receitas Previstas (${formatCurrency(summary.totalExpectedIncome ?? 0)}) − Despesas Orçadas (${formatCurrency(summary.totalBudgeted)})`}
                               >
-                                Real: {(summary.actualNetResult ?? 0) > 0.005 ? '+' : ''}{formatCurrency(summary.actualNetResult ?? 0)}
+                                Meta: {(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}{formatCurrency(summary.plannedNetResult ?? 0)}
                               </span>
-                              <span
-                                className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60 flex-shrink-0"
-                                title={`Gasto realizado: ${formatCurrency(summary.totalSpent ?? 0)} de ${formatCurrency(summary.totalBudgeted)} orçado`}
-                              >
-                                Gasto: {formatCurrency(summary.totalSpent ?? 0)} / {formatCurrency(summary.totalBudgeted)}
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1.5">
-                              <span
-                                className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60 flex-shrink-0"
-                                title={`Total orçado em despesas: ${formatCurrency(summary.totalBudgeted)}`}
-                              >
-                                Orçado: {formatCurrency(summary.totalBudgeted)}
-                              </span>
-                              <span
-                                className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60 flex-shrink-0"
-                                title={`Total gasto realizado: ${formatCurrency(summary.totalSpent ?? 0)}`}
-                              >
-                                Gasto: {formatCurrency(summary.totalSpent ?? 0)}
-                              </span>
-                            </div>
-                          )}
+                            )}
+                            <span
+                              className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60 flex-shrink-0"
+                              title={`Gasto realizado: ${formatCurrency(summary.totalSpent ?? 0)} de ${formatCurrency(summary.totalBudgeted)} orçado`}
+                            >
+                              Gasto: {formatCurrency(summary.totalSpent ?? 0)} / {formatCurrency(summary.totalBudgeted)}
+                            </span>
+                          </div>
                         </>
                       ) : (
                         <>
@@ -683,45 +667,30 @@ export default function BudgetPage() {
                     {isAccrual ? (
                       <>
                         <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                          {hasExpectedIncome ? 'Resultado Previsto' : 'Resultado do Mês'}
+                          Resultado Realizado
                         </span>
-                        {hasExpectedIncome ? (
-                          <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {hasExpectedIncome && (
                             <span
                               className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                                (summary.actualNetResult ?? 0) > 0.005
-                                  ? 'bg-emerald-950/90 text-emerald-300 border-emerald-800/60'
-                                  : (summary.actualNetResult ?? 0) < -0.005
-                                  ? 'bg-rose-950/90 text-rose-300 border-rose-800/60'
+                                (summary.plannedNetResult ?? 0) > 0.005
+                                  ? 'bg-sky-950/90 text-sky-300 border-sky-800/60'
+                                  : (summary.plannedNetResult ?? 0) < -0.005
+                                  ? 'bg-amber-950/90 text-amber-300 border-amber-800/60'
                                   : 'bg-slate-800 text-slate-300 border-slate-700'
                               }`}
-                              title={`Receitas Reais (${formatCurrency(summary.totalIncome)}) − Despesas Reais (${formatCurrency(summary.totalSpent ?? 0)})`}
+                              title={`Meta Prevista do mês: Receitas Previstas (${formatCurrency(summary.totalExpectedIncome ?? 0)}) − Despesas Orçadas (${formatCurrency(summary.totalBudgeted)})`}
                             >
-                              Real: {(summary.actualNetResult ?? 0) > 0.005 ? '+' : ''}{formatCurrency(summary.actualNetResult ?? 0)}
+                              Meta: {(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}{formatCurrency(summary.plannedNetResult ?? 0)}
                             </span>
-                            <span
-                              className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60"
-                              title={`Gasto realizado: ${formatCurrency(summary.totalSpent ?? 0)} de ${formatCurrency(summary.totalBudgeted)} orçado`}
-                            >
-                              Gasto: {formatCurrency(summary.totalSpent ?? 0)} / {formatCurrency(summary.totalBudgeted)}
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span
-                              className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60"
-                              title={`Total orçado em despesas: ${formatCurrency(summary.totalBudgeted)}`}
-                            >
-                              Orçado: {formatCurrency(summary.totalBudgeted)}
-                            </span>
-                            <span
-                              className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60"
-                              title={`Total gasto no mês: ${formatCurrency(summary.totalSpent ?? 0)}`}
-                            >
-                              Gasto: {formatCurrency(summary.totalSpent ?? 0)}
-                            </span>
-                          </div>
-                        )}
+                          )}
+                          <span
+                            className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60"
+                            title={`Gasto realizado: ${formatCurrency(summary.totalSpent ?? 0)} de ${formatCurrency(summary.totalBudgeted)} orçado`}
+                          >
+                            Gasto: {formatCurrency(summary.totalSpent ?? 0)} / {formatCurrency(summary.totalBudgeted)}
+                          </span>
+                        </div>
                       </>
                     ) : (
                       <>
