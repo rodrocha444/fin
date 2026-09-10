@@ -514,98 +514,106 @@ export default function BudgetPage() {
               <BudgetRegimeSelector regime={budgetRegime} onChangeRegime={handleBudgetRegimeChange} />
             </div>
 
-            {/* Centro no Desktop (sm+): Card Hero ("Disponível a Orçar" no Caixa / "Resultado" na Competência) */}
+            {/* Centro no Desktop (sm+): Card Hero ("Disponível a Orçar" no Caixa / 3 Pilares na Competência) */}
             {summary && (
               <div className="hidden sm:flex flex-1 items-center justify-center px-2 min-w-0">
-                <div
-                  className={`px-4 py-1.5 rounded-xl border flex items-center justify-center gap-3 shadow-sm transition-all duration-200 ${heroBgBorder}`}
-                >
-                  <div className="text-right min-w-0">
-                    <div className="flex flex-col items-end gap-1">
-                      {isAccrual ? (
-                        <>
-                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate">
-                            {isFuture ? 'Resultado Previsto' : 'Resultado Realizado'}
-                          </span>
-                          <div className="flex items-center gap-1.5">
-                            {isFuture ? (
-                              <>
-                                <span
-                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60 flex-shrink-0"
-                                  title={`Receitas Previstas planejadas para o mês: ${formatCurrency(summary.totalExpectedIncome ?? 0)}`}
-                                >
-                                  Receitas: {formatCurrency(summary.totalExpectedIncome ?? 0)}
-                                </span>
-                                <span
-                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60 flex-shrink-0"
-                                  title={`Total orçado em despesas para o mês: ${formatCurrency(summary.totalBudgeted)}`}
-                                >
-                                  Orçado: {formatCurrency(summary.totalBudgeted)}
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                {hasExpectedIncome && (
-                                  <span
-                                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0 ${
-                                      (summary.plannedNetResult ?? 0) > 0.005
-                                        ? 'bg-sky-950/90 text-sky-300 border-sky-800/60'
-                                        : (summary.plannedNetResult ?? 0) < -0.005
-                                        ? 'bg-amber-950/90 text-amber-300 border-amber-800/60'
-                                        : 'bg-slate-800 text-slate-300 border-slate-700'
-                                    }`}
-                                    title={`Meta Prevista do mês: Receitas Previstas (${formatCurrency(summary.totalExpectedIncome ?? 0)}) − Despesas Orçadas (${formatCurrency(summary.totalBudgeted)})`}
-                                  >
-                                    Meta: {(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}{formatCurrency(summary.plannedNetResult ?? 0)}
-                                  </span>
-                                )}
-                                <span
-                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60 flex-shrink-0"
-                                  title={`Gasto realizado: ${formatCurrency(summary.totalSpent ?? 0)} de ${formatCurrency(summary.totalBudgeted)} orçado`}
-                                >
-                                  Gasto: {formatCurrency(summary.totalSpent ?? 0)} / {formatCurrency(summary.totalBudgeted)}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate">
-                            {summary.isFutureMonth ? 'Projeção a Orçar' : 'Disponível a Orçar'}
-                          </span>
-                          {/* Carryover do mês atual para meses futuros */}
-                          {summary.isFutureMonth && (summary.rolloverFromPreviousMonth ?? 0) !== 0 && (
-                            <span
-                              className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60 flex-shrink-0"
-                              title={`Sobra real do mês atual que seria levada para este mês: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
-                            >
-                              Carryover: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
-                            </span>
-                          )}
+                {isAccrual ? (
+                  <div
+                    className={`px-3.5 py-1.5 rounded-xl border flex items-center justify-center gap-3 sm:gap-4 shadow-sm transition-all duration-200 ${heroBgBorder}`}
+                  >
+                    {/* 1. Receitas */}
+                    <div className="flex flex-col text-right min-w-0">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                        Receitas
+                      </span>
+                      <span className="text-xs sm:text-sm font-bold text-emerald-400 tabular-nums">
+                        {formatCurrency(isFuture ? (summary.totalExpectedIncome ?? 0) : summary.totalIncome)}
+                      </span>
+                      <span className="text-[9px] text-slate-500 truncate" title="Meta de receita prevista orçada">
+                        {isFuture ? 'Previstas' : `Meta: ${formatCurrency(summary.totalExpectedIncome ?? 0)}`}
+                      </span>
+                    </div>
 
-                          {/* Projeção com renda prevista */}
-                          {(summary.pendingExpectedIncome ?? 0) > 0 && (
-                            <span
-                              className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60 flex-shrink-0"
-                              title={summary.isFutureMonth
-                                ? `Se toda a renda planejada para os meses até aqui entrar, o valor a orçar seria ${formatCurrency(summary.projectedToBeBudgeted)}`
-                                : 'Saldo projetado incluindo receitas previstas que ainda não entraram'}
-                            >
-                              {summary.isFutureMonth ? 'Otimista:' : 'Previsto:'} {formatCurrency(summary.projectedToBeBudgeted)}
-                            </span>
-                          )}
-                        </>
-                      )}
+                    <span className="text-slate-600 font-bold text-xs select-none">−</span>
+
+                    {/* 2. Despesas */}
+                    <div className="flex flex-col text-right min-w-0">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                        Despesas
+                      </span>
+                      <span className="text-xs sm:text-sm font-bold text-rose-400 tabular-nums">
+                        {formatCurrency(isFuture ? summary.totalBudgeted : (summary.totalSpent ?? 0))}
+                      </span>
+                      <span className="text-[9px] text-slate-500 truncate" title="Teto de despesas orçado">
+                        {isFuture ? 'Orçadas' : `Orçado: ${formatCurrency(summary.totalBudgeted)}`}
+                      </span>
+                    </div>
+
+                    <span className="text-slate-600 font-bold text-xs select-none">=</span>
+
+                    {/* 3. Resultado Final */}
+                    <div className="flex flex-col text-right pl-2 border-l border-slate-700/60 min-w-0">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate">
+                        {isFuture ? 'Resultado Previsto' : 'Resultado Real'}
+                      </span>
+                      <span className={`text-sm sm:text-base font-extrabold tabular-nums tracking-tight ${heroColor}`}>
+                        {heroValue > 0.005 ? `+${formatCurrency(heroValue)}` : formatCurrency(heroValue)}
+                      </span>
+                      <span
+                        className={`text-[9px] font-semibold truncate ${
+                          heroValue > 0.005 ? 'text-emerald-400/90' : heroValue < -0.005 ? 'text-rose-400/90' : 'text-slate-400'
+                        }`}
+                        title={
+                          isFuture
+                            ? 'Superávit ou Déficit planejado para o mês'
+                            : `Resultado Real (Receitas − Despesas). Meta planejada: ${formatCurrency(summary.plannedNetResult ?? 0)}`
+                        }
+                      >
+                        {heroValue > 0.005 ? 'Superávit' : heroValue < -0.005 ? 'Déficit' : 'Equilibrado'}
+                        {!isFuture && hasExpectedIncome ? ` · Meta: ${(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}${formatCurrency(summary.plannedNetResult ?? 0)}` : ''}
+                      </span>
                     </div>
                   </div>
+                ) : (
+                  <div
+                    className={`px-4 py-1.5 rounded-xl border flex items-center justify-center gap-3 shadow-sm transition-all duration-200 ${heroBgBorder}`}
+                  >
+                    <div className="text-right min-w-0">
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate">
+                          {summary.isFutureMonth ? 'Projeção a Orçar' : 'Disponível a Orçar'}
+                        </span>
+                        {/* Carryover do mês atual para meses futuros */}
+                        {summary.isFutureMonth && (summary.rolloverFromPreviousMonth ?? 0) !== 0 && (
+                          <span
+                            className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60 flex-shrink-0"
+                            title={`Sobra real do mês atual que seria levada para este mês: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
+                          >
+                            Carryover: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
+                          </span>
+                        )}
 
-                  <div className="text-right flex-shrink-0">
-                    <span className={`text-base lg:text-lg font-extrabold tabular-nums tracking-tight ${heroColor}`}>
-                      {isAccrual && heroValue > 0.005 ? `+${formatCurrency(heroValue)}` : formatCurrency(heroValue)}
-                    </span>
+                        {/* Projeção com renda prevista */}
+                        {(summary.pendingExpectedIncome ?? 0) > 0 && (
+                          <span
+                            className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60 flex-shrink-0"
+                            title={summary.isFutureMonth
+                              ? `Se toda a renda planejada para os meses até aqui entrar, o valor a orçar seria ${formatCurrency(summary.projectedToBeBudgeted)}`
+                              : 'Saldo projetado incluindo receitas previstas que ainda não entraram'}
+                          >
+                            {summary.isFutureMonth ? 'Otimista:' : 'Previsto:'} {formatCurrency(summary.projectedToBeBudgeted)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="text-right flex-shrink-0">
+                      <span className={`text-base lg:text-lg font-extrabold tabular-nums tracking-tight ${heroColor}`}>
+                        {formatCurrency(summary.toBeBudgeted)}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
 
@@ -667,122 +675,106 @@ export default function BudgetPage() {
           {/* Mobile (< sm): Card Hero posicionado logo abaixo */}
           {summary && (
             <div className="sm:hidden pt-0.5">
-              <div
-                className={`w-full px-3.5 py-2 rounded-xl border flex items-center justify-between gap-3 shadow-sm transition-all duration-200 ${heroBgBorder}`}
-              >
-                <div className="text-left min-w-0">
-                  <div className="flex flex-col items-start gap-1">
-                    {isAccrual ? (
-                      <>
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                          {isFuture ? 'Resultado Previsto' : 'Resultado Realizado'}
-                        </span>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {isFuture ? (
-                            <>
-                              <span
-                                className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60"
-                                title={`Receitas Previstas planejadas: ${formatCurrency(summary.totalExpectedIncome ?? 0)}`}
-                              >
-                                Receitas: {formatCurrency(summary.totalExpectedIncome ?? 0)}
-                              </span>
-                              <span
-                                className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60"
-                                title={`Total orçado em despesas: ${formatCurrency(summary.totalBudgeted)}`}
-                              >
-                                Orçado: {formatCurrency(summary.totalBudgeted)}
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              {hasExpectedIncome && (
-                                <span
-                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                                    (summary.plannedNetResult ?? 0) > 0.005
-                                      ? 'bg-sky-950/90 text-sky-300 border-sky-800/60'
-                                      : (summary.plannedNetResult ?? 0) < -0.005
-                                      ? 'bg-amber-950/90 text-amber-300 border-amber-800/60'
-                                      : 'bg-slate-800 text-slate-300 border-slate-700'
-                                  }`}
-                                  title={`Meta Prevista do mês: Receitas Previstas (${formatCurrency(summary.totalExpectedIncome ?? 0)}) − Despesas Orçadas (${formatCurrency(summary.totalBudgeted)})`}
-                                >
-                                  Meta: {(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}{formatCurrency(summary.plannedNetResult ?? 0)}
-                                </span>
-                              )}
-                              <span
-                                className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60"
-                                title={`Gasto realizado: ${formatCurrency(summary.totalSpent ?? 0)} de ${formatCurrency(summary.totalBudgeted)} orçado`}
-                              >
-                                Gasto: {formatCurrency(summary.totalSpent ?? 0)} / {formatCurrency(summary.totalBudgeted)}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                          {summary.isFutureMonth ? 'Projeção a Orçar' : 'Disponível a Orçar'}
-                        </span>
-                        {summary.isFutureMonth && (summary.rolloverFromPreviousMonth ?? 0) !== 0 && (
-                          <span
-                            className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60"
-                            title={`Sobra real do mês atual: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
-                          >
-                            Carryover: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
-                          </span>
-                        )}
-
-                        {(summary.pendingExpectedIncome ?? 0) > 0 && (
-                          <span
-                            className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60"
-                            title={summary.isFutureMonth
-                              ? `Se toda a renda planejada entrar, o valor seria ${formatCurrency(summary.projectedToBeBudgeted)}`
-                              : 'Saldo projetado incluindo receitas previstas'}
-                          >
-                            {summary.isFutureMonth ? 'Otimista:' : 'Previsto:'} {formatCurrency(summary.projectedToBeBudgeted)}
-                          </span>
-                        )}
-                      </>
-                    )}
+              {isAccrual ? (
+                <div
+                  className={`w-full px-2.5 py-2 rounded-xl border grid grid-cols-3 divide-x divide-slate-800/80 shadow-sm transition-all duration-200 ${heroBgBorder}`}
+                >
+                  {/* Coluna 1: Receitas */}
+                  <div className="flex flex-col items-center justify-center text-center px-1 min-w-0">
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 truncate">
+                      Receitas
+                    </span>
+                    <span className="text-xs font-bold text-emerald-400 tabular-nums truncate">
+                      {formatCurrency(isFuture ? (summary.totalExpectedIncome ?? 0) : summary.totalIncome)}
+                    </span>
+                    <span className="text-[8.5px] text-slate-500 truncate" title="Meta prevista">
+                      {isFuture ? 'Previstas' : `Meta: ${formatCurrency(summary.totalExpectedIncome ?? 0)}`}
+                    </span>
                   </div>
-                  <p className="text-[10px] text-slate-500 truncate">
-                    {isAccrual ? (
-                      isFuture
-                        ? heroValue > 0.005
-                          ? 'Superávit planejado para o mês'
-                          : heroValue < -0.005
-                          ? 'Déficit planejado para o mês'
-                          : 'Orçamento equilibrado (zero a zero)'
-                        : hasExpectedIncome
-                        ? heroValue > 0.005
-                          ? 'Superávit realizado (receitas > gastos)'
-                          : heroValue < -0.005
-                          ? 'Déficit realizado (gastos > receitas)'
-                          : 'Zero a zero no mês'
-                        : heroValue > 0.005
-                        ? `Superávit de ${formatCurrency(heroValue)} (Receitas: ${formatCurrency(summary.totalIncome)} − Gastos: ${formatCurrency(summary.totalSpent ?? 0)})`
-                        : heroValue < -0.005
-                        ? `Déficit de ${formatCurrency(Math.abs(heroValue))} (Gastos superaram receitas)`
-                        : 'Zero a zero no mês'
-                    ) : (
-                      summary.isFutureMonth
+
+                  {/* Coluna 2: Despesas */}
+                  <div className="flex flex-col items-center justify-center text-center px-1 min-w-0">
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 truncate">
+                      Despesas
+                    </span>
+                    <span className="text-xs font-bold text-rose-400 tabular-nums truncate">
+                      {formatCurrency(isFuture ? summary.totalBudgeted : (summary.totalSpent ?? 0))}
+                    </span>
+                    <span className="text-[8.5px] text-slate-500 truncate" title="Teto orçado">
+                      {isFuture ? 'Orçadas' : `Orç: ${formatCurrency(summary.totalBudgeted)}`}
+                    </span>
+                  </div>
+
+                  {/* Coluna 3: Resultado */}
+                  <div className="flex flex-col items-center justify-center text-center px-1 min-w-0">
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 truncate">
+                      {isFuture ? 'Previsto' : 'Resultado'}
+                    </span>
+                    <span className={`text-xs font-extrabold tabular-nums tracking-tight truncate ${heroColor}`}>
+                      {heroValue > 0.005 ? `+${formatCurrency(heroValue)}` : formatCurrency(heroValue)}
+                    </span>
+                    <span
+                      className={`text-[8.5px] font-semibold truncate ${
+                        heroValue > 0.005 ? 'text-emerald-400/90' : heroValue < -0.005 ? 'text-rose-400/90' : 'text-slate-400'
+                      }`}
+                      title={
+                        isFuture
+                          ? 'Superávit ou Déficit planejado'
+                          : `Resultado Real (Receitas − Despesas). Meta: ${formatCurrency(summary.plannedNetResult ?? 0)}`
+                      }
+                    >
+                      {heroValue > 0.005 ? 'Superávit' : heroValue < -0.005 ? 'Déficit' : 'Equil.'}
+                      {!isFuture && hasExpectedIncome ? ` (${(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}${formatCurrency(summary.plannedNetResult ?? 0)})` : ''}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className={`w-full px-3.5 py-2 rounded-xl border flex items-center justify-between gap-3 shadow-sm transition-all duration-200 ${heroBgBorder}`}
+                >
+                  <div className="text-left min-w-0">
+                    <div className="flex flex-col items-start gap-1">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                        {summary.isFutureMonth ? 'Projeção a Orçar' : 'Disponível a Orçar'}
+                      </span>
+                      {summary.isFutureMonth && (summary.rolloverFromPreviousMonth ?? 0) !== 0 && (
+                        <span
+                          className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60"
+                          title={`Sobra real do mês atual: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
+                        >
+                          Carryover: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
+                        </span>
+                      )}
+
+                      {(summary.pendingExpectedIncome ?? 0) > 0 && (
+                        <span
+                          className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60"
+                          title={summary.isFutureMonth
+                            ? `Se toda a renda planejada entrar, o valor seria ${formatCurrency(summary.projectedToBeBudgeted)}`
+                            : 'Saldo projetado incluindo receitas previstas'}
+                        >
+                          {summary.isFutureMonth ? 'Otimista:' : 'Previsto:'} {formatCurrency(summary.projectedToBeBudgeted)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-500 truncate">
+                      {summary.isFutureMonth
                         ? `Carryover: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)} · Pessimista (sem renda futura)`
                         : summary.toBeBudgeted > 0.005
                         ? 'Disponível para distribuir'
                         : summary.toBeBudgeted < -0.005
                         ? 'Orçamento excedeu receitas'
-                        : 'Orçamento 100% equilibrado'
-                    )}
-                  </p>
-                </div>
+                        : 'Orçamento 100% equilibrado'}
+                    </p>
+                  </div>
 
-                <div className="text-right flex-shrink-0">
-                  <span className={`text-base font-extrabold tabular-nums tracking-tight ${heroColor}`}>
-                    {isAccrual && heroValue > 0.005 ? `+${formatCurrency(heroValue)}` : formatCurrency(heroValue)}
-                  </span>
+                  <div className="text-right flex-shrink-0">
+                    <span className={`text-base font-extrabold tabular-nums tracking-tight ${heroColor}`}>
+                      {formatCurrency(summary.toBeBudgeted)}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
