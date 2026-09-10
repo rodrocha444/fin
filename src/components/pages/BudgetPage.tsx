@@ -533,15 +533,7 @@ export default function BudgetPage() {
                           Carryover: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
                         </span>
                       )}
-                      {/* Fatura CC descontada */}
-                      {(summary.currentInvoicesDue ?? 0) > 0.005 && (
-                        <span
-                          className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-800/60 flex-shrink-0"
-                          title={`Fatura(s) de cartão que fecha(m) neste mês: ${formatCurrency(summary.currentInvoicesDue!)} já descontado do valor a orçar`}
-                        >
-                          −{formatCurrency(summary.currentInvoicesDue!)} faturas
-                        </span>
-                      )}
+
                       {/* Projeção com renda prevista */}
                       {(summary.pendingExpectedIncome ?? 0) > 0 && (
                         <span
@@ -645,14 +637,7 @@ export default function BudgetPage() {
                         Carryover: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
                       </span>
                     )}
-                    {(summary.currentInvoicesDue ?? 0) > 0.005 && (
-                      <span
-                        className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-800/60"
-                        title={`Fatura(s) de cartão que fecha(m) neste mês: ${formatCurrency(summary.currentInvoicesDue!)} descontado`}
-                      >
-                        −{formatCurrency(summary.currentInvoicesDue!)} faturas
-                      </span>
-                    )}
+
                     {(summary.pendingExpectedIncome ?? 0) > 0 && (
                       <span
                         className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60"
