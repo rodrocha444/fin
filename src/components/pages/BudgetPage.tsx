@@ -559,19 +559,32 @@ export default function BudgetPage() {
                       <span className={`text-sm sm:text-base font-extrabold tabular-nums tracking-tight ${heroColor}`}>
                         {heroValue > 0.005 ? `+${formatCurrency(heroValue)}` : formatCurrency(heroValue)}
                       </span>
-                      <span
-                        className={`text-[9px] font-semibold truncate ${
-                          heroValue > 0.005 ? 'text-emerald-400/90' : heroValue < -0.005 ? 'text-rose-400 font-bold' : 'text-slate-400'
-                        }`}
-                        title={
-                          isFuture
-                            ? 'Resultado planejado para o mês'
-                            : `Resultado Real (Receitas − Despesas). Meta planejada: ${formatCurrency(summary.plannedNetResult ?? 0)}`
-                        }
-                      >
-                        {heroValue > 0.005 ? 'Sobra' : heroValue < -0.005 ? 'Negativo' : 'Equilibrado'}
-                        {!isFuture && hasExpectedIncome ? ` · Meta: ${(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}${formatCurrency(summary.plannedNetResult ?? 0)}` : ''}
-                      </span>
+                      <div className="flex items-center justify-end gap-1 text-[9px] truncate">
+                        <span
+                          className={`font-semibold ${
+                            heroValue > 0.005 ? 'text-emerald-400' : heroValue < -0.005 ? 'text-rose-400 font-bold' : 'text-slate-400'
+                          }`}
+                        >
+                          {heroValue > 0.005 ? 'Sobra' : heroValue < -0.005 ? 'Negativo' : 'Equilibrado'}
+                        </span>
+                        {!isFuture && hasExpectedIncome && (
+                          <>
+                            <span className="text-slate-600">·</span>
+                            <span
+                              className={`font-semibold ${
+                                (summary.plannedNetResult ?? 0) < -0.005
+                                  ? 'text-rose-400 font-bold'
+                                  : (summary.plannedNetResult ?? 0) > 0.005
+                                  ? 'text-emerald-400/90'
+                                  : 'text-slate-400'
+                              }`}
+                              title={`Meta planejada do orçamento: ${formatCurrency(summary.plannedNetResult ?? 0)}`}
+                            >
+                              Meta: {(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}{formatCurrency(summary.plannedNetResult ?? 0)}
+                            </span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -713,19 +726,29 @@ export default function BudgetPage() {
                     <span className={`text-xs font-extrabold tabular-nums tracking-tight truncate ${heroColor}`}>
                       {heroValue > 0.005 ? `+${formatCurrency(heroValue)}` : formatCurrency(heroValue)}
                     </span>
-                    <span
-                      className={`text-[8.5px] font-semibold truncate ${
-                        heroValue > 0.005 ? 'text-emerald-400/90' : heroValue < -0.005 ? 'text-rose-400 font-bold' : 'text-slate-400'
-                      }`}
-                      title={
-                        isFuture
-                          ? 'Resultado planejado'
-                          : `Resultado Real (Receitas − Despesas). Meta: ${formatCurrency(summary.plannedNetResult ?? 0)}`
-                      }
-                    >
-                      {heroValue > 0.005 ? 'Sobra' : heroValue < -0.005 ? 'Negativo' : 'Equil.'}
-                      {!isFuture && hasExpectedIncome ? ` (${(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}${formatCurrency(summary.plannedNetResult ?? 0)})` : ''}
-                    </span>
+                    <div className="flex items-center justify-center gap-1 text-[8.5px] truncate max-w-full">
+                      <span
+                        className={`font-semibold truncate ${
+                          heroValue > 0.005 ? 'text-emerald-400' : heroValue < -0.005 ? 'text-rose-400 font-bold' : 'text-slate-400'
+                        }`}
+                      >
+                        {heroValue > 0.005 ? 'Sobra' : heroValue < -0.005 ? 'Negativo' : 'Equil.'}
+                      </span>
+                      {!isFuture && hasExpectedIncome && (
+                        <span
+                          className={`truncate ${
+                            (summary.plannedNetResult ?? 0) < -0.005
+                              ? 'text-rose-400 font-bold'
+                              : (summary.plannedNetResult ?? 0) > 0.005
+                              ? 'text-emerald-400/90'
+                              : 'text-slate-400'
+                          }`}
+                          title={`Meta: ${formatCurrency(summary.plannedNetResult ?? 0)}`}
+                        >
+                          ({(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}{formatCurrency(summary.plannedNetResult ?? 0)})
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               ) : (
