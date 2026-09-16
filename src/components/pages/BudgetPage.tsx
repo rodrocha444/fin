@@ -9,10 +9,10 @@ import {
 } from 'lucide-react'
 import { useBudgetRows, useIncomeBudgetRows, useBudgetSummary } from '@/hooks/useBudget'
 import { setBudget, copyFromPreviousMonth, clearMonthBudgets, coverMonthSpent } from '@/services/api/budget'
-import { formatCurrency, currentMonth } from '@/utils/format'
+import { formatCurrency, currentMonth, formatMonthLabel, shiftMonth } from '@/utils/format'
 import { useAccountingPeriod } from '@/utils/accountingPeriod'
 import { getSavedBudgetRegime, saveBudgetRegime, type AccountingRegime } from '@/utils/accountingRegime'
-import { useConfirm } from '@/context/ConfirmContext'
+import { useConfirm, useAlert } from '@/context/ConfirmContext'
 import PriceInput from '@/components/atoms/PriceInput'
 import MonthNavigator from '@/components/atoms/MonthNavigator'
 import BudgetRegimeSelector from '@/components/atoms/BudgetRegimeSelector'
@@ -434,10 +434,45 @@ export default function BudgetPage() {
   }
 
   const confirm = useConfirm()
+  const alert = useAlert()
+  const [isProcessingBudget, setIsProcessingBudget] = useState(false)
 
   const handleCopy = async () => {
     setShowMenu(false)
-    await copyFromPreviousMonth(month, budgetRegime)
+    const prevMonth = shiftMonth(month, -1)
+    const prevLabel = formatMonthLabel(prevMonth)
+    const currentLabel = formatMonthLabel(month)
+    const regimeLabel = budgetRegime === 'accrual' ? 'Regime de Competência' : 'Regime de Caixa'
+
+    const ok = await confirm({
+      title: 'Copiar Orçamento do Mês Anterior?',
+      message: `Deseja copiar todos os valores orçados de ${prevLabel} para ${currentLabel} (${regimeLabel})?`,
+      details: 'Atenção: Quaisquer valores já orçados nas categorias correspondentes deste mês serão substituídos.',
+      confirmText: 'Copiar Orçamento',
+      variant: 'info',
+    })
+
+    if (!ok) return
+
+    try {
+      setIsProcessingBudget(true)
+      const result = await copyFromPreviousMonth(month, budgetRegime)
+      if (!result.success || result.copiedCount === 0) {
+        await alert({
+          title: 'Nenhum Orçamento Encontrado',
+          message: `Não foram encontrados valores orçados no mês anterior (${prevLabel}) para o ${regimeLabel}.`,
+          variant: 'info',
+        })
+      }
+    } catch (err: any) {
+      await alert({
+        title: 'Erro ao Copiar Orçamento',
+        message: err?.message || 'Ocorreu um erro inesperado ao copiar o orçamento.',
+        variant: 'danger',
+      })
+    } finally {
+      setIsProcessingBudget(false)
+    }
   }
 
   const handleCoverSpent = async () => {
@@ -449,7 +484,18 @@ export default function BudgetPage() {
       variant: 'info',
     })
     if (ok) {
-      await coverMonthSpent(month, rows, budgetRegime)
+      try {
+        setIsProcessingBudget(true)
+        await coverMonthSpent(month, rows, budgetRegime)
+      } catch (err: any) {
+        await alert({
+          title: 'Erro ao Cobrir Gastos',
+          message: err?.message || 'Erro inesperado ao cobrir gastos.',
+          variant: 'danger',
+        })
+      } finally {
+        setIsProcessingBudget(false)
+      }
     }
   }
 
@@ -462,7 +508,18 @@ export default function BudgetPage() {
       variant: 'warning',
     })
     if (ok) {
-      await clearMonthBudgets(month, budgetRegime)
+      try {
+        setIsProcessingBudget(true)
+        await clearMonthBudgets(month, budgetRegime)
+      } catch (err: any) {
+        await alert({
+          title: 'Erro ao Zerar Orçamento',
+          message: err?.message || 'Erro inesperado ao zerar orçamento.',
+          variant: 'danger',
+        })
+      } finally {
+        setIsProcessingBudget(false)
+      }
     }
   }
 
@@ -647,15 +704,20 @@ export default function BudgetPage() {
                 <button
                   type="button"
                   onClick={() => setShowMenu(s => !s)}
+                  disabled={isProcessingBudget}
                   className={`p-2 rounded-lg transition-all duration-150 border ${
                     showMenu
                       ? 'bg-slate-800 border-indigo-500/50 text-indigo-300 shadow-sm'
                       : 'bg-slate-800/70 hover:bg-slate-800 border-slate-700/70 text-slate-400 hover:text-slate-200'
-                  }`}
+                  } ${isProcessingBudget ? 'opacity-50 cursor-not-allowed' : ''}`}
                   title="Ações do orçamento do mês"
                   aria-label="Opções do orçamento"
                 >
-                  <MoreHorizontal className="w-4 h-4" />
+                  {isProcessingBudget ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+                  ) : (
+                    <MoreHorizontal className="w-4 h-4" />
+                  )}
                 </button>
 
                 {showMenu && (
@@ -664,21 +726,24 @@ export default function BudgetPage() {
                     <div className="absolute right-0 top-full mt-1.5 bg-slate-900/95 backdrop-blur-md border border-slate-700/90 rounded-xl shadow-2xl z-40 p-1.5 min-w-[210px] animate-in fade-in zoom-in-95 duration-150">
                       <button
                         onClick={handleCoverSpent}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors"
+                        disabled={isProcessingBudget}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors disabled:opacity-50"
                       >
                         <CheckCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                         <span>Cobrir gastos do mês</span>
                       </button>
                       <button
                         onClick={handleCopy}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
+                        disabled={isProcessingBudget}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2 disabled:opacity-50"
                       >
                         <Copy className="w-4 h-4 text-indigo-400 flex-shrink-0" />
                         <span>Copiar mês anterior</span>
                       </button>
                       <button
                         onClick={handleClear}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
+                        disabled={isProcessingBudget}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2 disabled:opacity-50"
                       >
                         <Trash2 className="w-4 h-4 text-rose-400 flex-shrink-0" />
                         <span>Zerar orçamento</span>

@@ -1,8 +1,8 @@
 import { getClient } from './client'
 import { rowToTransaction, rowToBudgetMonth, rowToAccount, rowToInstallmentGroup } from './types'
 import { createId } from '@/utils/id'
-import { format, subMonths, addMonths } from 'date-fns'
-import { isInitialSetupCategory, currentMonth } from '@/utils/format'
+import { format, addMonths } from 'date-fns'
+import { isInitialSetupCategory, currentMonth, shiftMonth } from '@/utils/format'
 
 import { getInvoiceCycle, getInvoiceData, isInvoicePaid } from '@/utils/invoices'
 import { extractPaidInvoicesMap } from '@/services/api/invoices'
@@ -129,22 +129,147 @@ export async function setBudget(
   }
 }
 
-export async function copyFromPreviousMonth(targetMonth: string, budgetType: BudgetType = 'cash'): Promise<void> {
-  const client = getClient()
-  const [year, mon] = targetMonth.split('-').map(Number)
-  const prevDate = subMonths(new Date(year, mon - 1), 1)
-  const prevMonth = format(prevDate, 'yyyy-MM')
+export interface CopyBudgetResult {
+  success: boolean
+  copiedCount: number
+  prevMonth: string
+  targetMonth: string
+}
 
-  const { data: prevBudgets } = await client.from('budget_months').select('*').eq('month', prevMonth)
-  if (!prevBudgets || prevBudgets.length === 0) return
+export async function copyFromPreviousMonth(
+  targetMonth: string,
+  budgetType: BudgetType = 'cash'
+): Promise<CopyBudgetResult> {
+  const client = getClient()
+  const prevMonth = shiftMonth(targetMonth, -1)
+
+  const { data: prevBudgets, error: prevErr } = await client
+    .from('budget_months')
+    .select('*')
+    .eq('month', prevMonth)
+
+  if (prevErr) throw new Error(`Erro ao buscar orçamentos do mês anterior: ${prevErr.message}`)
+  if (!prevBudgets || prevBudgets.length === 0) {
+    return { success: false, copiedCount: 0, prevMonth, targetMonth }
+  }
 
   const filtered = prevBudgets.filter(b => getRowBudgetType(b) === budgetType)
-
-  for (const prev of filtered) {
-    await setBudget(targetMonth, prev.category_id, Number(prev.budgeted || 0), false, budgetType)
+  if (filtered.length === 0) {
+    return { success: false, copiedCount: 0, prevMonth, targetMonth }
   }
+
+  // Deduplica caso haja entradas múltiplas para a mesma categoria no mês anterior
+  const categoryBudgetMap = new Map<string, number>()
+  for (const prev of filtered) {
+    if (prev.category_id) {
+      categoryBudgetMap.set(prev.category_id, Number(prev.budgeted || 0))
+    }
+  }
+
+  if (categoryBudgetMap.size === 0) {
+    return { success: false, copiedCount: 0, prevMonth, targetMonth }
+  }
+
+  // Carrega registros existentes no mês destino em uma única query
+  const { data: currentBudgets, error: currErr } = await client
+    .from('budget_months')
+    .select('*')
+    .eq('month', targetMonth)
+
+  if (currErr) throw new Error(`Erro ao buscar orçamentos atuais: ${currErr.message}`)
+
+  // Mapeia registros atuais por category_id para o budgetType atual
+  const currentMap = new Map<string, any[]>()
+  for (const row of currentBudgets || []) {
+    if (getRowBudgetType(row) === budgetType) {
+      const list = currentMap.get(row.category_id) || []
+      list.push(row)
+      currentMap.set(row.category_id, list)
+    }
+  }
+
+  // Atualiza ou insere em paralelo
+  const operations: Promise<void>[] = []
+
+  for (const [categoryId, budgeted] of categoryBudgetMap.entries()) {
+    const existing = currentMap.get(categoryId)
+
+    if (existing && existing.length > 0) {
+      const primaryId = existing[0].id
+      operations.push(
+        (async () => {
+          const { error } = await client
+            .from('budget_months')
+            .update({ budgeted, budget_type: budgetType, updated_at: new Date().toISOString() })
+            .eq('id', primaryId)
+
+          if (error) {
+            const { error: fbErr } = await client
+              .from('budget_months')
+              .update({ budgeted, updated_at: new Date().toISOString() })
+              .eq('id', primaryId)
+            if (fbErr) throw new Error(`Erro ao atualizar orçamento: ${fbErr.message}`)
+          }
+
+          if (existing.length > 1) {
+            const duplicateIds = existing.slice(1).map((r: any) => r.id).filter(Boolean)
+            if (duplicateIds.length > 0) {
+              await client.from('budget_months').delete().in('id', duplicateIds)
+            }
+          }
+        })()
+      )
+    } else {
+      const id = budgetType === 'accrual' ? `accrual:${createId()}` : createId()
+      operations.push(
+        (async () => {
+          const { error } = await client.from('budget_months').insert({
+            id,
+            month: targetMonth,
+            category_id: categoryId,
+            budget_type: budgetType,
+            budgeted,
+            activity: 0,
+            available: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+
+          if (error) {
+            const { error: fbErr } = await client.from('budget_months').insert({
+              id,
+              month: targetMonth,
+              category_id: categoryId,
+              budgeted,
+              activity: 0,
+              available: 0,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            if (fbErr) {
+              const { error: updErr } = await client
+                .from('budget_months')
+                .update({ budgeted, updated_at: new Date().toISOString() })
+                .eq('id', id)
+              if (updErr) throw new Error(`Erro ao inserir orçamento: ${updErr.message}`)
+            }
+          }
+        })()
+      )
+    }
+  }
+
+  await Promise.all(operations)
   notifyDataChanged('budget_months', 'upsert')
+
+  return {
+    success: true,
+    copiedCount: categoryBudgetMap.size,
+    prevMonth,
+    targetMonth,
+  }
 }
+
 
 export async function clearMonthBudgets(month: string, budgetType: BudgetType = 'cash'): Promise<void> {
   const client = getClient()
