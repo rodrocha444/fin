@@ -4,8 +4,8 @@ import { createId } from '@/utils/id'
 import { format, subMonths, addMonths } from 'date-fns'
 import { isInitialSetupCategory, currentMonth } from '@/utils/format'
 
-import { getInvoiceCycle, getInvoiceData } from '@/utils/invoices'
-import { getPaidInvoicesMap } from '@/services/api/invoices'
+import { getInvoiceCycle, getInvoiceData, isInvoicePaid } from '@/utils/invoices'
+import { extractPaidInvoicesMap } from '@/services/api/invoices'
 import { isDateBeforeAccountingStart, isMonthBeforeAccountingStart } from '@/utils/accountingPeriod'
 import { buildGroupPurchaseMonthMap, type AccountingRegime } from '@/utils/accountingRegime'
 import { notifyDataChanged } from './events'
@@ -485,7 +485,7 @@ export function calculateBudgetSummary(
     }
   }
 
-  const paidMap = getPaidInvoicesMap()
+  const paidMap = extractPaidInvoicesMap(transactions)
   const ccAccounts = accounts.filter(
     a => a.type === 'credit_card' && a.isActive !== false && a.id && a.statementClosingDay
   )
@@ -529,10 +529,11 @@ export function calculateBudgetSummary(
   const computeCCInvoices = (m: string): number => {
     let total = 0
     for (const acc of ccAccounts) {
-      if (paidMap[`${acc.id}_${m}`]) continue
       const cycle = getInvoiceCycle(m, acc.statementClosingDay!, acc.paymentDueDay)
       const ccTxs = transactions.filter(t => t.accountId === acc.id)
       const inv = getInvoiceData(ccTxs, cycle)
+      const isPaid = isInvoicePaid(transactions, acc.id!, cycle, inv.totalAmount, paidMap)
+      if (isPaid) continue
       if (inv.totalAmount > 0.005) total += inv.totalAmount
     }
     return total

@@ -63,6 +63,7 @@ interface TransactionFormProps {
   defaultMode?: TxMode | 'installment'
   defaultAmount?: number
   defaultPayee?: string
+  defaultNotes?: string
 }
 
 const LAST_TX_DATE_KEY = 'fin_last_tx_date'
@@ -99,6 +100,7 @@ export default function TransactionForm({
   defaultMode = 'expense',
   defaultAmount,
   defaultPayee,
+  defaultNotes,
 }: TransactionFormProps) {
   const isEdit = !!transaction
   const isExistingInstallment = !!transaction?.installmentGroupId
@@ -208,7 +210,7 @@ export default function TransactionForm({
       amount: initialTotalAmount,
       payee: transaction?.payee ?? defaultPayee,
       categoryId: transaction?.categoryId ?? defaultCategoryId ?? '',
-      notes: transaction?.notes ? transaction.notes.replace(/\s*\(\d+\/\d+\)$/, '').trim() : undefined,
+      notes: transaction?.notes ? transaction.notes.replace(/\s*\(\d+\/\d+\)$/, '').trim() : (defaultNotes ?? undefined),
       installmentCount: transaction?.installmentTotal ?? 2,
     },
   })

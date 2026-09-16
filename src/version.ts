@@ -1,5 +1,2 @@
-export const APP_VERSION = '2.15.15'
-export const BUILD_DATE = '10/09/2026 às 09:53'
-
-
-
+export const APP_VERSION = '2.15.16'
+export const BUILD_DATE = '16/09/2026 às 07:59'

@@ -137,7 +137,9 @@ export default function AccountInvoicePage() {
     return tx.payee.toLowerCase().includes(q) || (tx.notes ?? '').toLowerCase().includes(q)
   })
 
-  const isCurrentInvoicePaid = account?.id ? isPaid(account.id, activeMonth) : false
+  const isCurrentInvoicePaid = account?.id && cycle
+    ? isPaid(account.id, activeMonth, cycle, invoiceData?.totalAmount)
+    : false
 
   return (
     <div className="fade-in">
@@ -219,6 +221,7 @@ export default function AccountInvoicePage() {
               isPaid={isCurrentInvoicePaid}
               paidMap={paidMap}
               accountId={account.id}
+              transactions={transactions}
             />
 
             {/* Atalhos rápidos se não estiver na fatura aberta */}
@@ -283,28 +286,26 @@ export default function AccountInvoicePage() {
 
               {/* Botões de Ação */}
               <div className="flex flex-wrap items-center gap-2.5 pt-4 mt-4 border-t border-slate-800/80">
-                {cycle.status === 'closed' && (
-                  isCurrentInvoicePaid ? (
-                    <button
-                      type="button"
-                      onClick={() => invoiceData && setConfirmPaidModalData({ invoice: invoiceData, targetStatus: false })}
-                      className="btn-secondary py-2.5 px-4 text-xs font-semibold flex items-center gap-2 text-emerald-400 border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-900/50"
-                      title="Fatura marcada como paga. Clique para desmarcar"
-                    >
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      <span>Fatura Paga</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => invoiceData && setConfirmPaidModalData({ invoice: invoiceData, targetStatus: true })}
-                      className="btn-primary py-2.5 px-4 text-xs font-semibold flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 border-emerald-500 shadow-lg shadow-emerald-900/30"
-                      title="Marcar esta fatura como paga"
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Marcar como Paga</span>
-                    </button>
-                  )
+                {isCurrentInvoicePaid ? (
+                  <button
+                    type="button"
+                    onClick={() => invoiceData && setConfirmPaidModalData({ invoice: invoiceData, targetStatus: false })}
+                    className="btn-secondary py-2.5 px-4 text-xs font-semibold flex items-center gap-2 text-emerald-400 border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-900/50"
+                    title="Fatura marcada como paga. Clique para desmarcar"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>Fatura Paga</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => invoiceData && setConfirmPaidModalData({ invoice: invoiceData, targetStatus: true })}
+                    className="btn-primary py-2.5 px-4 text-xs font-semibold flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 border-emerald-500 shadow-lg shadow-emerald-900/30"
+                    title="Marcar esta fatura como paga"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Marcar como Paga</span>
+                  </button>
                 )}
 
                 <button
@@ -457,7 +458,8 @@ export default function AccountInvoicePage() {
           defaultMode="transfer"
           defaultTransferAccountId={accountId}
           defaultAmount={invoiceData?.totalAmount}
-          defaultPayee={`Pagamento de Fatura ${account.name}`}
+          defaultPayee={`Pagamento de Fatura ${account.name} (${cycle?.label || activeMonth})`}
+          defaultNotes={`[invoice_paid:${accountId}:${activeMonth}]`}
           onClose={() => setShowPayForm(false)}
         />
       )}
@@ -486,9 +488,14 @@ export default function AccountInvoicePage() {
           account={account}
           invoiceData={confirmPaidModalData.invoice}
           targetStatus={confirmPaidModalData.targetStatus}
-          onConfirm={async () => {
+          onConfirm={async (options) => {
             if (account.id) {
-              await setPaidStatus(account.id, confirmPaidModalData.invoice.cycle.monthKey, confirmPaidModalData.targetStatus)
+              await setPaidStatus(
+                account.id,
+                confirmPaidModalData.invoice.cycle.monthKey,
+                confirmPaidModalData.targetStatus,
+                options
+              )
             }
           }}
           onClose={() => setConfirmPaidModalData(null)}

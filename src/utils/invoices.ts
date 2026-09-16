@@ -216,6 +216,65 @@ export function getInvoicesOverview(
 }
 
 /**
+ * Verifica se uma fatura está paga através de:
+ * 1. Marcação direta no paidMap (localStorage/nuvem)
+ * 2. Transações com tag explícita: [invoice_paid:accountId:monthKey] ou [invoice_paid:monthKey]
+ * 3. Transferências recebidas pelo cartão que mencionam o ciclo no payee (ex: "ago 2026", "2026-08")
+ * 4. Transferências recebidas pelo cartão na janela de fechamento/vencimento cujo valor cubra a fatura
+ */
+export function isInvoicePaid(
+  transactions: Transaction[] | undefined,
+  accountId: string,
+  cycle: InvoiceCycle,
+  totalAmount: number,
+  paidMap?: Record<string, boolean>
+): boolean {
+  if (paidMap && Boolean(paidMap[`${accountId}_${cycle.monthKey}`])) {
+    return true
+  }
+
+  if (!transactions || transactions.length === 0) {
+    return false
+  }
+
+  const cycleTag1 = `[invoice_paid:${accountId}:${cycle.monthKey}]`
+  const cycleTag2 = `[invoice_paid:${cycle.monthKey}]`
+  const cycleLabelLower = cycle.label.toLowerCase() // ex: 'ago 2026'
+
+  for (const tx of transactions) {
+    const isTargetCard = tx.accountId === accountId || tx.transferAccountId === accountId
+    if (!isTargetCard) continue
+
+    // 1. Tag explícita em notes
+    if (tx.notes && (tx.notes.includes(cycleTag1) || tx.notes.includes(cycleTag2))) {
+      return true
+    }
+
+    // 2. Transferência para o cartão
+    if (tx.transferAccountId === accountId && tx.type === 'transfer') {
+      const payeeLower = (tx.payee || '').toLowerCase()
+      if (payeeLower.includes(cycleLabelLower) || payeeLower.includes(cycle.monthKey)) {
+        return true
+      }
+
+      // 3. Janela de pagamento: 3 dias antes do fechamento até 35 dias após
+      if (totalAmount > 0) {
+        const txDate = new Date(tx.date)
+        const windowStart = new Date(cycle.closingDate.getTime() - 3 * 24 * 60 * 60 * 1000)
+        const windowEnd = new Date(cycle.closingDate.getTime() + 35 * 24 * 60 * 60 * 1000)
+        if (txDate >= windowStart && txDate <= windowEnd) {
+          if (Math.abs(tx.amount - totalAmount) < 1.00) {
+            return true
+          }
+        }
+      }
+    }
+  }
+
+  return false
+}
+
+/**
  * Retorna as faturas fechadas que possuem saldo e não foram marcadas como pagas
  */
 export function getClosedUnpaidInvoices(
@@ -237,9 +296,9 @@ export function getClosedUnpaidInvoices(
 
     if (cycle.status === 'closed') {
       const invoice = getInvoiceData(transactions, cycle)
-      const isMarkedPaid = Boolean(paidMap[`${accountId}_${monthKey}`])
+      const isPaid = isInvoicePaid(transactions, accountId, cycle, invoice.totalAmount, paidMap)
 
-      if (invoice.totalAmount > 0 && !isMarkedPaid) {
+      if (invoice.totalAmount > 0 && !isPaid) {
         closedUnpaid.push(invoice)
       }
     }
@@ -250,7 +309,7 @@ export function getClosedUnpaidInvoices(
 
 /**
  * Retorna o valor total das faturas de cartão de crédito cujo vencimento ocorre no mês do orçamento ('YYYY-MM')
- * Se paidMap for fornecido, desconsidera faturas que já foram marcadas como pagas
+ * Se paidMap ou transações indicarem pagamento, desconsidera faturas que já foram pagas
  */
 export function getInvoiceForBudgetMonth(
   transactions: Transaction[],
@@ -258,7 +317,7 @@ export function getInvoiceForBudgetMonth(
   budgetMonth: string,
   paidMap?: Record<string, boolean>
 ): number {
-  if (!account.statementClosingDay) return 0
+  if (!account.statementClosingDay || !account.id) return 0
 
   const closingDay = account.statementClosingDay
   const dueDay = account.paymentDueDay
@@ -274,10 +333,11 @@ export function getInvoiceForBudgetMonth(
   for (const monthKey of checkMonths) {
     const cycle = getInvoiceCycle(monthKey, closingDay, dueDay)
     if (format(cycle.dueDate, 'yyyy-MM') === budgetMonth) {
-      if (paidMap && account.id && paidMap[`${account.id}_${monthKey}`]) {
+      const data = getInvoiceData(transactions, cycle)
+      const isPaid = isInvoicePaid(transactions, account.id, cycle, data.totalAmount, paidMap)
+      if (isPaid) {
         continue
       }
-      const data = getInvoiceData(transactions, cycle)
       totalInvoice += data.totalAmount
     }
   }

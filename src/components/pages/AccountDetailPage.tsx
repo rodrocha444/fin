@@ -662,9 +662,14 @@ export default function AccountDetailPage() {
             account={account}
             invoiceData={confirmPaidModalData.invoice}
             targetStatus={confirmPaidModalData.targetStatus}
-            onConfirm={async () => {
+            onConfirm={async (options) => {
               if (account.id) {
-                await setPaidStatus(account.id, confirmPaidModalData.invoice.cycle.monthKey, confirmPaidModalData.targetStatus)
+                await setPaidStatus(
+                  account.id,
+                  confirmPaidModalData.invoice.cycle.monthKey,
+                  confirmPaidModalData.targetStatus,
+                  options
+                )
               }
             }}
             onClose={() => setConfirmPaidModalData(null)}
@@ -678,6 +683,7 @@ export default function AccountDetailPage() {
             defaultTransferAccountId={accountId}
             defaultAmount={payModalInvoice.totalAmount}
             defaultPayee={`Pagamento de Fatura ${account.name} (${payModalInvoice.cycle.label})`}
+            defaultNotes={`[invoice_paid:${accountId}:${payModalInvoice.cycle.monthKey}]`}
             onClose={() => setPayModalInvoice(null)}
           />
         )}

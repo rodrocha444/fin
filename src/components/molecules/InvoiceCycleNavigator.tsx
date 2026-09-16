@@ -2,7 +2,8 @@
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import { formatDate, shiftMonth, formatCurrency } from '@/utils/format'
 import Badge from '@/components/atoms/Badge'
-import type { InvoiceCycle, InvoiceData } from '@/utils/invoices'
+import { isInvoicePaid, type InvoiceCycle, type InvoiceData } from '@/utils/invoices'
+import type { Transaction } from '@/types'
 
 interface InvoiceCycleNavigatorProps {
   cycle: InvoiceCycle
@@ -12,6 +13,7 @@ interface InvoiceCycleNavigatorProps {
   isPaid?: boolean
   paidMap?: Record<string, boolean>
   accountId?: string
+  transactions?: Transaction[]
 }
 
 export default function InvoiceCycleNavigator({
@@ -22,6 +24,7 @@ export default function InvoiceCycleNavigator({
   isPaid = false,
   paidMap = {},
   accountId = '',
+  transactions,
 }: InvoiceCycleNavigatorProps) {
   return (
     <div className="space-y-2.5">
@@ -82,7 +85,7 @@ export default function InvoiceCycleNavigator({
           {invoicesList.map(inv => {
             const isSelected = inv.cycle.monthKey === activeMonth
             const hasCharges = inv.totalAmount > 0
-            const isInvPaid = Boolean(paidMap[`${accountId}_${inv.cycle.monthKey}`])
+            const isInvPaid = isInvoicePaid(transactions, accountId, inv.cycle, inv.totalAmount, paidMap)
 
             return (
               <button
