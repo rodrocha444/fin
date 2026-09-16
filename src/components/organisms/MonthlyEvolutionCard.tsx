@@ -67,10 +67,20 @@ export default function MonthlyEvolutionCard({
   const availableCategoryOptions = useMemo(() => {
     const list: Array<{ id: string; name: string; groupName?: string }> = []
     const hiddenSet = hiddenCategoryIds ?? new Set()
+    const groupMap = new Map(categoryGroups.map(g => [g.id!, g]))
+    const catMap = new Map(categories.map(c => [c.id!, c]))
+    const accountMap = new Map(accounts.map(a => [a.id!, a]))
+
+    const isIncomeGroup = (g?: { name?: string; type?: string }) => {
+      if (!g) return false
+      if (g.type === 'income') return true
+      const lower = (g.name || '').toLowerCase()
+      return lower.includes('renda') || lower.includes('receita') || lower.includes('ganho') || lower.includes('entrada')
+    }
 
     if (viewMode === 'expense') {
       const expenseGroups = categoryGroups.filter(
-        g => g.type !== 'income' && g.name !== 'Faturas Atuais' && g.name !== 'Faturas de Cartão'
+        g => !isIncomeGroup(g) && g.name !== 'Faturas Atuais' && g.name !== 'Faturas de Cartão'
       )
       for (const group of expenseGroups) {
         if (group.isHidden) continue
@@ -84,7 +94,7 @@ export default function MonthlyEvolutionCard({
         list.push({ id: 'uncategorized_expense', name: 'Sem Categoria (Despesas)' })
       }
     } else if (viewMode === 'income') {
-      const incomeGroups = categoryGroups.filter(g => g.type === 'income')
+      const incomeGroups = categoryGroups.filter(isIncomeGroup)
       for (const group of incomeGroups) {
         if (group.isHidden) continue
         const groupCats = categories.filter(c => c.groupId === group.id && !c.isHidden)
@@ -99,18 +109,63 @@ export default function MonthlyEvolutionCard({
     }
 
     // Inclusão de quaisquer outras categorias cadastradas correspondentes ao modo
-    const groupMap = new Map(categoryGroups.map(g => [g.id!, g]))
     for (const cat of categories) {
       if (!cat.id || hiddenSet.has(cat.id) || list.some(item => item.id === cat.id)) continue
       const grp = groupMap.get(cat.groupId)
-      const isIncome = grp?.type === 'income'
-      if ((viewMode === 'income' && isIncome) || (viewMode === 'expense' && !isIncome)) {
-        list.push({ id: cat.id, name: cat.name, groupName: grp?.name || 'Geral' })
+      const isInc = isIncomeGroup(grp)
+      if ((viewMode === 'income' && isInc) || (viewMode === 'expense' && !isInc)) {
+        list.push({ id: cat.id, name: cat.name, groupName: grp?.name || (viewMode === 'income' ? 'Renda' : 'Geral') })
+      }
+    }
+
+    // Inclusão dinâmica a partir de transações registradas para garantir que NENHUMA categoria usada fique de fora
+    for (const tx of transactions) {
+      let isExp = tx.type === 'expense' && (accountMap && tx.accountId ? accountMap.get(tx.accountId)?.type !== 'off_budget' : true)
+      let isInc = tx.type === 'income' && (accountMap && tx.accountId ? accountMap.get(tx.accountId)?.type !== 'off_budget' : true)
+      if (tx.type === 'transfer' && accountMap) {
+        const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
+        const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
+        if (fromAcc?.type !== 'off_budget' && toAcc?.type === 'off_budget') {
+          isExp = true
+        } else if (fromAcc?.type === 'off_budget' && toAcc?.type !== 'off_budget') {
+          isInc = true
+        }
+      }
+
+      if (viewMode === 'income' && isInc) {
+        if (tx.categoryId && !hiddenSet.has(tx.categoryId) && !list.some(item => item.id === tx.categoryId)) {
+          const cat = catMap.get(tx.categoryId)
+          const grp = cat?.groupId ? groupMap.get(cat.groupId) : undefined
+          list.push({
+            id: tx.categoryId,
+            name: cat?.name || 'Categoria Diversa',
+            groupName: grp?.name || 'Renda',
+          })
+        } else if (!tx.categoryId && tx.payee) {
+          const payeeKey = `payee_${tx.payee}`
+          if (!hiddenSet.has(payeeKey) && !list.some(item => item.id === payeeKey)) {
+            list.push({
+              id: payeeKey,
+              name: tx.payee,
+              groupName: 'Por Pagador/Origem',
+            })
+          }
+        }
+      } else if (viewMode === 'expense' && isExp) {
+        if (tx.categoryId && !hiddenSet.has(tx.categoryId) && !list.some(item => item.id === tx.categoryId)) {
+          const cat = catMap.get(tx.categoryId)
+          const grp = cat?.groupId ? groupMap.get(cat.groupId) : undefined
+          list.push({
+            id: tx.categoryId,
+            name: cat?.name || 'Categoria Diversa',
+            groupName: grp?.name || 'Despesas',
+          })
+        }
       }
     }
 
     return list
-  }, [viewMode, categoryGroups, categories, hiddenCategoryIds])
+  }, [viewMode, categoryGroups, categories, hiddenCategoryIds, transactions, accounts])
 
   // Nome da categoria atualmente selecionada
   const selectedCategoryObj = useMemo(() => {
@@ -121,8 +176,16 @@ export default function MonthlyEvolutionCard({
     if (selectedCategoryId === 'uncategorized_income') {
       return { id: 'uncategorized_income', name: 'Sem Categoria' }
     }
-    return categories.find(c => c.id === selectedCategoryId) ?? null
-  }, [selectedCategoryId, categories])
+    if (selectedCategoryId.startsWith('payee_')) {
+      const payeeName = selectedCategoryId.replace(/^payee_/, '')
+      return { id: selectedCategoryId, name: payeeName }
+    }
+    const cat = categories.find(c => c.id === selectedCategoryId)
+    if (cat) return cat
+    const opt = availableCategoryOptions.find(o => o.id === selectedCategoryId)
+    if (opt) return { id: opt.id, name: opt.name }
+    return { id: selectedCategoryId, name: selectedCategoryId }
+  }, [selectedCategoryId, categories, availableCategoryOptions])
 
   // Gera a lista de meses com base no preset selecionado
   const monthsList = useMemo(() => {
@@ -798,7 +861,7 @@ export default function MonthlyEvolutionCard({
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap max-h-24 overflow-y-auto pr-1">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap max-h-40 sm:max-h-48 overflow-y-auto pr-1">
             {periodCategoriesLegend.map(cat => (
               <button
                 key={cat.id}

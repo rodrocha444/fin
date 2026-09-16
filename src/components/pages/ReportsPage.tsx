@@ -227,7 +227,12 @@ export default function ReportsPage() {
     if (categoryId) {
       const catObj = categories.find(c => c.id === categoryId)
       const catName =
-        catObj?.name || (categoryId.startsWith('uncategorized') ? 'Sem Categoria' : categoryId)
+        catObj?.name ||
+        (categoryId.startsWith('payee_')
+          ? categoryId.replace(/^payee_/, '')
+          : categoryId.startsWith('uncategorized')
+          ? 'Sem Categoria'
+          : categoryId)
       title = catName
       description = `Lançamentos de ${catName} em ${monthLabel} (${regimeLabel})`
     } else {

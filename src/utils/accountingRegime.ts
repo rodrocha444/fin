@@ -456,8 +456,8 @@ export function getReportTransactionsForMonth(
       }
 
       // Filtragem de competência vs caixa
-      if (regime === 'accrual') {
-        if (tx.installmentGroupId) {
+      if (regime === 'accrual' || isInc) {
+        if (regime === 'accrual' && tx.installmentGroupId) {
           const purchaseMonth = groupMonthMap.get(tx.installmentGroupId)
           if (purchaseMonth !== month) return false
         } else {
@@ -524,7 +524,9 @@ const DEFAULT_EXPENSE_PALETTE = [
 
 const DEFAULT_INCOME_PALETTE = [
   '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#14b8a6',
-  '#22c55e', '#6366f1', '#eab308', '#f59e0b', '#0ea5e9'
+  '#22c55e', '#6366f1', '#eab308', '#f59e0b', '#0ea5e9',
+  '#84cc16', '#a855f7', '#2dd4bf', '#38bdf8', '#fbbf24',
+  '#4ade80', '#c084fc', '#818cf8', '#34d399', '#f97316'
 ]
 
 function getDeterministicColor(key: string, palette: string[]): string {
@@ -555,6 +557,31 @@ export function calculateMonthlyEvolution(
 
   const catMap = new Map(categories.map(c => [c.id!, c]))
   const grpMap = new Map(categoryGroups.map(g => [g.id!, g]))
+  const accountMap = accounts ? new Map(accounts.map(a => [a.id!, a])) : undefined
+
+  const isTxExpense = (tx: Transaction) => {
+    let isExp = tx.type === 'expense' && (accountMap && tx.accountId ? accountMap.get(tx.accountId)?.type !== 'off_budget' : true)
+    if (tx.type === 'transfer' && accountMap) {
+      const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
+      const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
+      if (fromAcc?.type !== 'off_budget' && toAcc?.type === 'off_budget') {
+        isExp = true
+      }
+    }
+    return isExp
+  }
+
+  const isTxIncome = (tx: Transaction) => {
+    let isInc = tx.type === 'income' && (accountMap && tx.accountId ? accountMap.get(tx.accountId)?.type !== 'off_budget' : true)
+    if (tx.type === 'transfer' && accountMap) {
+      const fromAcc = tx.accountId ? accountMap.get(tx.accountId) : undefined
+      const toAcc = tx.transferAccountId ? accountMap.get(tx.transferAccountId) : undefined
+      if (fromAcc?.type === 'off_budget' && toAcc?.type !== 'off_budget') {
+        isInc = true
+      }
+    }
+    return isInc
+  }
 
   for (let i = 0; i < months.length; i++) {
     const m = months[i]
@@ -569,8 +596,8 @@ export function calculateMonthlyEvolution(
       let expense = 0
       let income = 0
       for (const t of monthTxs) {
-        if (t.type === 'expense') expense += t.amount
-        if (t.type === 'income') income += t.amount
+        if (isTxExpense(t)) expense += t.amount
+        if (isTxIncome(t)) income += t.amount
       }
       const netSavings = income - expense
       const savingsRate = income > 0 ? (netSavings / income) * 100 : 0
@@ -582,8 +609,8 @@ export function calculateMonthlyEvolution(
       }, accounts)
     }
 
-    const expenseTxs = monthTxs.filter(t => t.type === 'expense')
-    const incomeTxs = monthTxs.filter(t => t.type === 'income')
+    const expenseTxs = monthTxs.filter(isTxExpense)
+    const incomeTxs = monthTxs.filter(isTxIncome)
     const expenseCount = expenseTxs.length
     const incomeCount = incomeTxs.length
 
@@ -620,7 +647,7 @@ export function calculateMonthlyEvolution(
       const catId = tx.categoryId || (tx.payee ? `payee_${tx.payee}` : 'uncategorized_income')
       const cat = catMap.get(catId)
       const grp = cat?.groupId ? grpMap.get(cat.groupId) : undefined
-      const label = cat?.name || tx.payee || (catId === 'uncategorized_income' ? 'Sem Categoria' : catId)
+      const label = cat?.name || (catId.startsWith('payee_') ? catId.replace(/^payee_/, '') : catId === 'uncategorized_income' ? 'Sem Categoria' : catId)
       const sublabel = grp?.name
       const color = getDeterministicColor(catId, DEFAULT_INCOME_PALETTE)
 
