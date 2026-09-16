@@ -260,14 +260,41 @@ export default function ReportsPage() {
         className="px-3 sm:px-6 pb-3 border-b border-slate-800 bg-slate-900 sticky top-0 z-20"
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
       >
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h1 className="text-lg sm:text-xl font-bold text-slate-100 flex items-center gap-2">
-              <span>Relatórios Financeiros</span>
-            </h1>
-            <p className="text-[11px] sm:text-xs text-slate-500">
-              Análise de distribuição de despesas, receitas e evolução patrimonial
-            </p>
+        <div className="flex items-center justify-between gap-2.5 flex-wrap">
+          {/* Seletor de Mês */}
+          <div className="flex items-center gap-1.5">
+            <div className="flex items-center bg-slate-950/80 rounded-xl border border-slate-800 p-0.5 shadow-inner">
+              <button
+                type="button"
+                onClick={handlePrevMonth}
+                disabled={isMonthBeforeAccountingStart(month)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                title="Mês anterior"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <span className="px-3 py-1 text-xs font-bold text-slate-200 capitalize min-w-[110px] text-center">
+                {formatMonthLabel(month)}
+              </span>
+
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                title="Próximo mês"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCurrentMonth}
+              className="btn-secondary text-xs py-1.5 px-2.5 hidden sm:inline-flex"
+            >
+              Mês Atual
+            </button>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -329,42 +356,6 @@ export default function ReportsPage() {
               </button>
             </div>
 
-            {/* Seletor de Mês */}
-            <div className="flex items-center bg-slate-950/80 rounded-xl border border-slate-800 p-0.5">
-              <button
-                type="button"
-                onClick={handlePrevMonth}
-                disabled={isMonthBeforeAccountingStart(month)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                title="Mês anterior"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-
-              <span className="px-3 py-1 text-xs font-bold text-slate-200 capitalize min-w-[110px] text-center">
-                {formatMonthLabel(month)}
-              </span>
-
-              <button
-                type="button"
-                onClick={handleNextMonth}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                title="Próximo mês"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-
-            {month !== currentMonth() && (
-              <button
-                type="button"
-                onClick={handleCurrentMonth}
-                className="btn-secondary py-1.5 px-2.5 text-xs font-semibold"
-                title="Voltar para o mês atual"
-              >
-                Mês Atual
-              </button>
-            )}
 
             <div className="lg:hidden">
               <SyncStatusBadge compact={true} />
