@@ -19,6 +19,7 @@ import { deleteDebtAccount } from '@/services/api/debts'
 import { formatCurrency } from '@/utils/format'
 import { useConfirm, useAlert } from '@/context/ConfirmContext'
 import AccountForm from '@/components/organisms/AccountForm'
+import OnboardingWizardModal from '@/components/organisms/OnboardingWizardModal'
 import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
 import type { Account, DebtAccount } from '@/types'
 
@@ -36,6 +37,7 @@ export default function AccountsPage() {
   const debtSummary = useDebtsSummary()
 
   const [showForm, setShowForm] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
   const [editingAccount, setEditingAccount] = useState<Account | undefined>()
   const [editingDebtAccount, setEditingDebtAccount] = useState<DebtAccount | undefined>()
   const [formCategory, setFormCategory] = useState<'on_budget' | 'off_budget'>('on_budget')
@@ -218,11 +220,14 @@ export default function AccountsPage() {
         ════════════════════════════════════════════════════════════════ */}
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-slate-800/80">
-            <div className="flex items-center gap-2">
-              <Landmark className="w-4 h-4 text-indigo-400" />
-              <h2 className="text-sm sm:text-base font-bold text-slate-100 uppercase tracking-wide">
-                No Orçamento
-              </h2>
+            <div className="flex flex-col gap-0.5">
+              <div className="flex items-center gap-2">
+                <Landmark className="w-4 h-4 text-indigo-400" />
+                <h2 className="text-sm sm:text-base font-bold text-slate-100 uppercase tracking-wide">
+                  No Orçamento
+                </h2>
+              </div>
+              <p className="text-[11px] text-slate-400">Contas operacionais do dia a dia (alimentam o orçamento)</p>
             </div>
             <div className="text-left sm:text-right">
               <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Saldo no Orçamento</span>
@@ -235,15 +240,32 @@ export default function AccountsPage() {
           {!accounts ? (
             <p className="text-slate-600 text-sm">Carregando contas…</p>
           ) : onBudgetAccounts.length === 0 ? (
-            <div className="card flex flex-col items-center justify-center py-8 gap-3 bg-slate-900/60 border-dashed border-slate-800">
-              <Landmark className="w-8 h-8 text-slate-700" />
-              <p className="text-slate-500 text-xs">Nenhuma conta no orçamento cadastrada</p>
-              <button
-                onClick={() => handleOpenNew('on_budget')}
-                className="btn-secondary text-xs py-1.5 px-3"
-              >
-                + Adicionar Conta no Orçamento
-              </button>
+            <div className="card flex flex-col items-center justify-center py-10 px-4 text-center gap-3 bg-slate-900/60 border-dashed border-slate-800">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                <Sparkles className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-slate-200">Comece cadastrando sua conta principal</h4>
+                <p className="text-slate-400 text-xs max-w-sm">
+                  O saldo da sua conta corrente será a base para você distribuir nos envelopes de despesas.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowOnboarding(true)}
+                  className="btn-primary text-xs py-2 px-4 font-semibold flex items-center gap-1.5 shadow-lg shadow-indigo-950/50"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Configuração Guiada (1 min)</span>
+                </button>
+                <button
+                  onClick={() => handleOpenNew('on_budget')}
+                  className="btn-secondary text-xs py-2 px-3"
+                >
+                  + Adicionar Manualmente
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -395,11 +417,14 @@ export default function AccountsPage() {
         ════════════════════════════════════════════════════════════════ */}
         <div className="space-y-4 pt-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-slate-800/80">
-            <div className="flex items-center gap-2">
-              <HandCoins className="w-4 h-4 text-emerald-400" />
-              <h2 className="text-sm sm:text-base font-bold text-slate-100 uppercase tracking-wide">
-                Fora do Orçamento
-              </h2>
+            <div className="flex flex-col gap-0.5">
+              <div className="flex items-center gap-2">
+                <HandCoins className="w-4 h-4 text-emerald-400" />
+                <h2 className="text-sm sm:text-base font-bold text-slate-100 uppercase tracking-wide">
+                  Fora do Orçamento
+                </h2>
+              </div>
+              <p className="text-[11px] text-slate-400">Investimentos, patrimônio e contatos (não afetam envelopes de gastos)</p>
             </div>
             <div className="text-left sm:text-right">
               <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Saldo Fora do Orçamento</span>
@@ -626,6 +651,12 @@ export default function AccountsPage() {
           onClose={closeForm}
         />
       )}
+
+      {/* Assistente de Onboarding Guiado */}
+      <OnboardingWizardModal
+        isOpen={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+      />
     </div>
   )
 }

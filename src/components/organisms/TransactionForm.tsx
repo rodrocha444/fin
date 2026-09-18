@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Split, Plus, Trash2, CheckCircle2 } from 'lucide-react'
+import { Split, Plus, Trash2, CheckCircle2, CreditCard, ArrowLeftRight, Info } from 'lucide-react'
 import { format } from 'date-fns'
 import { useFinancialData } from '@/context/FinancialDataContext'
 import { useAccounts } from '@/hooks/useAccounts'
@@ -1084,23 +1084,28 @@ export default function TransactionForm({
             </div>
             )
           ) : isTransferRequiringCategory ? (
-            <div className="space-y-2 p-3.5 bg-slate-950/60 rounded-2xl border border-sky-900/50 shadow-inner">
+            <div className="space-y-2.5 p-3.5 bg-slate-950/70 rounded-2xl border border-sky-800/60 shadow-inner">
               <div className="flex items-center justify-between">
-                <label className="label !mb-0 flex items-center gap-1.5 font-semibold text-slate-200">
-                  <span>Categoria</span>
+                <label className="label !mb-0 flex items-center gap-1.5 font-semibold text-slate-200 text-xs">
+                  <Info className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Categoria do Orçamento</span>
                   <span className="text-[10px] font-bold text-amber-300 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30">
                     Obrigatória
                   </span>
                 </label>
-                <span className={`text-[11px] font-semibold ${isOffBudgetOutflow ? 'text-rose-400' : 'text-emerald-400'}`}>
+                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+                  isOffBudgetOutflow
+                    ? 'text-rose-400 bg-rose-950/40 border-rose-800/40'
+                    : 'text-emerald-400 bg-emerald-950/40 border-emerald-800/40'
+                }`}>
                   {isOffBudgetOutflow ? 'Saída do Orçamento' : 'Entrada no Orçamento'}
                 </span>
               </div>
 
-              <p className="text-[11px] text-slate-400 leading-relaxed">
+              <p className="text-[11px] text-slate-300 leading-relaxed bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
                 {isOffBudgetOutflow
-                  ? 'Esta transferência retira recursos do orçamento para uma conta externa (ex: investimentos). Selecione uma categoria de despesa para registrar o gasto.'
-                  : 'Esta transferência traz recursos externos para o orçamento. Selecione uma categoria de renda para registrar a entrada dos fundos.'}
+                  ? '💡 Como você está enviando dinheiro para uma conta fora do orçamento (ex: investimentos ou patrimônio), escolha o envelope de despesa correspondente (ex: Aporte ou Investimentos).'
+                  : '💡 Como este recurso está vindo de fora do orçamento para sua conta do dia a dia, escolha a categoria de renda para somá-lo ao seu Disponível a Orçar.'}
               </p>
 
               <Controller
@@ -1131,16 +1136,43 @@ export default function TransactionForm({
               />
             </div>
           ) : (
-            <div className="p-3 bg-slate-900/40 rounded-xl border border-slate-800 text-xs text-slate-400 space-y-1">
-              <p className="font-medium text-slate-300">
-                {fromAccount?.type === 'off_budget' && toAccount?.type === 'off_budget'
-                  ? 'Transferência entre contas fora do orçamento'
-                  : 'Transferência interna no orçamento'}
-              </p>
-              <p className="text-[11px] text-slate-500">
-                {fromAccount?.type === 'off_budget' && toAccount?.type === 'off_budget'
-                  ? 'Movimentação entre contas externas. Não altera o saldo do orçamento e não requer categoria.'
-                  : 'O dinheiro permanece dentro das contas do orçamento (ex: conta corrente ou pagamento de fatura). Não altera o total global do orçamento e não requer categoria.'}
+            <div className={`p-3 rounded-xl border text-xs space-y-1.5 ${
+              toAccount?.type === 'credit_card'
+                ? 'bg-indigo-950/30 border-indigo-500/40 text-indigo-200'
+                : fromAccount?.type === 'credit_card'
+                ? 'bg-amber-950/30 border-amber-500/40 text-amber-200'
+                : 'bg-slate-900/50 border-slate-800 text-slate-300'
+            }`}>
+              <div className="flex items-center gap-2 font-semibold text-xs">
+                {toAccount?.type === 'credit_card' ? (
+                  <>
+                    <CreditCard className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                    <span className="text-slate-100">Pagamento de Fatura de Cartão</span>
+                  </>
+                ) : fromAccount?.type === 'credit_card' ? (
+                  <>
+                    <CreditCard className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                    <span className="text-slate-100">Saque / Movimentação do Cartão</span>
+                  </>
+                ) : fromAccount?.type === 'off_budget' && toAccount?.type === 'off_budget' ? (
+                  <>
+                    <ArrowLeftRight className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    <span className="text-slate-100">Transferência Externa</span>
+                  </>
+                ) : (
+                  <>
+                    <ArrowLeftRight className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                    <span className="text-slate-100">Transferência Interna entre Contas</span>
+                  </>
+                )}
+              </div>
+
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                {toAccount?.type === 'credit_card'
+                  ? 'Esta transferência quita a fatura do cartão com o saldo da sua conta corrente. Não requer categoria nem consome envelopes, pois suas compras já foram orçadas no momento da compra.'
+                  : fromAccount?.type === 'off_budget' && toAccount?.type === 'off_budget'
+                  ? 'Movimentação entre contas externas ao orçamento. Não altera o saldo do dia a dia e não requer categoria.'
+                  : 'O dinheiro permanece dentro das suas contas operacionais. Não altera o total global do orçamento e não requer categoria.'}
               </p>
             </div>
           )}

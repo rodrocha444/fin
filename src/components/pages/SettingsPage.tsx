@@ -4,7 +4,8 @@ import {
   Plus, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronRight,
   Download, Upload, Database, CheckCircle2, Cloud, RefreshCw,
   Copy, Check, ExternalLink, KeyRound, Server, AlertCircle,
-  CalendarRange, CalendarCheck, ShieldAlert, LogOut, User as UserIcon
+  CalendarRange, CalendarCheck, ShieldAlert, LogOut, User as UserIcon,
+  Smartphone, SlidersHorizontal, Sparkles, BookOpen,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useFinancialData } from '@/context/FinancialDataContext'
@@ -22,7 +23,9 @@ import { copyToClipboard } from '@/utils/clipboard'
 import { useConfirm, useAlert } from '@/context/ConfirmContext'
 import { useAccountingPeriod } from '@/utils/accountingPeriod'
 import { formatDate } from '@/utils/format'
+import { usePwaInstall } from '@/hooks/usePwaInstall'
 import ResetDatabaseModal from '@/components/organisms/ResetDatabaseModal'
+import OnboardingWizardModal from '@/components/organisms/OnboardingWizardModal'
 import Logo from '@/components/atoms/Logo'
 import { APP_VERSION, BUILD_DATE } from '@/version'
 
@@ -61,6 +64,17 @@ export default function SettingsPage() {
   const showAlert = useAlert()
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+
+  const { isStandalone, isIos, hasNativePrompt, promptInstall } = usePwaInstall()
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false)
+  const [showQuickGuide, setShowQuickGuide] = useState(false)
+  const [isAdvancedMode, setIsAdvancedMode] = useState(() => localStorage.getItem('finplan_advanced_mode') === 'true')
+
+  const toggleAdvancedMode = () => {
+    const next = !isAdvancedMode
+    setIsAdvancedMode(next)
+    localStorage.setItem('finplan_advanced_mode', String(next))
+  }
 
   const handleLogout = async () => {
     const ok = await confirm({
@@ -344,6 +358,113 @@ export default function SettingsPage() {
       </div>
 
       <div className="p-3 sm:p-6 space-y-4 max-w-2xl">
+
+        {/* ── Card PWA & Experiência do Usuário ── */}
+        <div className="card p-5 space-y-4 bg-slate-900 border border-slate-800">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                <Smartphone className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-200">Aplicativo & Experiência</h2>
+                <p className="text-xs text-slate-500">Instalação no celular, assistente guiado e preferências</p>
+              </div>
+            </div>
+
+            {isStandalone ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex-shrink-0">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Instalado</span>
+              </span>
+            ) : hasNativePrompt ? (
+              <button
+                type="button"
+                onClick={promptInstall}
+                className="btn-primary text-xs py-1.5 px-3 font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-950/40 flex-shrink-0"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Instalar App</span>
+              </button>
+            ) : null}
+          </div>
+
+          {!isStandalone && isIos && (
+            <div className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/30 text-xs text-slate-300 space-y-1">
+              <p className="font-semibold text-indigo-300 flex items-center gap-1.5">
+                <Smartphone className="w-4 h-4" />
+                <span>Instalar no iPhone / iPad</span>
+              </p>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Abra no Safari, toque no botão <strong>Compartilhar</strong> e depois em <strong>Adicionar à Tela de Início</strong> para ter o app em tela cheia com alta velocidade.
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+            {/* Botão para reabrir o Onboarding */}
+            <button
+              type="button"
+              onClick={() => setShowOnboardingModal(true)}
+              className="btn-secondary py-2 px-3 text-xs flex items-center justify-center gap-2 font-medium hover:border-indigo-500/40 hover:text-indigo-300 transition-colors"
+            >
+              <Sparkles className="w-4 h-4 text-indigo-400" />
+              <span>Configuração Inicial Guiada</span>
+            </button>
+
+            {/* Toggle de Modo Avançado */}
+            <button
+              type="button"
+              onClick={toggleAdvancedMode}
+              className={`py-2 px-3 text-xs rounded-xl border flex items-center justify-center gap-2 font-medium transition-all ${
+                isAdvancedMode
+                  ? 'bg-indigo-950/40 border-indigo-500/50 text-indigo-200'
+                  : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <SlidersHorizontal className="w-4 h-4 text-slate-400" />
+              <span>Modo Avançado: {isAdvancedMode ? 'Ativado' : 'Desativado'}</span>
+            </button>
+          </div>
+
+          {/* Acordeão do Guia do Orçamento Base Zero */}
+          <div className="border-t border-slate-800/80 pt-3">
+            <button
+              type="button"
+              onClick={() => setShowQuickGuide(!showQuickGuide)}
+              className="flex items-center justify-between w-full text-xs font-medium text-slate-300 hover:text-slate-100 transition-colors"
+            >
+              <span className="flex items-center gap-1.5">
+                <BookOpen className="w-4 h-4 text-indigo-400" />
+                <span>Como Funciona o FinPlan (Guia Rápido)</span>
+              </span>
+              <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${showQuickGuide ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showQuickGuide && (
+              <div className="mt-3 space-y-2.5 bg-slate-950/70 p-3.5 rounded-xl border border-slate-800 text-xs text-slate-400 animate-in fade-in">
+                <div className="space-y-1">
+                  <h4 className="font-semibold text-slate-200">1. Dê um destino a cada real</h4>
+                  <p className="text-[11px] leading-relaxed">
+                    Você só orça o dinheiro que já está na sua conta corrente. Distribua esse saldo nos envelopes de gastos do mês até que o "Disponível a Orçar" zere.
+                  </p>
+                </div>
+                <div className="space-y-1 border-t border-slate-800/80 pt-2">
+                  <h4 className="font-semibold text-slate-200">2. Lance os gastos na hora</h4>
+                  <p className="text-[11px] leading-relaxed">
+                    Use o botão central <strong>+</strong> no celular para registrar qualquer despesa em 5 segundos. O valor é subtraído do envelope correspondente.
+                  </p>
+                </div>
+                <div className="space-y-1 border-t border-slate-800/80 pt-2">
+                  <h4 className="font-semibold text-slate-200">3. Cartão de crédito sem dor de cabeça</h4>
+                  <p className="text-[11px] leading-relaxed">
+                    Compras no cartão consom os envelopes no momento da compra. Ao pagar a fatura, faça uma transferência da conta corrente para o cartão — sem precisar de categoria.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Seletor de Tipo (Despesas vs Rendas) */}
         <div className="flex bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
@@ -972,6 +1093,12 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Assistente de Onboarding Guiado */}
+      <OnboardingWizardModal
+        isOpen={showOnboardingModal}
+        onClose={() => setShowOnboardingModal(false)}
+      />
     </div>
   )
 }

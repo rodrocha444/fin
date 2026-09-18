@@ -6,6 +6,9 @@ import {
   MoreHorizontal,
   CheckCheck,
   Loader2,
+  HelpCircle,
+  Sparkles,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { useBudgetRows, useIncomeBudgetRows, useBudgetSummary } from '@/hooks/useBudget'
 import { setBudget, copyFromPreviousMonth, clearMonthBudgets, coverMonthSpent } from '@/services/api/budget'
@@ -19,6 +22,8 @@ import BudgetRegimeSelector from '@/components/atoms/BudgetRegimeSelector'
 import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
 import PendingIssuesCard from '@/components/organisms/PendingIssuesCard'
 import CategoryTransactionsModal from '@/components/organisms/CategoryTransactionsModal'
+import OnboardingWizardModal from '@/components/organisms/OnboardingWizardModal'
+import Modal from '@/components/atoms/Modal'
 import type {
   Category,
   CategoryBudgetRow,
@@ -417,6 +422,20 @@ export default function BudgetPage() {
   const [budgetRegime, setBudgetRegime] = useState<AccountingRegime>(getSavedBudgetRegime)
   const [showMenu, setShowMenu] = useState(false)
   const [selectedCategoryModal, setSelectedCategoryModal] = useState<CategoryModalData | null>(null)
+  const [showHelpModal, setShowHelpModal] = useState(false)
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false)
+  const [showAdvancedMode, setShowAdvancedMode] = useState<boolean>(() => {
+    return localStorage.getItem('finplan_advanced_mode') === 'true' || getSavedBudgetRegime() === 'accrual'
+  })
+
+  const toggleAdvancedMode = () => {
+    const next = !showAdvancedMode
+    setShowAdvancedMode(next)
+    localStorage.setItem('finplan_advanced_mode', String(next))
+    if (!next && budgetRegime !== 'cash') {
+      handleBudgetRegimeChange('cash')
+    }
+  }
 
   const { startMonth } = useAccountingPeriod()
 
@@ -561,14 +580,16 @@ export default function BudgetPage() {
           {/* Barra Principal: Mês + Regime + Hero Card (sm+) + Sync & Menu */}
           <div className="flex items-center justify-between gap-2">
             
-            {/* Esquerda: Navegação de Mês + Seletor de Regime */}
+            {/* Esquerda: Navegação de Mês + Seletor de Regime (se ativado) */}
             <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-shrink-0">
               <MonthNavigator
                 month={month}
                 onChangeMonth={handleMonthChange}
                 minMonth={startMonth}
               />
-              <BudgetRegimeSelector regime={budgetRegime} onChangeRegime={handleBudgetRegimeChange} />
+              {(showAdvancedMode || budgetRegime === 'accrual') && (
+                <BudgetRegimeSelector regime={budgetRegime} onChangeRegime={handleBudgetRegimeChange} />
+              )}
             </div>
 
             {/* Centro no Desktop (sm+): Card Hero ("Disponível a Orçar" no Caixa / 3 Pilares na Competência) */}
@@ -656,9 +677,20 @@ export default function BudgetPage() {
                   >
                     <div className="text-right min-w-0">
                       <div className="flex flex-col items-end gap-1">
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate">
-                          {summary.isFutureMonth ? 'Projeção a Orçar' : 'Disponível a Orçar'}
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate">
+                            {summary.isFutureMonth ? 'Projeção a Orçar' : 'Disponível a Orçar'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setShowHelpModal(true)}
+                            className="text-slate-500 hover:text-indigo-400 p-0.5 rounded transition-colors"
+                            title="Como funciona o Disponível a Orçar?"
+                            aria-label="Explicação sobre Disponível a Orçar"
+                          >
+                            <HelpCircle className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                         {/* Carryover do mês atual para meses futuros */}
                         {summary.isFutureMonth && (summary.rolloverFromPreviousMonth ?? 0) !== 0 && (
                           <span
@@ -747,6 +779,26 @@ export default function BudgetPage() {
                       >
                         <Trash2 className="w-4 h-4 text-rose-400 flex-shrink-0" />
                         <span>Zerar orçamento</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowMenu(false)
+                          setShowHelpModal(true)
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-indigo-300 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
+                      >
+                        <HelpCircle className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                        <span>Como funciona o Orçamento</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowMenu(false)
+                          toggleAdvancedMode()
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-400 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
+                      >
+                        <SlidersHorizontal className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                        <span>{showAdvancedMode ? 'Ocultar Modo Avançado' : 'Modo Avançado (Regimes)'}</span>
                       </button>
                     </div>
                   </>
@@ -837,9 +889,20 @@ export default function BudgetPage() {
                 >
                   <div className="text-left min-w-0">
                     <div className="flex flex-col items-start gap-1">
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                        {summary.isFutureMonth ? 'Projeção a Orçar' : 'Disponível a Orçar'}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                          {summary.isFutureMonth ? 'Projeção a Orçar' : 'Disponível a Orçar'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowHelpModal(true)}
+                          className="text-slate-500 hover:text-indigo-400 p-0.5 rounded transition-colors"
+                          title="Como funciona o Disponível a Orçar?"
+                          aria-label="Explicação sobre Disponível a Orçar"
+                        >
+                          <HelpCircle className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                       {summary.isFutureMonth && (summary.rolloverFromPreviousMonth ?? 0) !== 0 && (
                         <span
                           className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60"
@@ -894,11 +957,33 @@ export default function BudgetPage() {
         {!rows && !incomeRows ? (
           <div className="flex items-center justify-center h-32 text-slate-600 text-sm">Carregando…</div>
         ) : (rows?.length === 0 && incomeRows?.length === 0) ? (
-          <div className="flex flex-col items-center justify-center h-64 gap-3 px-4 text-center">
-            <p className="text-slate-500 text-sm">Nenhuma categoria ainda.</p>
-            <Link to="/settings" className="btn-secondary text-xs">
-              Criar categorias em Configurações
-            </Link>
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center max-w-md mx-auto space-y-4">
+            <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-indigo-600/30 to-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-xl shadow-indigo-950/40">
+              <Sparkles className="w-8 h-8" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-bold text-slate-100">Bem-vindo ao seu Novo Orçamento!</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                O FinPlan funciona com <strong>Envelopes Virtuais</strong>. Você distribui o dinheiro que tem hoje nas categorias que precisa pagar este mês e acompanha os gastos em tempo real.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2.5 w-full pt-2">
+              <button
+                type="button"
+                onClick={() => setShowOnboardingModal(true)}
+                className="btn-primary flex-1 py-2.5 px-4 text-xs font-semibold flex items-center justify-center gap-2 shadow-lg shadow-indigo-950/50"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Configuração Guiada (1 min)</span>
+              </button>
+              <Link
+                to="/settings"
+                className="btn-secondary py-2.5 px-4 text-xs flex items-center justify-center"
+              >
+                Criar Manualmente
+              </Link>
+            </div>
           </div>
         ) : (
           <table className="w-full table-fixed">
@@ -913,10 +998,18 @@ export default function BudgetPage() {
               {rows && rows.length > 0 && (
                 <>
                   <tr className="bg-slate-950/90 text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800 sticky top-0 backdrop-blur-sm z-10 select-none">
-                    <th className="py-2 pl-3 sm:pl-6 pr-1 text-left">Despesas</th>
-                    <th className="py-2 px-2 text-right">Orçado</th>
-                    <th className="py-2 px-2 text-right">Gasto</th>
-                    <th className="py-2 pl-2 pr-3 sm:pr-6 text-right">Disponível</th>
+                    <th className="py-2 pl-3 sm:pl-6 pr-1 text-left" title="Envelopes de despesas organizados por grupos">
+                      Despesas
+                    </th>
+                    <th className="py-2 px-2 text-right" title="Meta planejada para o envelope no mês">
+                      Orçado
+                    </th>
+                    <th className="py-2 px-2 text-right" title="Total já gasto no mês nesta categoria">
+                      Gasto
+                    </th>
+                    <th className="py-2 pl-2 pr-3 sm:pr-6 text-right" title="Saldo restante no envelope (verde = sobrou, vermelho = estourou o teto)">
+                      Disponível
+                    </th>
                   </tr>
                   {rows.map(row => (
                     <GroupRow key={row.group.id} row={row} month={month} budgetRegime={budgetRegime} onSelectCategory={setSelectedCategoryModal} />
@@ -956,6 +1049,73 @@ export default function BudgetPage() {
           onClose={() => setSelectedCategoryModal(null)}
         />
       )}
+
+      {/* Modal Didático de Ajuda do Orçamento Base Zero */}
+      {showHelpModal && (
+        <Modal
+          isOpen={true}
+          onClose={() => setShowHelpModal(false)}
+          size="md"
+          title={
+            <div className="flex items-center gap-2 text-indigo-400">
+              <HelpCircle className="w-5 h-5" />
+              <span className="text-slate-100 font-semibold text-base">Entenda o Orçamento Base Zero</span>
+            </div>
+          }
+        >
+          <div className="p-5 space-y-4 text-xs leading-relaxed text-slate-300">
+            <div className="p-3.5 bg-indigo-950/30 border border-indigo-500/30 rounded-2xl space-y-1.5">
+              <h4 className="font-bold text-slate-100 flex items-center gap-1.5 text-sm">
+                💡 O que é "Disponível a Orçar"?
+              </h4>
+              <p className="text-slate-300 text-[11px] leading-relaxed">
+                É a soma de todo o dinheiro líquido em suas contas correntes que ainda não tem destinação definida.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="font-bold text-slate-200 text-xs uppercase tracking-wider">
+                As 3 Colunas do seu Mês:
+              </h4>
+
+              <div className="space-y-2 bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800">
+                <div>
+                  <span className="font-bold text-slate-200">1. Orçado:</span>
+                  <p className="text-[11px] text-slate-400">Quanto você colocou no envelope desta categoria para o mês.</p>
+                </div>
+                <div className="border-t border-slate-800 pt-2">
+                  <span className="font-bold text-slate-200">2. Gasto:</span>
+                  <p className="text-[11px] text-slate-400">O total de despesas e compras já lançadas nesta categoria.</p>
+                </div>
+                <div className="border-t border-slate-800 pt-2">
+                  <span className="font-bold text-slate-200">3. Disponível:</span>
+                  <p className="text-[11px] text-slate-400">
+                    O que restou no envelope. Se estiver verde, você ainda tem saldo. Se ficar vermelho, você gastou mais do que havia planejado e deve remanejar de outro envelope.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-emerald-950/20 border border-emerald-800/40 rounded-xl text-[11px] text-emerald-300">
+              🎯 <strong>A Regra de Ouro:</strong> Distribua seu dinheiro até o "Disponível a Orçar" ficar <strong>R$ 0,00</strong>. Assim cada real tem um trabalho e você tem controle total.
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowHelpModal(false)}
+              className="btn-primary w-full py-2.5 text-xs font-semibold mt-2"
+            >
+              Entendido, fechar
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Assistente de Onboarding Guiado */}
+      <OnboardingWizardModal
+        isOpen={showOnboardingModal}
+        onClose={() => setShowOnboardingModal(false)}
+      />
     </div>
   )
 }
