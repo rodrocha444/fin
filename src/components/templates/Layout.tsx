@@ -1,4 +1,4 @@
-// src/components/templates/Layout.tsx — Template principal de Layout da aplicação com Quick Add e PWA
+// src/components/templates/Layout.tsx — Template principal de Layout da aplicação
 import { useState, useEffect } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
@@ -21,7 +21,7 @@ import PwaInstallPrompt from '@/components/organisms/PwaInstallPrompt'
 import OnboardingWizardModal from '@/components/organisms/OnboardingWizardModal'
 import { APP_VERSION } from '@/version'
 
-const NAV_DESKTOP = [
+const NAV = [
   { to: '/budget', label: 'Orçamento', icon: LayoutGrid },
   { to: '/accounts', label: 'Contas', icon: Wallet },
   { to: '/transactions', label: 'Transações', icon: ArrowLeftRight },
@@ -46,7 +46,6 @@ export default function Layout() {
       localStorage.getItem('finplan_onboarding_completed')
 
     if (!completed && accounts && accounts.length === 0) {
-      // Dispara o wizard com pequeno delay para fluidez de renderização
       const timer = setTimeout(() => {
         setShowOnboarding(true)
       }, 500)
@@ -93,7 +92,7 @@ export default function Layout() {
 
         {/* Nav desktop */}
         <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto">
-          {NAV_DESKTOP.map(({ to, label, icon: Icon }) => (
+          {NAV.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -136,7 +135,7 @@ export default function Layout() {
       </aside>
 
       {/* ── Conteúdo ─────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden print:overflow-visible print:h-auto print:block">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden print:overflow-visible print:h-auto print:block relative">
 
         {/* Área de conteúdo */}
         <main className="flex-1 overflow-y-auto bg-slate-950 print:p-0 print:m-0 print:overflow-visible print:h-auto print:bg-white print:block">
@@ -145,91 +144,38 @@ export default function Layout() {
           </div>
         </main>
 
-        {/* ── Bottom Nav mobile (sm/md) com Quick Add Central e Safe Area ─────────────────── */}
-        <nav
-          className="lg:hidden flex items-center justify-around bg-slate-900 border-t border-slate-800 flex-shrink-0 print:hidden relative z-30 px-1 pt-1.5"
-          style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 0.5rem)' }}
+        {/* Botão Flutuante (FAB) Mobile de Nova Transação — sem ocupar slot do menu */}
+        <button
+          type="button"
+          onClick={() => setShowQuickAddModal(true)}
+          className="lg:hidden fixed bottom-16 right-4 z-40 w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-xl shadow-indigo-950/60 border border-indigo-400/40 active:scale-95 transition-transform"
+          aria-label="Nova Transação"
+          title="Nova Transação"
         >
-          {/* 1. Orçamento */}
-          <NavLink
-            to="/budget"
-            className={({ isActive }) =>
-              `flex-1 flex flex-col items-center justify-center gap-0.5 py-1 text-[10px] font-medium transition-colors ${
-                isActive ? 'text-indigo-400 font-semibold' : 'text-slate-500 hover:text-slate-300'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <LayoutGrid className={`w-5 h-5 ${isActive ? 'text-indigo-400' : ''}`} />
-                <span>Orçamento</span>
-              </>
-            )}
-          </NavLink>
+          <Plus className="w-6 h-6 stroke-[2.5]" />
+        </button>
 
-          {/* 2. Contas */}
-          <NavLink
-            to="/accounts"
-            className={({ isActive }) =>
-              `flex-1 flex flex-col items-center justify-center gap-0.5 py-1 text-[10px] font-medium transition-colors ${
-                isActive ? 'text-indigo-400 font-semibold' : 'text-slate-500 hover:text-slate-300'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <Wallet className={`w-5 h-5 ${isActive ? 'text-indigo-400' : ''}`} />
-                <span>Contas</span>
-              </>
-            )}
-          </NavLink>
-
-          {/* 3. BOTÃO CENTRAL DESTACADO QUICK ADD (+) */}
-          <div className="flex-shrink-0 px-1 -mt-4">
-            <button
-              type="button"
-              onClick={() => setShowQuickAddModal(true)}
-              className="w-12 h-12 rounded-full bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-950/60 border-2 border-slate-900 active:scale-95 transition-transform"
-              aria-label="Registrar Nova Transação"
-              title="Registrar Nova Transação"
+        {/* ── Bottom Nav mobile original (sm/md) sem safe area bottom e com Relatórios ─────────────────── */}
+        <nav className="lg:hidden flex items-center bg-slate-900 border-t border-slate-800 flex-shrink-0 print:hidden">
+          {NAV.map(({ to, label, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                `flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors ${isActive
+                  ? 'text-indigo-400'
+                  : 'text-slate-500 hover:text-slate-300'
+                }`
+              }
             >
-              <Plus className="w-6 h-6 stroke-[2.5]" />
-            </button>
-          </div>
-
-          {/* 4. Transações */}
-          <NavLink
-            to="/transactions"
-            className={({ isActive }) =>
-              `flex-1 flex flex-col items-center justify-center gap-0.5 py-1 text-[10px] font-medium transition-colors ${
-                isActive ? 'text-indigo-400 font-semibold' : 'text-slate-500 hover:text-slate-300'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <ArrowLeftRight className={`w-5 h-5 ${isActive ? 'text-indigo-400' : ''}`} />
-                <span>Extrato</span>
-              </>
-            )}
-          </NavLink>
-
-          {/* 5. Configurações / Mais */}
-          <NavLink
-            to="/settings"
-            className={({ isActive }) =>
-              `flex-1 flex flex-col items-center justify-center gap-0.5 py-1 text-[10px] font-medium transition-colors ${
-                isActive ? 'text-indigo-400 font-semibold' : 'text-slate-500 hover:text-slate-300'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <Settings className={`w-5 h-5 ${isActive ? 'text-indigo-400' : ''}`} />
-                <span>Ajustes</span>
-              </>
-            )}
-          </NavLink>
+              {({ isActive }) => (
+                <>
+                  <Icon className={`w-5 h-5 ${isActive ? 'text-indigo-400' : ''}`} />
+                  <span>{label}</span>
+                </>
+              )}
+            </NavLink>
+          ))}
         </nav>
       </div>
 
