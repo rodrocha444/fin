@@ -20,6 +20,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
@@ -35,7 +36,7 @@ export default function LoginPage() {
     const msg = (err as { message?: string }).message || ''
     if (msg.includes('Invalid login credentials')) return 'E-mail ou senha incorretos.'
     if (msg.includes('User already registered')) return 'Este e-mail já está cadastrado.'
-    if (msg.includes('Password should be at least')) return 'A senha deve ter pelo menos 6 caracteres.'
+    if (msg.includes('Password should be at least')) return 'A senha deve ter pelo menos 8 caracteres.'
     if (msg.includes('rate limit')) return 'Muitas tentativas. Aguarde alguns instantes.'
     return msg || 'Falha ao autenticar. Tente novamente.'
   }
@@ -69,8 +70,8 @@ export default function LoginPage() {
     }
 
     if (mode === 'register') {
-      if (password.length < 6) {
-        setErrorMsg('A senha deve ter pelo menos 6 caracteres.')
+      if (password.length < 8) {
+        setErrorMsg('A senha deve ter pelo menos 8 caracteres.')
         return
       }
       if (password !== confirmPassword) {
@@ -143,11 +144,11 @@ export default function LoginPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form id="auth-form" name="auth-form" onSubmit={handleSubmit} className="space-y-4">
             
             {/* E-mail */}
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+              <label htmlFor="email" className="block text-xs font-medium text-slate-300 mb-1.5">
                 E-mail
               </label>
               <div className="relative">
@@ -155,9 +156,15 @@ export default function LoginPage() {
                   <Mail className="w-4 h-4" />
                 </div>
                 <input
+                  id="email"
+                  name="email"
                   type="email"
+                  inputMode="email"
                   required
-                  autoComplete="email"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="seu@email.com"
@@ -170,7 +177,7 @@ export default function LoginPage() {
             {mode !== 'forgot' && (
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-medium text-slate-300">
+                  <label htmlFor="password" className="block text-xs font-medium text-slate-300">
                     Senha
                   </label>
                   {mode === 'login' && (
@@ -192,29 +199,40 @@ export default function LoginPage() {
                     <Lock className="w-4 h-4" />
                   </div>
                   <input
+                    id="password"
+                    name="password"
                     type={showPassword ? 'text' : 'password'}
                     required
                     autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder={mode === 'register' ? 'No mínimo 8 caracteres' : '••••••••'}
                     className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-10 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
                   />
                   <button
                     type="button"
+                    aria-label={showPassword ? 'Ocultar senha' : 'Exibir senha'}
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300 transition-colors"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                {mode === 'register' && (
+                  <div className="flex items-center gap-2 mt-1.5 px-0.5">
+                    <div className={`h-1 flex-1 rounded-full transition-colors ${password.length === 0 ? 'bg-slate-800' : password.length >= 8 ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                    <span className="text-[10px] text-slate-400">
+                      {password.length >= 8 ? 'Tamanho seguro (8+ caracteres)' : 'Mínimo de 8 caracteres'}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
             {/* Confirmar Senha (apenas no modo register) */}
             {mode === 'register' && (
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                <label htmlFor="confirmPassword" className="block text-xs font-medium text-slate-300 mb-1.5">
                   Confirmar Senha
                 </label>
                 <div className="relative">
@@ -222,14 +240,24 @@ export default function LoginPage() {
                     <Lock className="w-4 h-4" />
                   </div>
                   <input
-                    type={showPassword ? 'text' : 'password'}
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
                     required
                     autoComplete="new-password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-10 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
                   />
+                  <button
+                    type="button"
+                    aria-label={showConfirmPassword ? 'Ocultar confirmação de senha' : 'Exibir confirmação de senha'}
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
             )}

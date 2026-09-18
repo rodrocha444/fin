@@ -9,6 +9,7 @@ export default function PasswordRecoveryModal() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
@@ -20,8 +21,8 @@ export default function PasswordRecoveryModal() {
     setErrorMsg(null)
     setSuccessMsg(null)
 
-    if (password.length < 6) {
-      setErrorMsg('A nova senha deve ter pelo menos 6 caracteres.')
+    if (password.length < 8) {
+      setErrorMsg('A nova senha deve ter pelo menos 8 caracteres.')
       return
     }
 
@@ -57,7 +58,7 @@ export default function PasswordRecoveryModal() {
         </div>
       }
     >
-      <form onSubmit={handleSubmit} className="p-5 space-y-4">
+      <form id="recovery-form" name="recovery-form" onSubmit={handleSubmit} className="p-5 space-y-4">
         <p className="text-xs text-slate-400">
           Você acessou através de um link de recuperação. Digite sua nova senha de acesso abaixo.
         </p>
@@ -77,7 +78,7 @@ export default function PasswordRecoveryModal() {
         )}
 
         <div>
-          <label className="block text-xs font-medium text-slate-300 mb-1.5">
+          <label htmlFor="recovery-password" className="block text-xs font-medium text-slate-300 mb-1.5">
             Nova Senha
           </label>
           <div className="relative">
@@ -85,15 +86,19 @@ export default function PasswordRecoveryModal() {
               <Lock className="w-4 h-4" />
             </div>
             <input
+              id="recovery-password"
+              name="new-password"
               type={showPassword ? 'text' : 'password'}
               required
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="No mínimo 6 caracteres"
+              placeholder="No mínimo 8 caracteres"
               className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-10 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
             <button
               type="button"
+              aria-label={showPassword ? 'Ocultar senha' : 'Exibir senha'}
               onClick={() => setShowPassword(!showPassword)}
               className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300"
             >
@@ -103,7 +108,7 @@ export default function PasswordRecoveryModal() {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-slate-300 mb-1.5">
+          <label htmlFor="recovery-confirm-password" className="block text-xs font-medium text-slate-300 mb-1.5">
             Confirmar Nova Senha
           </label>
           <div className="relative">
@@ -111,13 +116,24 @@ export default function PasswordRecoveryModal() {
               <Lock className="w-4 h-4" />
             </div>
             <input
-              type={showPassword ? 'text' : 'password'}
+              id="recovery-confirm-password"
+              name="confirm-new-password"
+              type={showConfirmPassword ? 'text' : 'password'}
               required
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Repita a nova senha"
-              className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3.5 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-10 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
+            <button
+              type="button"
+              aria-label={showConfirmPassword ? 'Ocultar confirmação de senha' : 'Exibir confirmação de senha'}
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300"
+            >
+              {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
           </div>
         </div>
 

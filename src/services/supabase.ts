@@ -71,6 +71,8 @@ export function getSupabaseClient(): SupabaseClient<Database> | null {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
       },
     })
     return cachedClient
