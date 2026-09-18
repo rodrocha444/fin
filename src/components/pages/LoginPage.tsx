@@ -7,6 +7,9 @@ import Logo from '@/components/atoms/Logo'
 
 type AuthMode = 'login' | 'register' | 'forgot'
 
+// Controle de acesso: auto-cadastro público desativado por padrão em instâncias privadas
+const ALLOW_PUBLIC_REGISTRATION = false
+
 export default function LoginPage() {
   const { user, signIn, signUp, resetPassword, isConfigured } = useAuth()
   const location = useLocation()
@@ -266,7 +269,7 @@ export default function LoginPage() {
 
           {/* Alternar modos */}
           <div className="mt-6 pt-5 border-t border-slate-800/80 text-center">
-            {mode === 'login' && (
+            {mode === 'login' && ALLOW_PUBLIC_REGISTRATION && (
               <p className="text-xs text-slate-400">
                 Não tem uma conta?{' '}
                 <button

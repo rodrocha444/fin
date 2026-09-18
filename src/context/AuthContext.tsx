@@ -7,20 +7,25 @@ import {
   signUp as apiSignUp,
   signOut as apiSignOut,
   resetPasswordForEmail as apiResetPassword,
+  updatePassword as apiUpdatePassword,
   getSession,
   onAuthStateChange,
 } from '@/services/api/auth'
 import { getSupabaseConfig } from '@/services/supabase'
+import { clearUserSessionData } from '@/utils/sessionCleanup'
 
 interface AuthContextValue {
   user: User | null
   session: Session | null
   isLoading: boolean
   isConfigured: boolean
+  isPasswordRecovery: boolean
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
+  updateUserPassword: (password: string) => Promise<void>
+  clearPasswordRecovery: () => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -29,6 +34,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
   const queryClient = useQueryClient()
   const [, startTransition] = useTransition()
 
@@ -56,7 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (mounted) setIsLoading(false)
       })
 
-    // Escuta mudanças de auth (login, logout, token_refresh)
+    // Escuta mudanças de auth (login, logout, token_refresh, password_recovery)
     const { unsubscribe } = onAuthStateChange((event, currentSession) => {
       if (!mounted) return
 
@@ -66,8 +72,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsLoading(false)
       })
 
-      if (event === 'SIGNED_OUT') {
-        // Limpa todo o cache em memória de queries para isolamento de dados
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsPasswordRecovery(true)
+      } else if (event === 'SIGNED_OUT') {
+        // Limpa todo o cache em memória de queries e dados locais de sessão
+        clearUserSessionData()
         queryClient.clear()
       } else if (event === 'SIGNED_IN') {
         // Invalida e recarrega as queries para o novo usuário
@@ -95,6 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     await apiSignOut()
+    clearUserSessionData()
     queryClient.clear()
     setUser(null)
     setSession(null)
@@ -104,6 +114,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await apiResetPassword(email)
   }
 
+  const updateUserPassword = async (password: string) => {
+    await apiUpdatePassword(password)
+    setIsPasswordRecovery(false)
+  }
+
+  const clearPasswordRecovery = () => {
+    setIsPasswordRecovery(false)
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -111,10 +130,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         session,
         isLoading,
         isConfigured,
+        isPasswordRecovery,
         signIn,
         signUp,
         signOut,
         resetPassword,
+        updateUserPassword,
+        clearPasswordRecovery,
       }}
     >
       {children}

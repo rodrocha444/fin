@@ -18,6 +18,8 @@ const DebtAccountPage = lazy(() => import('@/components/pages/DebtAccountPage'))
 const ReportsPage = lazy(() => import('@/components/pages/ReportsPage'))
 const SettingsPage = lazy(() => import('@/components/pages/SettingsPage'))
 
+import PasswordRecoveryModal from '@/components/organisms/PasswordRecoveryModal'
+
 function PageFallback() {
   return (
     <div className="flex-1 flex items-center justify-center min-h-[50vh]">
@@ -34,6 +36,7 @@ export default function App() {
     <AuthProvider>
       <FinancialDataProvider>
         <ConfirmProvider>
+          <PasswordRecoveryModal />
           <HashRouter>
             <Suspense fallback={<PageFallback />}>
               <Routes>

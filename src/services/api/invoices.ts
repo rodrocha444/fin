@@ -5,17 +5,17 @@ import { transactionToRow } from './types'
 import { createId } from '@/utils/id'
 import type { Transaction } from '@/types'
 
-const PAID_INVOICES_KEY = 'finplan_paid_invoices_map'
+// Cache volátil em memória para resposta síncrona instantânea na sessão ativa
+let memoryPaidInvoicesMap: Record<string, boolean> = {}
 
-/** Retorna o mapa de faturas pagas salvo no localStorage (cache síncrono rápido) */
+/** Limpa o cache de faturas pagas em memória */
+export function clearPaidInvoicesCache(): void {
+  memoryPaidInvoicesMap = {}
+}
+
+/** Retorna o mapa de faturas pagas em memória (cache síncrono rápido) */
 export function getPaidInvoicesMap(): Record<string, boolean> {
-  try {
-    const raw = localStorage.getItem(PAID_INVOICES_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch (err) {
-    console.error('Erro ao ler faturas pagas do localStorage:', err)
-  }
-  return {}
+  return memoryPaidInvoicesMap
 }
 
 /** Extrai faturas pagas a partir de tags explícitas nas transações e combina com o cache local */
@@ -48,7 +48,7 @@ export interface SetInvoicePaidOptions {
 
 /**
  * Atualiza o status de fatura paga.
- * Sincroniza tanto no localStorage quanto no Supabase (garantindo atualização em todos os dispositivos).
+ * Sincroniza em memória e persiste na nuvem (Supabase).
  */
 export async function setInvoicePaidStatus(
   accountId: string,
@@ -56,14 +56,8 @@ export async function setInvoicePaidStatus(
   isPaid: boolean,
   options?: SetInvoicePaidOptions
 ): Promise<void> {
-  const current = getPaidInvoicesMap()
   const key = `${accountId}_${monthKey}`
-  const updated = { ...current, [key]: isPaid }
-  try {
-    localStorage.setItem(PAID_INVOICES_KEY, JSON.stringify(updated))
-  } catch (e) {
-    console.error('Erro ao salvar no localStorage:', e)
-  }
+  memoryPaidInvoicesMap[key] = isPaid
   window.dispatchEvent(new Event('finplan_paid_invoices_changed'))
 
   const client = getClient()
