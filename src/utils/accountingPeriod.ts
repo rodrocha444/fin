@@ -8,6 +8,21 @@ const EVENT_KEY = 'finplan_accounting_period_changed'
 const SYSTEM_PAYEE_ID = 'system_accounting_period'
 
 /**
+ * Retorna o ID isolado por usuário no formato system_accounting_period_<uid>
+ */
+async function getSystemPayeeId(): Promise<string> {
+  const client = getSupabaseClient()
+  if (!client) return SYSTEM_PAYEE_ID
+  try {
+    const { data } = await client.auth.getSession()
+    const uid = data.session?.user?.id
+    return uid ? `system_accounting_period_${uid}` : SYSTEM_PAYEE_ID
+  } catch {
+    return SYSTEM_PAYEE_ID
+  }
+}
+
+/**
  * Obtém a data configurada como início do período contábil (formato YYYY-MM-DD) ou null
  */
 export function getAccountingStartDate(): string | null {
@@ -25,9 +40,13 @@ export async function syncAccountingStartDateWithRemote(): Promise<string | null
   if (!client) return getAccountingStartDate()
 
   try {
+    const targetId = await getSystemPayeeId()
+
+    // Busca o registro do usuário (seja pelo ID com UID ou legado)
     const { data } = await (client.from('payees') as any)
       .select('*')
-      .eq('id', SYSTEM_PAYEE_ID)
+      .like('id', 'system_accounting_period%')
+      .limit(1)
       .maybeSingle()
 
     if (data && data.name) {
@@ -39,13 +58,25 @@ export async function syncAccountingStartDateWithRemote(): Promise<string | null
           window.dispatchEvent(new CustomEvent(EVENT_KEY, { detail: { date: remoteDate } }))
         }
       }
+
+      // Se o registro estava com ID legado, migra para o ID isolado por UID
+      if (data.id !== targetId && targetId !== SYSTEM_PAYEE_ID) {
+        await (client.from('payees') as any).upsert({
+          id: targetId,
+          name: remoteDate,
+          created_at: data.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        await (client.from('payees') as any).delete().eq('id', data.id)
+      }
+
       return remoteDate
     } else {
-      // Se não há no remoto, mas temos local, sincroniza para o remoto
+      // Se não há no remoto, mas temos local, sincroniza para o remoto com o ID único
       const localDate = getAccountingStartDate()
       if (localDate) {
         await (client.from('payees') as any).upsert({
-          id: SYSTEM_PAYEE_ID,
+          id: targetId,
           name: localDate,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -77,15 +108,20 @@ export async function setAccountingStartDate(date: string | null): Promise<void>
   const client = getSupabaseClient()
   if (client) {
     try {
+      const targetId = await getSystemPayeeId()
       if (clean) {
         await (client.from('payees') as any).upsert({
-          id: SYSTEM_PAYEE_ID,
+          id: targetId,
           name: clean,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
+        // Remove ID legado se diferente do targetId
+        if (targetId !== SYSTEM_PAYEE_ID) {
+          await (client.from('payees') as any).delete().eq('id', SYSTEM_PAYEE_ID)
+        }
       } else {
-        await (client.from('payees') as any).delete().eq('id', SYSTEM_PAYEE_ID)
+        await (client.from('payees') as any).delete().like('id', 'system_accounting_period%')
       }
     } catch (err) {
       console.warn('Falha ao sincronizar período contábil no Supabase:', err)
