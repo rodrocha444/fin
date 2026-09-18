@@ -1,6 +1,21 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
+@theme {
+  --color-slate-950: #000000;
+  --color-slate-900: #000000;
+  --color-slate-850: #0e0e11;
+  --color-slate-800: #18181b;
+  --color-slate-700: #27272a;
+  --color-slate-600: #3f3f46;
+  --color-slate-500: #71717a;
+  --color-slate-400: #a1a1aa;
+  --color-slate-300: #d4d4d8;
+  --color-slate-200: #e4e4e7;
+  --color-slate-100: #f4f4f5;
+  --color-slate-50: #fafafa;
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -15,7 +30,7 @@
 
   body {
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    background-color: #0f172a;
+    background-color: #000000;
     color: #e2e8f0;
     -webkit-font-smoothing: antialiased;
     /* Previne zoom duplo toque em iOS */
@@ -53,11 +68,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #334155;
+    background: #27272a;
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #475569;
+    background: #3f3f46;
   }
 
   /* Input number sem setas */
@@ -86,9 +101,9 @@
 
 @layer utilities {
   .glass {
-    background: rgba(30, 41, 59, 0.7);
+    background: rgba(0, 0, 0, 0.75);
     backdrop-filter: blur(12px);
-    border: 1px solid rgba(148, 163, 184, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .card {

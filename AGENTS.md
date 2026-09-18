@@ -22,7 +22,7 @@
 - **Cartão de Crédito:** Compras abatem envelope de categoria; pagamento de fatura é transferência `checking ➔ credit_card` sem categoria.
 
 ## 4. Padrões de Código e UI
-- **UI:** Tema escuro Slate (`bg-slate-900`, `border-slate-800`), safe-area mobile (`env(safe-area-inset-top/bottom)`).
+- **UI:** Tema escuro OLED/Preto (`bg-slate-950`/`bg-slate-900` em `#000000`, `border-slate-800`), safe-area mobile (`env(safe-area-inset-top/bottom)`).
 - **Modais:** Exclusivamente `useConfirm()` e `useAlert()` de `@/context/ConfirmContext` (nunca `window.confirm`/`alert`).
 - **Reatividade:** Disparar `notifyDataChanged(...)` em mutations de `services/api/`.
 
