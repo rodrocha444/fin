@@ -52,6 +52,9 @@ export default function SettingsPage() {
   const [copiedTestResult, setCopiedTestResult] = useState(false)
   const [copiedBackupStatus, setCopiedBackupStatus] = useState(false)
 
+  type SettingsTab = 'account' | 'categories' | 'system'
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('account')
+
   const [groupTypeTab, setGroupTypeTab] = useState<'expense' | 'income'>('expense')
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
@@ -352,147 +355,346 @@ export default function SettingsPage() {
   return (
     <div className="fade-in">
 
-      {/* Header */}
+      {/* Header com Abas */}
       <div
-        className="px-3 sm:px-6 pb-3 border-b border-slate-800 bg-slate-900"
+        className="px-3 sm:px-6 pb-3 border-b border-slate-800 bg-slate-900 sticky top-0 z-10"
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
       >
-        <h1 className="text-lg sm:text-xl font-semibold text-slate-100">Configurações</h1>
-        <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Grupos e categorias de orçamento</p>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <h1 className="text-lg sm:text-xl font-semibold text-slate-100">Configurações</h1>
+            <p className="text-xs text-slate-500">
+              {settingsTab === 'account' && 'Sua conta, plano Pro e preferências'}
+              {settingsTab === 'categories' && 'Grupos e categorias de receitas e despesas'}
+              {settingsTab === 'system' && 'Sincronização, período contábil e dados'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowOnboardingModal(true)}
+            className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-950/30 hover:border-indigo-800/60 shrink-0"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Guia de Uso</span>
+          </button>
+        </div>
+
+        {/* Seletor de Abas */}
+        <div className="flex items-center gap-1 p-1 bg-slate-950/80 rounded-xl border border-slate-800/80">
+          <button
+            type="button"
+            onClick={() => setSettingsTab('account')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-semibold transition-all ${
+              settingsTab === 'account'
+                ? 'bg-slate-800 text-white shadow-xs border border-slate-700/80'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <UserIcon className="w-3.5 h-3.5" />
+            <span>Conta & Plano</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSettingsTab('categories')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-semibold transition-all ${
+              settingsTab === 'categories'
+                ? 'bg-slate-800 text-white shadow-xs border border-slate-700/80'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span>Categorias</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSettingsTab('system')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-semibold transition-all ${
+              settingsTab === 'system'
+                ? 'bg-slate-800 text-white shadow-xs border border-slate-700/80'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Database className="w-3.5 h-3.5" />
+            <span>Dados & Nuvem</span>
+          </button>
+        </div>
       </div>
 
       <div className="p-3 sm:p-6 space-y-4 max-w-2xl">
 
-        {/* ── Card PWA & Experiência do Usuário ── */}
-        <div className="card p-5 space-y-4 bg-slate-900 border border-slate-800">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                <Smartphone className="w-5 h-5" />
+        {/* ── ABA 1: CONTA & PLANO ───────────────────────────── */}
+        {settingsTab === 'account' && (
+          <div className="space-y-4 animate-in fade-in duration-150">
+            {/* ── Card Sessão / Conta de Usuário ───────────────── */}
+            <div className="card p-5 space-y-4 bg-slate-900 border border-slate-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                    <UserIcon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-200">Sua Conta</h2>
+                    <p className="text-xs text-slate-500">Dados do usuário autenticado no FinPlan</p>
+                  </div>
+                </div>
+
+                {user && (
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 hover:border-rose-800/60"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sair da Conta</span>
+                  </button>
+                )}
               </div>
-              <div>
-                <h2 className="text-sm font-semibold text-slate-200">Aplicativo & Experiência</h2>
-                <p className="text-xs text-slate-500">Instalação no celular, assistente guiado e preferências</p>
+
+              <div className="space-y-2 text-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-slate-800/60 gap-1">
+                  <span className="text-slate-400 font-medium">E-mail:</span>
+                  <span className="text-slate-200 font-mono">{user?.email || 'Nenhum usuário logado'}</span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 gap-1">
+                  <span className="text-slate-400 font-medium">User UID:</span>
+                  <span className="text-slate-400 font-mono text-[11px] select-all break-all">{user?.id || '—'}</span>
+                </div>
               </div>
             </div>
 
-            {isStandalone ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex-shrink-0">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Instalado</span>
-              </span>
-            ) : hasNativePrompt ? (
+            {/* ── Card Plano & Assinatura (FinPlan Pro / RevenueCat) ── */}
+            <div className="card p-5 space-y-4 bg-slate-900 border border-slate-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-semibold text-slate-200">Plano & Assinatura</h2>
+                      {isPro && <ProBadge size="sm" variant="gold" />}
+                    </div>
+                    <p className="text-xs text-slate-500">Acesso a recursos avançados e limites do FinPlan</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isRestoringSub || isSubLoading}
+                    onClick={async () => {
+                      setIsRestoringSub(true)
+                      await restore()
+                      setIsRestoringSub(false)
+                    }}
+                    className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isRestoringSub ? 'animate-spin' : ''}`} />
+                    <span>{isRestoringSub ? 'Restaurando...' : 'Restaurar Compras'}</span>
+                  </button>
+
+                  {!isPro && (
+                    <button
+                      type="button"
+                      onClick={openPaywall}
+                      className="py-1.5 px-3.5 rounded-xl font-bold text-xs bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white shadow-md shadow-amber-500/10 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Fazer Upgrade para o Pro</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {isPro ? (
+                <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-800/40 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 font-medium">Status da Assinatura:</span>
+                    <span className="font-semibold text-emerald-400 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Ativa (Pro)
+                    </span>
+                  </div>
+                  {subscription?.billingPeriod && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 font-medium">Ciclo de Faturamento:</span>
+                      <span className="text-slate-200 capitalize">
+                        {subscription.billingPeriod === 'annual' ? 'Anual' : 'Mensal'}
+                      </span>
+                    </div>
+                  )}
+                  {subscription?.expiresAt && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 font-medium">Data de Renovação / Término:</span>
+                      <span className="text-slate-200 font-mono">
+                        {formatDate(subscription.expiresAt)}
+                      </span>
+                    </div>
+                  )}
+                  <p className="text-[11px] text-slate-400 pt-1 border-t border-emerald-800/30">
+                    Você possui acesso ilimitado a todas as contas, relatórios detalhados, projeções orçamentárias e sincronização multi-dispositivo.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-slate-200">Você está no plano Gratuito</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-medium border border-slate-700">
+                        Free
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 max-w-xl">
+                      Faça upgrade para o FinPlan Pro e desbloqueie relatórios financeiros completos, contas e cartões ilimitados e projeção orçamentária para meses futuros.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={openPaywall}
+                    className="shrink-0 py-2 px-4 rounded-xl font-bold text-xs bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Ver Planos</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* ── Card PWA & Experiência do Usuário ── */}
+            <div className="card p-5 space-y-4 bg-slate-900 border border-slate-800">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                    <Smartphone className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-200">Aplicativo & Experiência</h2>
+                    <p className="text-xs text-slate-500">Instalação no celular, assistente guiado e preferências</p>
+                  </div>
+                </div>
+
+                {isStandalone ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex-shrink-0">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Instalado</span>
+                  </span>
+                ) : hasNativePrompt ? (
+                  <button
+                    type="button"
+                    onClick={promptInstall}
+                    className="btn-primary text-xs py-1.5 px-3 font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-950/40 flex-shrink-0"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Instalar App</span>
+                  </button>
+                ) : null}
+              </div>
+
+              {!isStandalone && isIos && (
+                <div className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/30 text-xs text-slate-300 space-y-1">
+                  <p className="font-semibold text-indigo-300 flex items-center gap-1.5">
+                    <Smartphone className="w-4 h-4" />
+                    <span>Instalar no iPhone / iPad</span>
+                  </p>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Abra no Safari, toque no botão <strong>Compartilhar</strong> e depois em <strong>Adicionar à Tela de Início</strong> para ter o app em tela cheia com alta velocidade.
+                  </p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                {/* Botão para reabrir o Onboarding */}
+                <button
+                  type="button"
+                  onClick={() => setShowOnboardingModal(true)}
+                  className="btn-secondary py-2 px-3 text-xs flex items-center justify-center gap-2 font-medium hover:border-indigo-500/40 hover:text-indigo-300 transition-colors"
+                >
+                  <Sparkles className="w-4 h-4 text-indigo-400" />
+                  <span>Configuração Inicial Guiada</span>
+                </button>
+
+                {/* Toggle de Modo Avançado */}
+                <button
+                  type="button"
+                  onClick={toggleAdvancedMode}
+                  className={`py-2 px-3 text-xs rounded-xl border flex items-center justify-center gap-2 font-medium transition-all ${
+                    isAdvancedMode
+                      ? 'bg-indigo-950/40 border-indigo-500/50 text-indigo-200'
+                      : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <SlidersHorizontal className="w-4 h-4 text-slate-400" />
+                  <span>Modo Avançado: {isAdvancedMode ? 'Ativado' : 'Desativado'}</span>
+                </button>
+              </div>
+
+              {/* Acordeão do Guia do Orçamento Base Zero */}
+              <div className="border-t border-slate-800/80 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowQuickGuide(!showQuickGuide)}
+                  className="flex items-center justify-between w-full text-xs font-medium text-slate-300 hover:text-slate-100 transition-colors"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <BookOpen className="w-4 h-4 text-indigo-400" />
+                    <span>Como Funciona o FinPlan (Guia Rápido)</span>
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${showQuickGuide ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showQuickGuide && (
+                  <div className="mt-3 space-y-2.5 bg-slate-950/70 p-3.5 rounded-xl border border-slate-800 text-xs text-slate-400 animate-in fade-in">
+                    <div className="space-y-1">
+                      <h4 className="font-semibold text-slate-200">1. Dê um destino a cada real</h4>
+                      <p className="text-[11px] leading-relaxed">
+                        Você só orça o dinheiro que já está na sua conta corrente. Distribua esse saldo nos envelopes de gastos do mês até que o "Disponível a Orçar" zere.
+                      </p>
+                    </div>
+                    <div className="space-y-1 border-t border-slate-800/80 pt-2">
+                      <h4 className="font-semibold text-slate-200">2. Lance os gastos na hora</h4>
+                      <p className="text-[11px] leading-relaxed">
+                        Use o botão central <strong>+</strong> no celular para registrar qualquer despesa em 5 segundos. O valor é subtraído do envelope correspondente.
+                      </p>
+                    </div>
+                    <div className="space-y-1 border-t border-slate-800/80 pt-2">
+                      <h4 className="font-semibold text-slate-200">3. Cartão de crédito sem dor de cabeça</h4>
+                      <p className="text-[11px] leading-relaxed">
+                        Compras no cartão consom os envelopes no momento da compra. Ao pagar a fatura, faça uma transferência da conta corrente para o cartão — sem precisar de categoria.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── ABA 2: CATEGORIAS ──────────────────────────────── */}
+        {settingsTab === 'categories' && (
+          <div className="space-y-4 animate-in fade-in duration-150">
+            {/* Seletor de Tipo (Despesas vs Rendas) */}
+            <div className="flex bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
               <button
-                type="button"
-                onClick={promptInstall}
-                className="btn-primary text-xs py-1.5 px-3 font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-950/40 flex-shrink-0"
+                onClick={() => setGroupTypeTab('expense')}
+                className={`flex-1 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all ${
+                  groupTypeTab === 'expense'
+                    ? 'bg-indigo-600 text-white shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
               >
-                <Download className="w-3.5 h-3.5" />
-                <span>Instalar App</span>
+                Categorias de Despesas
               </button>
-            ) : null}
-          </div>
-
-          {!isStandalone && isIos && (
-            <div className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/30 text-xs text-slate-300 space-y-1">
-              <p className="font-semibold text-indigo-300 flex items-center gap-1.5">
-                <Smartphone className="w-4 h-4" />
-                <span>Instalar no iPhone / iPad</span>
-              </p>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                Abra no Safari, toque no botão <strong>Compartilhar</strong> e depois em <strong>Adicionar à Tela de Início</strong> para ter o app em tela cheia com alta velocidade.
-              </p>
+              <button
+                onClick={() => setGroupTypeTab('income')}
+                className={`flex-1 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all ${
+                  groupTypeTab === 'income'
+                    ? 'bg-emerald-600 text-white shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Categorias de Receitas / Renda
+              </button>
             </div>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-            {/* Botão para reabrir o Onboarding */}
-            <button
-              type="button"
-              onClick={() => setShowOnboardingModal(true)}
-              className="btn-secondary py-2 px-3 text-xs flex items-center justify-center gap-2 font-medium hover:border-indigo-500/40 hover:text-indigo-300 transition-colors"
-            >
-              <Sparkles className="w-4 h-4 text-indigo-400" />
-              <span>Configuração Inicial Guiada</span>
-            </button>
-
-            {/* Toggle de Modo Avançado */}
-            <button
-              type="button"
-              onClick={toggleAdvancedMode}
-              className={`py-2 px-3 text-xs rounded-xl border flex items-center justify-center gap-2 font-medium transition-all ${
-                isAdvancedMode
-                  ? 'bg-indigo-950/40 border-indigo-500/50 text-indigo-200'
-                  : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <SlidersHorizontal className="w-4 h-4 text-slate-400" />
-              <span>Modo Avançado: {isAdvancedMode ? 'Ativado' : 'Desativado'}</span>
-            </button>
-          </div>
-
-          {/* Acordeão do Guia do Orçamento Base Zero */}
-          <div className="border-t border-slate-800/80 pt-3">
-            <button
-              type="button"
-              onClick={() => setShowQuickGuide(!showQuickGuide)}
-              className="flex items-center justify-between w-full text-xs font-medium text-slate-300 hover:text-slate-100 transition-colors"
-            >
-              <span className="flex items-center gap-1.5">
-                <BookOpen className="w-4 h-4 text-indigo-400" />
-                <span>Como Funciona o FinPlan (Guia Rápido)</span>
-              </span>
-              <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${showQuickGuide ? 'rotate-180' : ''}`} />
-            </button>
-
-            {showQuickGuide && (
-              <div className="mt-3 space-y-2.5 bg-slate-950/70 p-3.5 rounded-xl border border-slate-800 text-xs text-slate-400 animate-in fade-in">
-                <div className="space-y-1">
-                  <h4 className="font-semibold text-slate-200">1. Dê um destino a cada real</h4>
-                  <p className="text-[11px] leading-relaxed">
-                    Você só orça o dinheiro que já está na sua conta corrente. Distribua esse saldo nos envelopes de gastos do mês até que o "Disponível a Orçar" zere.
-                  </p>
-                </div>
-                <div className="space-y-1 border-t border-slate-800/80 pt-2">
-                  <h4 className="font-semibold text-slate-200">2. Lance os gastos na hora</h4>
-                  <p className="text-[11px] leading-relaxed">
-                    Use o botão central <strong>+</strong> no celular para registrar qualquer despesa em 5 segundos. O valor é subtraído do envelope correspondente.
-                  </p>
-                </div>
-                <div className="space-y-1 border-t border-slate-800/80 pt-2">
-                  <h4 className="font-semibold text-slate-200">3. Cartão de crédito sem dor de cabeça</h4>
-                  <p className="text-[11px] leading-relaxed">
-                    Compras no cartão consom os envelopes no momento da compra. Ao pagar a fatura, faça uma transferência da conta corrente para o cartão — sem precisar de categoria.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Seletor de Tipo (Despesas vs Rendas) */}
-        <div className="flex bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
-          <button
-            onClick={() => setGroupTypeTab('expense')}
-            className={`flex-1 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all ${
-              groupTypeTab === 'expense'
-                ? 'bg-indigo-600 text-white shadow'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Categorias de Despesas
-          </button>
-          <button
-            onClick={() => setGroupTypeTab('income')}
-            className={`flex-1 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all ${
-              groupTypeTab === 'income'
-                ? 'bg-emerald-600 text-white shadow'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Categorias de Receitas / Renda
-          </button>
-        </div>
 
         {/* Adicionar grupo */}
         <div className="card space-y-3">
@@ -698,142 +900,12 @@ export default function SettingsPage() {
             )
           })}
         </div>
+      </div>
+    )}
 
-        {/* ── Card Sessão / Conta de Usuário ───────────────── */}
-        <div className="card p-5 space-y-4 bg-slate-900 border border-slate-800">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                <UserIcon className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-sm font-semibold text-slate-200">Sua Conta</h2>
-                <p className="text-xs text-slate-500">Dados do usuário autenticado no FinPlan</p>
-              </div>
-            </div>
-
-            {user && (
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 hover:border-rose-800/60"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Sair da Conta</span>
-              </button>
-            )}
-          </div>
-
-          <div className="space-y-2 text-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-slate-800/60 gap-1">
-              <span className="text-slate-400 font-medium">E-mail:</span>
-              <span className="text-slate-200 font-mono">{user?.email || 'Nenhum usuário logado'}</span>
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 gap-1">
-              <span className="text-slate-400 font-medium">User UID:</span>
-              <span className="text-slate-400 font-mono text-[11px] select-all break-all">{user?.id || '—'}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Card Plano & Assinatura (FinPlan Pro / RevenueCat) ── */}
-        <div className="card p-5 space-y-4 bg-slate-900 border border-slate-800">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-semibold text-slate-200">Plano & Assinatura</h2>
-                  {isPro && <ProBadge size="sm" variant="gold" />}
-                </div>
-                <p className="text-xs text-slate-500">Acesso a recursos avançados e limites do FinPlan</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={isRestoringSub || isSubLoading}
-                onClick={async () => {
-                  setIsRestoringSub(true)
-                  await restore()
-                  setIsRestoringSub(false)
-                }}
-                className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isRestoringSub ? 'animate-spin' : ''}`} />
-                <span>{isRestoringSub ? 'Restaurando...' : 'Restaurar Compras'}</span>
-              </button>
-
-              {!isPro && (
-                <button
-                  type="button"
-                  onClick={openPaywall}
-                  className="py-1.5 px-3.5 rounded-xl font-bold text-xs bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white shadow-md shadow-amber-500/10 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Fazer Upgrade para o Pro</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {isPro ? (
-            <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-800/40 space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400 font-medium">Status da Assinatura:</span>
-                <span className="font-semibold text-emerald-400 flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Ativa (Pro)
-                </span>
-              </div>
-              {subscription?.billingPeriod && (
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 font-medium">Ciclo de Faturamento:</span>
-                  <span className="text-slate-200 capitalize">
-                    {subscription.billingPeriod === 'annual' ? 'Anual' : 'Mensal'}
-                  </span>
-                </div>
-              )}
-              {subscription?.expiresAt && (
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 font-medium">Data de Renovação / Término:</span>
-                  <span className="text-slate-200 font-mono">
-                    {formatDate(subscription.expiresAt)}
-                  </span>
-                </div>
-              )}
-              <p className="text-[11px] text-slate-400 pt-1 border-t border-emerald-800/30">
-                Você possui acesso ilimitado a todas as contas, relatórios detalhados, projeções orçamentárias e sincronização multi-dispositivo.
-              </p>
-            </div>
-          ) : (
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-slate-200">Você está no plano Gratuito</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-medium border border-slate-700">
-                    Free
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 max-w-xl">
-                  Faça upgrade para o FinPlan Pro e desbloqueie relatórios financeiros completos, contas e cartões ilimitados e projeção orçamentária para meses futuros.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={openPaywall}
-                className="shrink-0 py-2 px-4 rounded-xl font-bold text-xs bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 transition-all flex items-center justify-center gap-1.5"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Ver Planos</span>
-              </button>
-            </div>
-          )}
-        </div>
-
+    {/* ── ABA 3: DADOS & NUVEM ───────────────────────────── */}
+    {settingsTab === 'system' && (
+      <div className="space-y-4 animate-in fade-in duration-150">
         {/* ── Card Sincronização em Nuvem (Supabase) ─────────── */}
         <div className="card p-5 space-y-4 bg-slate-900 border border-slate-800">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
@@ -1165,8 +1237,10 @@ export default function SettingsPage() {
             />
           </div>
         </div>
+      </div>
+    )}
 
-        {/* Modal de confirmação para Zerar Banco com countdown de 10s */}
+    {/* Modal de confirmação para Zerar Banco com countdown de 10s */}
         <ResetDatabaseModal
           isOpen={showResetModal}
           onClose={() => setShowResetModal(false)}
