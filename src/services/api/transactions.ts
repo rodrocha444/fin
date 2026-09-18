@@ -5,7 +5,8 @@ import {
   transactionToUpdateRow,
   installmentGroupToRow,
 } from './types'
-import { createId } from '@/utils/id'
+import { createId, assertSafeFilterId } from '@/utils/id'
+
 import { addMonths } from 'date-fns'
 import { notifyDataChanged } from './events'
 import { compareTransactionsByDate } from '@/utils/format'
@@ -35,11 +36,12 @@ export async function getTransactionById(id: string): Promise<Transaction | unde
 }
 
 export async function getTransactionsByAccount(accountId: string): Promise<Transaction[]> {
+  const safeAccountId = assertSafeFilterId(accountId)
   const client = getClient()
   const { data, error } = await client
     .from('transactions')
     .select('*')
-    .or(`account_id.eq.${accountId},and(transfer_account_id.eq.${accountId},type.eq.transfer)`)
+    .or(`account_id.eq.${safeAccountId},and(transfer_account_id.eq.${safeAccountId},type.eq.transfer)`)
 
   if (error) throw new Error(`Erro ao buscar transações da conta: ${error.message}`)
   const txs = (data || []).map(rowToTransaction)

@@ -1,6 +1,7 @@
 import { getClient } from './client'
 import { rowToAccount, accountToRow, accountToUpdateRow } from './types'
-import { createId } from '@/utils/id'
+import { createId, assertSafeFilterId } from '@/utils/id'
+
 import { notifyDataChanged } from './events'
 import type { Account, AccountType } from '@/types'
 
@@ -63,14 +64,15 @@ export async function updateAccount(id: string, changes: Partial<Account>): Prom
 }
 
 export async function deleteAccount(id: string): Promise<void> {
+  const safeId = assertSafeFilterId(id)
   const client = getClient()
   // Deleta transações vinculadas primeiro
-  await client.from('transactions').delete().or(`account_id.eq.${id},transfer_account_id.eq.${id}`)
-  await client.from('installment_groups').delete().eq('account_id', id)
+  await client.from('transactions').delete().or(`account_id.eq.${safeId},transfer_account_id.eq.${safeId}`)
+  await client.from('installment_groups').delete().eq('account_id', safeId)
 
-  const { error } = await client.from('accounts').delete().eq('id', id)
+  const { error } = await client.from('accounts').delete().eq('id', safeId)
   if (error) throw new Error(`Erro ao excluir conta: ${error.message}`)
-  notifyDataChanged('accounts', 'delete', id)
+  notifyDataChanged('accounts', 'delete', safeId)
   notifyDataChanged('transactions', 'delete')
 }
 

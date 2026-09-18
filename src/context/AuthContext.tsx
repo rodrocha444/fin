@@ -38,7 +38,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const queryClient = useQueryClient()
   const [, startTransition] = useTransition()
 
-  const isConfigured = Boolean(getSupabaseConfig())
+  const [isConfigured, setIsConfigured] = useState(() => Boolean(getSupabaseConfig()))
+
+  useEffect(() => {
+    const handleConfigChange = () => {
+      setIsConfigured(Boolean(getSupabaseConfig()))
+    }
+    window.addEventListener('finplan_supabase_config_changed', handleConfigChange)
+    return () => window.removeEventListener('finplan_supabase_config_changed', handleConfigChange)
+  }, [])
 
   useEffect(() => {
     let mounted = true

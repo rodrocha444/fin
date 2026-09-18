@@ -210,17 +210,10 @@ export async function importDatabase(
     throw new Error('Arquivo de backup inválido ou corrompido.')
   }
 
-  const client = getClient()
-  const importedTables: string[] = []
-  let totalRecords = 0
+  // 1. Pré-validar e normalizar todos os registros em memória antes de qualquer deleção
+  const preparedBatches: Array<{ tableName: string; rows: any[] }> = []
+  let expectedRecords = 0
 
-  // 1. Limpar tabelas existentes no Supabase em ordem reversa
-  const reversedTables = [...TABLES].reverse()
-  for (const tableName of reversedTables) {
-    await client.from(tableName).delete().neq('id', '___force_delete_all___')
-  }
-
-  // 2. Inserir dados do backup com normalização para snake_case do Supabase
   for (const tableName of TABLES) {
     const camelMap: Record<string, string> = {
       category_groups: 'categoryGroups',
@@ -232,21 +225,53 @@ export async function importDatabase(
     const camelKey = camelMap[tableName]
     const records = backup.data[tableName] || (camelKey ? backup.data[camelKey] : undefined)
 
-    if (Array.isArray(records) && records.length > 0) {
-      const rowsToInsert = records.map(r => normalizeRecordForTable(tableName, r))
-
-      for (let i = 0; i < rowsToInsert.length; i += 100) {
-        const chunk = rowsToInsert.slice(i, i + 100)
-        const { error } = await client.from(tableName).upsert(chunk, { onConflict: 'id' })
-        if (error) {
-          console.warn(`Erro ao importar lote em ${tableName}:`, error.message)
-          throw new Error(`Erro ao importar lote em ${tableName}: ${error.message}`)
-        }
+    if (records !== undefined) {
+      if (!Array.isArray(records)) {
+        throw new Error(`Estrutura de dados inválida para a tabela "${tableName}": esperado array de registros.`)
       }
 
-      totalRecords += records.length
-      importedTables.push(tableName)
+      if (records.length > 0) {
+        try {
+          const rowsToInsert = records.map(r => normalizeRecordForTable(tableName, r))
+          preparedBatches.push({ tableName, rows: rowsToInsert })
+          expectedRecords += rowsToInsert.length
+        } catch (normErr: any) {
+          throw new Error(`Falha de validação prévia nos dados da tabela "${tableName}": ${normErr?.message || normErr}`)
+        }
+      }
     }
+  }
+
+  if (preparedBatches.length === 0 || expectedRecords === 0) {
+    throw new Error('Nenhum dado válido reconhecido foi encontrado no arquivo de backup. Nenhuma alteração foi realizada.')
+  }
+
+  const client = getClient()
+  const importedTables: string[] = []
+  let totalRecords = 0
+
+  // 2. Limpar tabelas existentes no Supabase em ordem reversa (somente após validação completa)
+  const reversedTables = [...TABLES].reverse()
+  for (const tableName of reversedTables) {
+    const { error: delError } = await client.from(tableName).delete().neq('id', '___force_delete_all___')
+    if (delError) {
+      throw new Error(`Erro ao limpar tabela "${tableName}" para importação: ${delError.message}`)
+    }
+  }
+
+  // 3. Inserir lotes validados com normalização garantida
+  for (const batch of preparedBatches) {
+    for (let i = 0; i < batch.rows.length; i += 100) {
+      const chunk = batch.rows.slice(i, i + 100)
+      const { error } = await client.from(batch.tableName).upsert(chunk, { onConflict: 'id' })
+      if (error) {
+        console.warn(`Erro ao importar lote em ${batch.tableName}:`, error.message)
+        throw new Error(`Erro ao importar lote em ${batch.tableName}: ${error.message}`)
+      }
+    }
+
+    totalRecords += batch.rows.length
+    importedTables.push(batch.tableName)
   }
 
   return { importedTables, totalRecords }

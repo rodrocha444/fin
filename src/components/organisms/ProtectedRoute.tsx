@@ -21,12 +21,8 @@ export default function ProtectedRoute() {
     return <PageFallback />
   }
 
-  // Se não houver configuração do Supabase configurada, vai para settings para configurar
-  if (!isConfigured) {
-    return <Navigate to="/settings" state={{ from: location }} replace />
-  }
-
-  if (!user) {
+  // Se não houver configuração do Supabase ou usuário autenticado, direciona para o login
+  if (!isConfigured || !user) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 

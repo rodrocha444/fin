@@ -15,7 +15,7 @@ import {
 import { downloadDatabaseBackup, importDatabase, type DatabaseBackup } from '@/services/api/backup'
 import {
   getSupabaseConfig, saveSupabaseConfig, clearSupabaseConfig,
-  testSupabaseConnection
+  testSupabaseConnection, isServiceRoleKey
 } from '@/services/supabase'
 import { SUPABASE_SCHEMA_SQL } from '@/services/supabaseSchema'
 import { copyToClipboard } from '@/utils/clipboard'
@@ -88,6 +88,14 @@ export default function SettingsPage() {
 
     const cleanUrl = supabaseUrl.trim().replace(/\/$/, '')
     const cleanKey = supabaseKey.trim()
+
+    if (isServiceRoleKey(cleanKey)) {
+      setTestResult({
+        success: false,
+        message: 'Atenção de Segurança: Você forneceu a chave "service_role" (chave mestra). É estritamente proibido utilizá-la no navegador porque ela anula o isolamento RLS do banco. Utilize a chave "anon" (pública).',
+      })
+      return
+    }
 
     const result = await testSupabaseConnection({ url: cleanUrl, anonKey: cleanKey })
     setIsTestingConnection(false)
@@ -269,11 +277,17 @@ export default function SettingsPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    if (file.size > 25 * 1024 * 1024) {
+      setBackupStatus({ type: 'error', message: 'O arquivo de backup excede o tamanho máximo permitido de 25 MB.' })
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
     try {
       const ok = await confirm({
         title: 'Importar Backup?',
-        message: 'Atenção: A importação irá substituir os dados no Supabase. Deseja continuar?',
-        confirmText: 'Importar e Substituir',
+        message: 'Atenção: A importação irá substituir os dados atuais no Supabase. Um download de backup preventivo dos seus dados atuais será realizado antes da substituição. Deseja continuar?',
+        confirmText: 'Baixar Backup e Importar',
         variant: 'warning',
       })
       if (!ok) {
@@ -282,8 +296,22 @@ export default function SettingsPage() {
       }
 
       setBackupStatus(null)
+
+      // 1. Gera e baixa backup de segurança preventivo
+      try {
+        await downloadDatabaseBackup()
+      } catch (backupErr) {
+        console.warn('Aviso: Falha ao gerar backup preventivo:', backupErr)
+      }
+
+      // 2. Lê e valida o JSON
       const text = await file.text()
-      const backupData = JSON.parse(text) as DatabaseBackup
+      let backupData: DatabaseBackup
+      try {
+        backupData = JSON.parse(text) as DatabaseBackup
+      } catch {
+        throw new Error('O arquivo selecionado não é um JSON de backup válido.')
+      }
 
       const result = await importDatabase(backupData)
       await refetch()

@@ -4,6 +4,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Lock, Mail, Eye, EyeOff, LogIn, UserPlus, KeyRound, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import Logo from '@/components/atoms/Logo'
+import { saveSupabaseConfig, testSupabaseConnection, isServiceRoleKey } from '@/services/supabase'
 
 type AuthMode = 'login' | 'register' | 'forgot'
 
@@ -24,6 +25,49 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
+
+  const [showConfigForm, setShowConfigForm] = useState(!isConfigured)
+  const [configUrl, setConfigUrl] = useState('')
+  const [configKey, setConfigKey] = useState('')
+  const [configLoading, setConfigLoading] = useState(false)
+  const [configError, setConfigError] = useState<string | null>(null)
+  const [configSuccess, setConfigSuccess] = useState<string | null>(null)
+
+  const handleSaveConnection = async (e: FormEvent) => {
+    e.preventDefault()
+    setConfigError(null)
+    setConfigSuccess(null)
+
+    if (!configUrl.trim() || !configKey.trim()) {
+      setConfigError('Informe a URL e a Chave Anon.')
+      return
+    }
+
+    const cleanUrl = configUrl.trim().replace(/\/$/, '')
+    const cleanKey = configKey.trim()
+
+    if (isServiceRoleKey(cleanKey)) {
+      setConfigError('Atenção de Segurança: você inseriu a chave "service_role" (admin secreta). É estritamente proibido utilizá-la no navegador. Use a chave "anon" pública.')
+      return
+    }
+
+    try {
+      setConfigLoading(true)
+      const res = await testSupabaseConnection({ url: cleanUrl, anonKey: cleanKey })
+      if (!res.success) {
+        setConfigError(res.message)
+        return
+      }
+
+      saveSupabaseConfig({ url: cleanUrl, anonKey: cleanKey })
+      setConfigSuccess('Supabase conectado com sucesso!')
+      setShowConfigForm(false)
+    } catch (err: any) {
+      setConfigError(err?.message || 'Falha ao conectar com o Supabase.')
+    } finally {
+      setConfigLoading(false)
+    }
+  }
 
   // Redireciona se já estiver autenticado
   if (user) {
@@ -117,12 +161,81 @@ export default function LoginPage() {
         </div>
 
         {!isConfigured && (
-          <div className="bg-amber-950/40 border border-amber-800/60 p-4 rounded-xl flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-            <div className="text-xs text-amber-200">
-              <span className="font-semibold block">Supabase não configurado</span>
-              Configure a URL e a Chave Anon nas Configurações da aplicação.
+          <div className="bg-slate-900 border border-amber-800/60 rounded-2xl p-5 shadow-xl shadow-black/40 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-xs font-semibold text-amber-200 block">Supabase não configurado</span>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Informe as credenciais do seu projeto Supabase para ativar a autenticação e sincronização.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowConfigForm(!showConfigForm)}
+                className="text-xs text-indigo-400 hover:text-indigo-300 font-medium whitespace-nowrap cursor-pointer"
+              >
+                {showConfigForm ? 'Ocultar' : 'Configurar'}
+              </button>
             </div>
+
+            {showConfigForm && (
+              <form onSubmit={handleSaveConnection} className="pt-2 border-t border-slate-800 space-y-3">
+                {configError && (
+                  <div className="p-2.5 bg-red-950/50 border border-red-800/80 rounded-xl text-xs text-red-200">
+                    {configError}
+                  </div>
+                )}
+                {configSuccess && (
+                  <div className="p-2.5 bg-emerald-950/50 border border-emerald-800/80 rounded-xl text-xs text-emerald-200">
+                    {configSuccess}
+                  </div>
+                )}
+
+                <div>
+                  <label htmlFor="config-url" className="block text-[11px] font-medium text-slate-300 mb-1">
+                    URL do Projeto Supabase
+                  </label>
+                  <input
+                    id="config-url"
+                    type="url"
+                    required
+                    placeholder="https://xyz.supabase.co"
+                    value={configUrl}
+                    onChange={(e) => setConfigUrl(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="config-key" className="block text-[11px] font-medium text-slate-300 mb-1">
+                    Chave Anon (Pública)
+                  </label>
+                  <input
+                    id="config-key"
+                    type="password"
+                    required
+                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    value={configKey}
+                    onChange={(e) => setConfigKey(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-[10px]"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    ⚠️ Nunca utilize a chave <code className="text-rose-400 font-mono">service_role</code>.
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={configLoading}
+                  className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 px-3 rounded-xl text-xs transition-all shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  {configLoading ? 'Testando conexão…' : 'Salvar e Conectar Supabase'}
+                </button>
+              </form>
+            )}
           </div>
         )}
 
