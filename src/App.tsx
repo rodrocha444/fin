@@ -36,43 +36,43 @@ function PageFallback() {
 export default function App() {
   return (
     <AuthProvider>
-      <SubscriptionProvider>
-        <FinancialDataProvider>
-          <ConfirmProvider>
+      <ConfirmProvider>
+        <SubscriptionProvider>
+          <FinancialDataProvider>
             <PasswordRecoveryModal />
             <PaywallModal />
             <HashRouter>
-            <Suspense fallback={<PageFallback />}>
-              <Routes>
-                {/* Rota pública de Autenticação */}
-                <Route path="/login" element={<LoginPage />} />
+              <Suspense fallback={<PageFallback />}>
+                <Routes>
+                  {/* Rota pública de Autenticação */}
+                  <Route path="/login" element={<LoginPage />} />
 
-                {/* Rotas protegidas (exigem sessão ativa) */}
-                <Route element={<ProtectedRoute />}>
-                  <Route path="/" element={<Layout />}>
-                    <Route index element={<Navigate to="/budget" replace />} />
-                    <Route path="budget" element={<BudgetPage />} />
-                    <Route path="accounts" element={<AccountsPage />} />
-                    <Route path="accounts/:id" element={<AccountDetailPage />} />
-                    <Route path="accounts/:id/invoice" element={<AccountInvoicePage />} />
-                    <Route path="accounts/debt/:id" element={<DebtAccountPage />} />
-                    <Route path="transactions" element={<TransactionsPage />} />
-                    <Route path="debts" element={<Navigate to="/accounts" replace />} />
-                    <Route path="debts/:id" element={<DebtAccountPage />} />
-                    <Route path="scheduled" element={<Navigate to="/budget" replace />} />
-                    <Route path="reports" element={<ReportsPage />} />
-                    <Route path="settings" element={<SettingsPage />} />
+                  {/* Rotas protegidas (exigem sessão ativa) */}
+                  <Route element={<ProtectedRoute />}>
+                    <Route path="/" element={<Layout />}>
+                      <Route index element={<Navigate to="/budget" replace />} />
+                      <Route path="budget" element={<BudgetPage />} />
+                      <Route path="accounts" element={<AccountsPage />} />
+                      <Route path="accounts/:id" element={<AccountDetailPage />} />
+                      <Route path="accounts/:id/invoice" element={<AccountInvoicePage />} />
+                      <Route path="accounts/debt/:id" element={<DebtAccountPage />} />
+                      <Route path="transactions" element={<TransactionsPage />} />
+                      <Route path="debts" element={<Navigate to="/accounts" replace />} />
+                      <Route path="debts/:id" element={<DebtAccountPage />} />
+                      <Route path="scheduled" element={<Navigate to="/budget" replace />} />
+                      <Route path="reports" element={<ReportsPage />} />
+                      <Route path="settings" element={<SettingsPage />} />
+                    </Route>
                   </Route>
-                </Route>
 
-                {/* Fallback de rotas desconhecidas */}
-                <Route path="*" element={<Navigate to="/budget" replace />} />
-              </Routes>
-            </Suspense>
-          </HashRouter>
-        </ConfirmProvider>
-      </FinancialDataProvider>
-    </SubscriptionProvider>
-  </AuthProvider>
-)
+                  {/* Fallback de rotas desconhecidas */}
+                  <Route path="*" element={<Navigate to="/budget" replace />} />
+                </Routes>
+              </Suspense>
+            </HashRouter>
+          </FinancialDataProvider>
+        </SubscriptionProvider>
+      </ConfirmProvider>
+    </AuthProvider>
+  )
 }

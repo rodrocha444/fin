@@ -1,5 +1,4 @@
-// src/services/api/subscription.ts — Persistência e Sincronização de Assinaturas no Supabase
-import { getClient } from './client'
+import { getSupabaseClient } from '@/services/supabase'
 import type { UserSubscription, SubscriptionStatus, BillingPeriod } from '@/types/subscription'
 import { notifyDataChanged } from './events'
 
@@ -17,7 +16,10 @@ interface SubscriptionDbRow {
 
 export async function getUserSubscriptionFromDb(userId: string): Promise<UserSubscription | null> {
   try {
-    const client = getClient()
+    const rawClient = getSupabaseClient()
+    if (!rawClient) return null
+    const client = rawClient as any
+
     const { data, error } = await client
       .from('user_subscriptions')
       .select('*')
@@ -26,7 +28,6 @@ export async function getUserSubscriptionFromDb(userId: string): Promise<UserSub
 
     if (error) {
       // Se a tabela ainda não foi criada no Supabase pelo usuário, retorna null silenciosamente
-      console.warn('Aviso ao consultar user_subscriptions:', error.message)
       return null
     }
 
@@ -62,7 +63,10 @@ export async function syncUserSubscriptionToDb(payload: {
   expiresAt?: Date | null
 }): Promise<void> {
   try {
-    const client = getClient()
+    const rawClient = getSupabaseClient()
+    if (!rawClient) return
+    const client = rawClient as any
+
     const row = {
       user_id: payload.userId,
       customer_id: payload.customerId ?? null,
@@ -78,12 +82,10 @@ export async function syncUserSubscriptionToDb(payload: {
       .from('user_subscriptions')
       .upsert(row, { onConflict: 'user_id' })
 
-    if (error) {
-      console.warn('Erro ao atualizar user_subscriptions no Supabase:', error.message)
-    } else {
+    if (!error) {
       notifyDataChanged('user_subscriptions' as any, 'update', payload.userId)
     }
-  } catch (err) {
-    console.warn('Falha ao sincronizar assinatura com o banco:', err)
+  } catch {
+    // Ignora silenciosamente se o banco não estiver disponível
   }
 }
