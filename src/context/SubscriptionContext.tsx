@@ -98,7 +98,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (!user) {
         await showAlert({
           title: 'Faça Login',
-          message: 'Você precisa estar conectado em sua conta para assinar o FinPlan Pro.',
+          message: 'Você precisa estar conectado em sua conta para assinar o Fin Pro.',
         })
         return false
       }

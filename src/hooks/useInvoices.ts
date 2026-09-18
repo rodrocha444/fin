@@ -21,8 +21,12 @@ export function usePaidInvoices() {
 
   useEffect(() => {
     const handleUpdate = () => setLocalMap(getPaidInvoicesMap())
+    window.addEventListener('fin_paid_invoices_changed', handleUpdate)
     window.addEventListener('finplan_paid_invoices_changed', handleUpdate)
-    return () => window.removeEventListener('finplan_paid_invoices_changed', handleUpdate)
+    return () => {
+      window.removeEventListener('fin_paid_invoices_changed', handleUpdate)
+      window.removeEventListener('finplan_paid_invoices_changed', handleUpdate)
+    }
   }, [])
 
   // Combina o cache local com as marcações vindas da nuvem (Supabase)

@@ -20,6 +20,11 @@ export interface DataChangeEventDetail {
 export function notifyDataChanged(table: TableName, action: 'insert' | 'update' | 'delete' | 'upsert' | 'refresh' = 'refresh', id?: string): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(
+      new CustomEvent<DataChangeEventDetail>('fin_data_changed', {
+        detail: { table, action, id },
+      })
+    )
+    window.dispatchEvent(
       new CustomEvent<DataChangeEventDetail>('finplan_data_changed', {
         detail: { table, action, id },
       })

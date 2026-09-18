@@ -1,4 +1,4 @@
-// src/types/database.types.ts — Tipos gerados do schema PostgreSQL do Supabase (FinPlan)
+// src/types/database.types.ts — Tipos gerados do schema PostgreSQL do Supabase (Fin)
 // Gerado com base em src/services/supabaseSchema.ts
 
 export type Json =

@@ -10,7 +10,8 @@ interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>
 }
 
-const DISMISS_KEY = 'finplan_pwa_prompt_dismissed_at'
+const DISMISS_KEY = 'fin_pwa_prompt_dismissed_at'
+const LEGACY_DISMISS_KEY = 'finplan_pwa_prompt_dismissed_at'
 const DAYS_TO_WAIT_AFTER_DISMISS = 7
 
 export function usePwaInstall() {
@@ -36,7 +37,7 @@ export function usePwaInstall() {
     setIsIos(isIosDevice)
 
     // 3. Verifica se o usuário já dispensou recentemente
-    const dismissedAt = localStorage.getItem(DISMISS_KEY)
+    const dismissedAt = localStorage.getItem(DISMISS_KEY) || localStorage.getItem(LEGACY_DISMISS_KEY)
     if (dismissedAt) {
       const diffMs = Date.now() - parseInt(dismissedAt, 10)
       const diffDays = diffMs / (1000 * 60 * 60 * 24)
@@ -78,6 +79,7 @@ export function usePwaInstall() {
 
   const resetDismiss = useCallback(() => {
     localStorage.removeItem(DISMISS_KEY)
+    localStorage.removeItem(LEGACY_DISMISS_KEY)
     setIsDismissed(false)
   }, [])
 

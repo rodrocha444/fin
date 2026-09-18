@@ -7,7 +7,8 @@ export interface SupabaseConfig {
   anonKey: string
 }
 
-const STORAGE_KEY = 'finplan_supabase_config'
+const STORAGE_KEY = 'fin_supabase_config'
+const LEGACY_STORAGE_KEY = 'finplan_supabase_config'
 
 /**
  * Verifica se uma chave JWT do Supabase possui a role "service_role".
@@ -35,7 +36,7 @@ export function isServiceRoleKey(key: string): boolean {
 export function getSupabaseConfig(): SupabaseConfig | null {
   // 1. Tenta pegar do localStorage (prioridade caso o usuário configure pela interface)
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
       if (parsed.url && parsed.anonKey) {
@@ -80,8 +81,10 @@ export function saveSupabaseConfig(config: SupabaseConfig): void {
     url: config.url.trim(),
     anonKey: config.anonKey.trim(),
   }))
+  localStorage.removeItem(LEGACY_STORAGE_KEY)
   resetSupabaseClient()
   if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('fin_supabase_config_changed'))
     window.dispatchEvent(new Event('finplan_supabase_config_changed'))
   }
 }
@@ -89,8 +92,10 @@ export function saveSupabaseConfig(config: SupabaseConfig): void {
 /** Limpa as credenciais salvas */
 export function clearSupabaseConfig(): void {
   localStorage.removeItem(STORAGE_KEY)
+  localStorage.removeItem(LEGACY_STORAGE_KEY)
   resetSupabaseClient()
   if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('fin_supabase_config_changed'))
     window.dispatchEvent(new Event('finplan_supabase_config_changed'))
   }
 }

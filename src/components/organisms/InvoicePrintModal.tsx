@@ -56,7 +56,7 @@ export default function InvoicePrintModal({
                   <div className="w-6 h-6 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">
                     F
                   </div>
-                  <span className="font-bold text-sm text-slate-100 print:text-slate-900 tracking-tight">FinPlan</span>
+                  <span className="font-bold text-sm text-slate-100 print:text-slate-900 tracking-tight">Fin</span>
                 </div>
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-indigo-400 print:text-indigo-900">
                   Fatura do Cartão de Crédito
@@ -235,7 +235,7 @@ export default function InvoicePrintModal({
 
             {/* Rodapé institucional para impressão */}
             <div className="pt-4 border-t border-slate-800 print:border-slate-300 text-center text-[10px] text-slate-500 print:text-slate-500 print-avoid-break">
-              <p>Extrato gerado pelo FinPlan — Gestão Financeira Pessoal</p>
+              <p>Extrato gerado pelo Fin — Gestão Financeira Pessoal</p>
             </div>
           </div>
     </Modal>

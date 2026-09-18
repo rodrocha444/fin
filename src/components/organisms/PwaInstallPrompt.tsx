@@ -34,7 +34,7 @@ export default function PwaInstallPrompt() {
 
           <div className="flex-1 min-w-0 pr-1">
             <h4 className="text-xs font-semibold text-slate-100 flex items-center gap-1.5">
-              Instale o FinPlan no Celular
+              Instale o Fin no Celular
             </h4>
             <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
               Tenha acesso rápido em tela cheia e registre seus gastos em poucos segundos.
@@ -115,7 +115,7 @@ export default function PwaInstallPrompt() {
 
             <div className="flex items-center gap-2 text-[11px] text-emerald-400 bg-emerald-950/20 border border-emerald-900/30 p-2.5 rounded-xl">
               <CheckCircle className="w-4 h-4 flex-shrink-0" />
-              <span>O FinPlan abrirá em tela cheia como um aplicativo nativo da App Store.</span>
+              <span>O Fin abrirá em tela cheia como um aplicativo nativo da App Store.</span>
             </div>
 
             <button

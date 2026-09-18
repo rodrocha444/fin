@@ -42,7 +42,9 @@ export default function Layout() {
   useEffect(() => {
     if (isLoading || !user) return
     const completed =
+      localStorage.getItem(`fin_onboarding_completed_${user.id}`) ||
       localStorage.getItem(`finplan_onboarding_completed_${user.id}`) ||
+      localStorage.getItem('fin_onboarding_completed') ||
       localStorage.getItem('finplan_onboarding_completed')
 
     if (!completed && accounts && accounts.length === 0) {
@@ -56,7 +58,7 @@ export default function Layout() {
   const handleLogout = async () => {
     const confirmed = await confirm({
       title: 'Sair da Conta',
-      message: 'Deseja realmente encerrar sua sessão no FinPlan?',
+      message: 'Deseja realmente encerrar sua sessão no Fin?',
       confirmText: 'Sair',
       cancelText: 'Cancelar',
       variant: 'danger',
@@ -129,7 +131,7 @@ export default function Layout() {
 
           <SyncStatusBadge className="w-full justify-between" />
           <div className="flex items-center justify-between px-1 text-[11px] text-slate-600">
-            <span>FinPlan v{APP_VERSION}</span>
+            <span>Fin v{APP_VERSION}</span>
           </div>
         </div>
       </aside>

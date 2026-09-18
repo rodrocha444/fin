@@ -25,8 +25,8 @@ export default defineConfig({
         'pwa-512x512.png',
       ],
       manifest: {
-        name: 'FinPlan – Gestão Financeira',
-        short_name: 'FinPlan',
+        name: 'Fin – Gestão Financeira',
+        short_name: 'Fin',
         description: 'App de finanças pessoais estilo envelope budgeting',
         theme_color: '#000000',
         background_color: '#000000',

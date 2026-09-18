@@ -1,4 +1,4 @@
-# Tarefas do Projeto FinPlan
+# Tarefas do Projeto Fin
 
 ## 1. Migração TanStack Query & Supabase TypeGen
 - [x] Criação de `src/types/database.types.ts` mapeando todas as tabelas Supabase com tipagem estrita

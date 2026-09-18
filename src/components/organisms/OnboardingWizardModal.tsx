@@ -76,8 +76,10 @@ export default function OnboardingWizardModal({
 
   const markCompleted = () => {
     if (user?.id) {
+      localStorage.setItem(`fin_onboarding_completed_${user.id}`, 'true')
       localStorage.setItem(`finplan_onboarding_completed_${user.id}`, 'true')
     }
+    localStorage.setItem('fin_onboarding_completed', 'true')
     localStorage.setItem('finplan_onboarding_completed', 'true')
     onCompleted?.()
     onClose()

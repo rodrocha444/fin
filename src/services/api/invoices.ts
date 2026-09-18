@@ -58,6 +58,7 @@ export async function setInvoicePaidStatus(
 ): Promise<void> {
   const key = `${accountId}_${monthKey}`
   memoryPaidInvoicesMap[key] = isPaid
+  window.dispatchEvent(new Event('fin_paid_invoices_changed'))
   window.dispatchEvent(new Event('finplan_paid_invoices_changed'))
 
   const client = getClient()
@@ -125,5 +126,6 @@ export async function setInvoicePaidStatus(
     notifyDataChanged('transactions', 'delete')
   }
 
+  window.dispatchEvent(new Event('fin_paid_invoices_changed'))
   window.dispatchEvent(new Event('finplan_paid_invoices_changed'))
 }

@@ -15,7 +15,7 @@ interface ProFeatureGateProps {
 export default function ProFeatureGate({
   children,
   fallback,
-  title = 'Recurso Exclusivo FinPlan Pro',
+  title = 'Recurso Exclusivo Fin Pro',
   description = 'Faça upgrade para ter acesso a relatórios avançados, projeções ilimitadas e muito mais.',
   compact = false,
 }: ProFeatureGateProps) {
@@ -62,7 +62,7 @@ export default function ProFeatureGate({
         className="px-5 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white shadow-md shadow-amber-500/10 active:scale-95 transition-all cursor-pointer flex items-center gap-2"
       >
         <Sparkles className="w-4 h-4 text-amber-300" />
-        <span>Conhecer o FinPlan Pro</span>
+        <span>Conhecer o Fin Pro</span>
       </button>
     </div>
   )

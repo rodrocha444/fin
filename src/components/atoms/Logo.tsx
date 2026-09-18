@@ -1,4 +1,4 @@
-// src/components/atoms/Logo.tsx — Identidade visual (Logo & Ícone) do FinPlan
+// src/components/atoms/Logo.tsx — Identidade visual (Logo & Ícone) do Fin
 import React from 'react'
 
 interface LogoProps {
@@ -82,9 +82,6 @@ export default function Logo({ size = 'md', variant = 'full', className = '' }: 
         <div className="flex flex-col">
           <div className="flex items-center tracking-tight font-extrabold leading-none">
             <span className={`text-slate-100 ${textSizes[size]}`}>Fin</span>
-            <span className={`bg-gradient-to-r from-indigo-400 to-emerald-400 bg-clip-text text-transparent ${textSizes[size]}`}>
-              Plan
-            </span>
           </div>
           {size !== 'sm' && (
             <span className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase mt-0.5">

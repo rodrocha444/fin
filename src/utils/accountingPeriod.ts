@@ -4,7 +4,8 @@ import { format } from 'date-fns'
 import { getSupabaseClient } from '@/services/supabase'
 
 const STORAGE_KEY = 'fin_accounting_start_date'
-const EVENT_KEY = 'finplan_accounting_period_changed'
+const EVENT_KEY = 'fin_accounting_period_changed'
+const LEGACY_EVENT_KEY = 'finplan_accounting_period_changed'
 const SYSTEM_PAYEE_ID = 'system_accounting_period'
 
 /**
@@ -56,6 +57,7 @@ export async function syncAccountingStartDateWithRemote(): Promise<string | null
         localStorage.setItem(STORAGE_KEY, remoteDate)
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent(EVENT_KEY, { detail: { date: remoteDate } }))
+          window.dispatchEvent(new CustomEvent(LEGACY_EVENT_KEY, { detail: { date: remoteDate } }))
         }
       }
 
@@ -103,6 +105,7 @@ export async function setAccountingStartDate(date: string | null): Promise<void>
       localStorage.setItem(STORAGE_KEY, clean)
     }
     window.dispatchEvent(new CustomEvent(EVENT_KEY, { detail: { date: clean } }))
+    window.dispatchEvent(new CustomEvent(LEGACY_EVENT_KEY, { detail: { date: clean } }))
   }
 
   const client = getSupabaseClient()
@@ -180,6 +183,7 @@ export function useAccountingPeriod() {
     }
 
     window.addEventListener(EVENT_KEY, handleUpdate)
+    window.addEventListener(LEGACY_EVENT_KEY, handleUpdate)
     window.addEventListener('storage', (e) => {
       if (e.key === STORAGE_KEY) {
         setStartDateState(getAccountingStartDate())
@@ -188,6 +192,7 @@ export function useAccountingPeriod() {
 
     return () => {
       window.removeEventListener(EVENT_KEY, handleUpdate)
+      window.removeEventListener(LEGACY_EVENT_KEY, handleUpdate)
     }
   }, [])
 

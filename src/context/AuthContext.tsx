@@ -44,8 +44,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleConfigChange = () => {
       setIsConfigured(Boolean(getSupabaseConfig()))
     }
+    window.addEventListener('fin_supabase_config_changed', handleConfigChange)
     window.addEventListener('finplan_supabase_config_changed', handleConfigChange)
-    return () => window.removeEventListener('finplan_supabase_config_changed', handleConfigChange)
+    return () => {
+      window.removeEventListener('fin_supabase_config_changed', handleConfigChange)
+      window.removeEventListener('finplan_supabase_config_changed', handleConfigChange)
+    }
   }, [])
 
   useEffect(() => {

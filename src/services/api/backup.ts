@@ -175,7 +175,7 @@ export async function exportDatabase(): Promise<DatabaseBackup> {
 
   return {
     meta: {
-      appName: 'FinPlan',
+      appName: 'Fin',
       dbVersion: 2,
       exportedAt: new Date().toISOString(),
       totalTables: TABLES.length,
@@ -192,7 +192,7 @@ export async function downloadDatabaseBackup(): Promise<void> {
   const url = URL.createObjectURL(blob)
 
   const timestamp = format(new Date(), 'yyyy-MM-dd_HH-mm')
-  const filename = `finplan_backup_${timestamp}.json`
+  const filename = `fin_backup_${timestamp}.json`
 
   const a = document.createElement('a')
   a.href = url

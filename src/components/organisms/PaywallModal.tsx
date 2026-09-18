@@ -1,4 +1,4 @@
-// src/components/organisms/PaywallModal.tsx — Paywall de Assinatura FinPlan Pro
+// src/components/organisms/PaywallModal.tsx — Paywall de Assinatura Fin Pro
 import React, { useState } from 'react'
 import {
   Sparkles, CheckCircle2, ShieldCheck, Zap,
@@ -95,7 +95,7 @@ export default function PaywallModal() {
           </div>
 
           <div className="flex items-center justify-center gap-2 mb-1">
-            <h2 className="text-2xl font-bold tracking-tight text-white">FinPlan</h2>
+            <h2 className="text-2xl font-bold tracking-tight text-white">Fin</h2>
             <ProBadge size="md" variant="gold" />
           </div>
           <p className="text-sm text-slate-400 max-w-sm mx-auto">

@@ -425,13 +425,13 @@ export default function BudgetPage() {
   const [showHelpModal, setShowHelpModal] = useState(false)
   const [showOnboardingModal, setShowOnboardingModal] = useState(false)
   const [showAdvancedMode, setShowAdvancedMode] = useState<boolean>(() => {
-    return localStorage.getItem('finplan_advanced_mode') === 'true' || getSavedBudgetRegime() === 'accrual'
+    return localStorage.getItem('fin_advanced_mode') === 'true' || localStorage.getItem('finplan_advanced_mode') === 'true' || getSavedBudgetRegime() === 'accrual'
   })
 
   const toggleAdvancedMode = () => {
     const next = !showAdvancedMode
     setShowAdvancedMode(next)
-    localStorage.setItem('finplan_advanced_mode', String(next))
+    localStorage.setItem('fin_advanced_mode', String(next))
     if (!next && budgetRegime !== 'cash') {
       handleBudgetRegimeChange('cash')
     }
@@ -964,7 +964,7 @@ export default function BudgetPage() {
             <div className="space-y-1.5">
               <h3 className="text-base font-bold text-slate-100">Bem-vindo ao seu Novo Orçamento!</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                O FinPlan funciona com <strong>Envelopes Virtuais</strong>. Você distribui o dinheiro que tem hoje nas categorias que precisa pagar este mês e acompanha os gastos em tempo real.
+                O Fin funciona com <strong>Envelopes Virtuais</strong>. Você distribui o dinheiro que tem hoje nas categorias que precisa pagar este mês e acompanha os gastos em tempo real.
               </p>
             </div>
 

@@ -146,7 +146,7 @@ export default function DebtPrintModal({
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <div className="w-6 h-6 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">F</div>
-                  <span className="font-bold text-sm text-slate-100 print:text-slate-900 tracking-tight">FinPlan</span>
+                  <span className="font-bold text-sm text-slate-100 print:text-slate-900 tracking-tight">Fin</span>
                 </div>
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-indigo-400 print:text-indigo-900">
                   Demonstrativo de Acerto de Contas
@@ -369,7 +369,7 @@ export default function DebtPrintModal({
             {/* Rodapé */}
             <div className="pt-8 print:pt-3 border-t border-slate-800 print:border-slate-300 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 print:text-slate-600 gap-2 print-avoid-break">
               <p>Demonstrativo para conferência e acerto mútuo.</p>
-              <p className="font-medium">FinPlan</p>
+              <p className="font-medium">Fin</p>
             </div>
           </div>
     </Modal>

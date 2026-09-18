@@ -78,7 +78,7 @@ export const FinancialDataProvider: React.FC<{ children: React.ReactNode }> = ({
       'payees', 'debt_accounts', 'debt_items',
     ] as const
 
-    const channel = client.channel('finplan_db_realtime')
+    const channel = client.channel('fin_db_realtime')
 
     for (const table of tables) {
       channel.on(
@@ -117,8 +117,12 @@ export const FinancialDataProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     }
 
+    window.addEventListener('fin_data_changed', handleLocalDataChanged)
     window.addEventListener('finplan_data_changed', handleLocalDataChanged)
-    return () => window.removeEventListener('finplan_data_changed', handleLocalDataChanged)
+    return () => {
+      window.removeEventListener('fin_data_changed', handleLocalDataChanged)
+      window.removeEventListener('finplan_data_changed', handleLocalDataChanged)
+    }
   }, [user, queryClient])
 
   // ── refetch manual (compatibilidade com chamadas existentes) ────────────────

@@ -1,7 +1,7 @@
 // src/services/supabaseSchema.ts — Script SQL de criação das tabelas no Supabase
 
 export const SUPABASE_SCHEMA_SQL = `-- ─────────────────────────────────────────────────────────────
--- FinPlan: Script de Estruturação do Banco no Supabase (PostgreSQL)
+-- Fin: Script de Estruturação do Banco no Supabase (PostgreSQL)
 -- Cole este script no SQL Editor do seu projeto Supabase e clique em "Run"
 -- ─────────────────────────────────────────────────────────────
 

@@ -75,12 +75,12 @@ export default function SettingsPage() {
   const { isStandalone, isIos, hasNativePrompt, promptInstall } = usePwaInstall()
   const [showOnboardingModal, setShowOnboardingModal] = useState(false)
   const [showQuickGuide, setShowQuickGuide] = useState(false)
-  const [isAdvancedMode, setIsAdvancedMode] = useState(() => localStorage.getItem('finplan_advanced_mode') === 'true')
+  const [isAdvancedMode, setIsAdvancedMode] = useState(() => localStorage.getItem('fin_advanced_mode') === 'true' || localStorage.getItem('finplan_advanced_mode') === 'true')
 
   const toggleAdvancedMode = () => {
     const next = !isAdvancedMode
     setIsAdvancedMode(next)
-    localStorage.setItem('finplan_advanced_mode', String(next))
+    localStorage.setItem('fin_advanced_mode', String(next))
   }
 
   const handleLogout = async () => {
@@ -155,7 +155,7 @@ export default function SettingsPage() {
 
     const ok = await confirm({
       title: 'Alterar Início do Período Contábil?',
-      message: `Você está prestes a definir a data ${formatDate(inputStartDate)} como o marco inicial de todo o FinPlan.\n\nTodos os cálculos de orçamentos, sobras acumuladas e relatórios serão recalculados a partir desta data.\n\nAguarde o término do tempo de segurança (10s) para confirmar.`,
+      message: `Você está prestes a definir a data ${formatDate(inputStartDate)} como o marco inicial de todo o Fin.\n\nTodos os cálculos de orçamentos, sobras acumuladas e relatórios serão recalculados a partir desta data.\n\nAguarde o término do tempo de segurança (10s) para confirmar.`,
       confirmText: 'Confirmar alteração',
       cancelText: 'Cancelar',
       variant: 'warning',
@@ -434,7 +434,7 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <h2 className="text-sm font-semibold text-slate-200">Sua Conta</h2>
-                    <p className="text-xs text-slate-500">Dados do usuário autenticado no FinPlan</p>
+                    <p className="text-xs text-slate-500">Dados do usuário autenticado no Fin</p>
                   </div>
                 </div>
 
@@ -462,7 +462,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* ── Card Plano & Assinatura (FinPlan Pro / RevenueCat) ── */}
+            {/* ── Card Plano & Assinatura (Fin Pro / RevenueCat) ── */}
             <div className="card p-5 space-y-4 bg-slate-900 border border-slate-800">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
                 <div className="flex items-center gap-2.5">
@@ -474,7 +474,7 @@ export default function SettingsPage() {
                       <h2 className="text-sm font-semibold text-slate-200">Plano & Assinatura</h2>
                       {isPro && <ProBadge size="sm" variant="gold" />}
                     </div>
-                    <p className="text-xs text-slate-500">Acesso a recursos avançados e limites do FinPlan</p>
+                    <p className="text-xs text-slate-500">Acesso a recursos avançados e limites do Fin</p>
                   </div>
                 </div>
 
@@ -545,7 +545,7 @@ export default function SettingsPage() {
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 max-w-xl">
-                      Faça upgrade para o FinPlan Pro e desbloqueie relatórios financeiros completos, contas e cartões ilimitados e projeção orçamentária para meses futuros.
+                      Faça upgrade para o Fin Pro e desbloqueie relatórios financeiros completos, contas e cartões ilimitados e projeção orçamentária para meses futuros.
                     </p>
                   </div>
                   <button
@@ -637,7 +637,7 @@ export default function SettingsPage() {
                 >
                   <span className="flex items-center gap-1.5">
                     <BookOpen className="w-4 h-4 text-indigo-400" />
-                    <span>Como Funciona o FinPlan (Guia Rápido)</span>
+                    <span>Como Funciona o Fin (Guia Rápido)</span>
                   </span>
                   <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${showQuickGuide ? 'rotate-180' : ''}`} />
                 </button>
@@ -1261,7 +1261,7 @@ export default function SettingsPage() {
             </span>
           </div>
           <p className="text-xs text-slate-400 leading-relaxed">
-            FinPlan é um aplicativo moderno de finanças pessoais focado em orçamento por envelope, gestão completa de cartões de crédito, contas bancárias e relatórios de evolução patrimonial.
+            Fin é um aplicativo moderno de finanças pessoais focado em orçamento por envelope, gestão completa de cartões de crédito, contas bancárias e relatórios de evolução patrimonial.
           </p>
           <div className="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 font-mono">
             <span>Versão da aplicação: <strong className="text-slate-400">v{APP_VERSION}</strong></span>
