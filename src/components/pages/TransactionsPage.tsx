@@ -213,15 +213,6 @@ export default function TransactionsPage() {
         )}
       </div>
 
-      {/* FAB para adicionar (mobile extra) */}
-      <button
-        onClick={() => setShowForm(true)}
-        className="lg:hidden fixed bottom-20 right-4 w-14 h-14 bg-indigo-600 hover:bg-indigo-500 rounded-full flex items-center justify-center shadow-lg shadow-indigo-900/50 active:scale-95 transition-all z-30"
-        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 72px)' }}
-      >
-        <Plus className="w-6 h-6 text-white" />
-      </button>
-
       {showForm && <TransactionForm onClose={() => setShowForm(false)} />}
       {editingTx && <TransactionForm transaction={editingTx} onClose={handleCloseEdit} />}
     </div>
