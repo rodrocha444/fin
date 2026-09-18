@@ -28,10 +28,14 @@ import ResetDatabaseModal from '@/components/organisms/ResetDatabaseModal'
 import OnboardingWizardModal from '@/components/organisms/OnboardingWizardModal'
 import Logo from '@/components/atoms/Logo'
 import { APP_VERSION, BUILD_DATE } from '@/version'
+import { useSubscription } from '@/context/SubscriptionContext'
+import ProBadge from '@/components/atoms/ProBadge'
 
 export default function SettingsPage() {
   const { categoryGroups: groups, categories, isLoading: isSyncing, refetch, isConfigured } = useFinancialData()
   const { startDate, setStartDate: updateAccountingStartDate } = useAccountingPeriod()
+  const { isPro, subscription, openPaywall, restore, isLoading: isSubLoading } = useSubscription()
+  const [isRestoringSub, setIsRestoringSub] = useState(false)
 
   const [supabaseUrl, setSupabaseUrl] = useState(() => getSupabaseConfig()?.url || '')
   const [supabaseKey, setSupabaseKey] = useState(() => getSupabaseConfig()?.anonKey || '')
@@ -730,6 +734,104 @@ export default function SettingsPage() {
               <span className="text-slate-400 font-mono text-[11px] select-all break-all">{user?.id || '—'}</span>
             </div>
           </div>
+        </div>
+
+        {/* ── Card Plano & Assinatura (FinPlan Pro / RevenueCat) ── */}
+        <div className="card p-5 space-y-4 bg-slate-900 border border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-slate-200">Plano & Assinatura</h2>
+                  {isPro && <ProBadge size="sm" variant="gold" />}
+                </div>
+                <p className="text-xs text-slate-500">Acesso a recursos avançados e limites do FinPlan</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={isRestoringSub || isSubLoading}
+                onClick={async () => {
+                  setIsRestoringSub(true)
+                  await restore()
+                  setIsRestoringSub(false)
+                }}
+                className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRestoringSub ? 'animate-spin' : ''}`} />
+                <span>{isRestoringSub ? 'Restaurando...' : 'Restaurar Compras'}</span>
+              </button>
+
+              {!isPro && (
+                <button
+                  type="button"
+                  onClick={openPaywall}
+                  className="py-1.5 px-3.5 rounded-xl font-bold text-xs bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white shadow-md shadow-amber-500/10 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Fazer Upgrade para o Pro</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {isPro ? (
+            <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-800/40 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-medium">Status da Assinatura:</span>
+                <span className="font-semibold text-emerald-400 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Ativa (Pro)
+                </span>
+              </div>
+              {subscription?.billingPeriod && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Ciclo de Faturamento:</span>
+                  <span className="text-slate-200 capitalize">
+                    {subscription.billingPeriod === 'annual' ? 'Anual' : 'Mensal'}
+                  </span>
+                </div>
+              )}
+              {subscription?.expiresAt && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Data de Renovação / Término:</span>
+                  <span className="text-slate-200 font-mono">
+                    {formatDate(subscription.expiresAt)}
+                  </span>
+                </div>
+              )}
+              <p className="text-[11px] text-slate-400 pt-1 border-t border-emerald-800/30">
+                Você possui acesso ilimitado a todas as contas, relatórios detalhados, projeções orçamentárias e sincronização multi-dispositivo.
+              </p>
+            </div>
+          ) : (
+            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-200">Você está no plano Gratuito</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-medium border border-slate-700">
+                    Free
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 max-w-xl">
+                  Faça upgrade para o FinPlan Pro e desbloqueie relatórios financeiros completos, contas e cartões ilimitados e projeção orçamentária para meses futuros.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={openPaywall}
+                className="shrink-0 py-2 px-4 rounded-xl font-bold text-xs bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 transition-all flex items-center justify-center gap-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Ver Planos</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ── Card Sincronização em Nuvem (Supabase) ─────────── */}

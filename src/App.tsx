@@ -6,6 +6,7 @@ import ProtectedRoute from '@/components/organisms/ProtectedRoute'
 import { AuthProvider } from '@/context/AuthContext'
 import { FinancialDataProvider } from '@/context/FinancialDataContext'
 import { ConfirmProvider } from '@/context/ConfirmContext'
+import { SubscriptionProvider } from '@/context/SubscriptionContext'
 
 // Code-splitting das páginas para redução do bundle inicial
 const LoginPage = lazy(() => import('@/components/pages/LoginPage'))
@@ -19,6 +20,7 @@ const ReportsPage = lazy(() => import('@/components/pages/ReportsPage'))
 const SettingsPage = lazy(() => import('@/components/pages/SettingsPage'))
 
 import PasswordRecoveryModal from '@/components/organisms/PasswordRecoveryModal'
+import PaywallModal from '@/components/organisms/PaywallModal'
 
 function PageFallback() {
   return (
@@ -34,10 +36,12 @@ function PageFallback() {
 export default function App() {
   return (
     <AuthProvider>
-      <FinancialDataProvider>
-        <ConfirmProvider>
-          <PasswordRecoveryModal />
-          <HashRouter>
+      <SubscriptionProvider>
+        <FinancialDataProvider>
+          <ConfirmProvider>
+            <PasswordRecoveryModal />
+            <PaywallModal />
+            <HashRouter>
             <Suspense fallback={<PageFallback />}>
               <Routes>
                 {/* Rota pública de Autenticação */}
@@ -68,6 +72,7 @@ export default function App() {
           </HashRouter>
         </ConfirmProvider>
       </FinancialDataProvider>
-    </AuthProvider>
-  )
+    </SubscriptionProvider>
+  </AuthProvider>
+)
 }

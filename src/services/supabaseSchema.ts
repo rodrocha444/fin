@@ -172,6 +172,19 @@ CREATE TABLE IF NOT EXISTS public.debt_items (
   deleted_at TIMESTAMPTZ
 );
 
+-- 11. Assinaturas e Status Pro (RevenueCat)
+CREATE TABLE IF NOT EXISTS public.user_subscriptions (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
+  customer_id TEXT,
+  status TEXT NOT NULL DEFAULT 'free', -- 'free', 'pro', 'past_due', 'canceled'
+  entitlement_id TEXT,
+  plan_id TEXT,
+  billing_period TEXT, -- 'monthly', 'annual', 'lifetime'
+  expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- ── Índices para busca rápida e sincronização incremental ──────
 CREATE INDEX IF NOT EXISTS idx_accounts_updated_at ON public.accounts(updated_at);
 CREATE INDEX IF NOT EXISTS idx_category_groups_updated_at ON public.category_groups(updated_at);
@@ -183,6 +196,7 @@ CREATE INDEX IF NOT EXISTS idx_scheduled_transactions_updated_at ON public.sched
 CREATE INDEX IF NOT EXISTS idx_payees_updated_at ON public.payees(updated_at);
 CREATE INDEX IF NOT EXISTS idx_debt_accounts_updated_at ON public.debt_accounts(updated_at);
 CREATE INDEX IF NOT EXISTS idx_debt_items_updated_at ON public.debt_items(updated_at);
+CREATE INDEX IF NOT EXISTS idx_user_subscriptions_updated_at ON public.user_subscriptions(updated_at);
 
 -- Índices de Isolamento por Usuário
 CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON public.accounts(user_id);
@@ -207,6 +221,7 @@ ALTER TABLE public.scheduled_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.debt_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.debt_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_subscriptions ENABLE ROW LEVEL SECURITY;
 
 DO $$
 DECLARE
@@ -215,7 +230,7 @@ BEGIN
   FOR t IN SELECT unnest(ARRAY[
     'accounts', 'category_groups', 'categories', 'budget_months',
     'transactions', 'installment_groups', 'scheduled_transactions',
-    'payees', 'debt_accounts', 'debt_items'
+    'payees', 'debt_accounts', 'debt_items', 'user_subscriptions'
   ])
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS "Anon All Access" ON public.%I;', t);
@@ -237,7 +252,7 @@ BEGIN
   FOR t IN SELECT unnest(ARRAY[
     'accounts', 'category_groups', 'categories', 'budget_months',
     'transactions', 'installment_groups', 'scheduled_transactions',
-    'payees', 'debt_accounts', 'debt_items'
+    'payees', 'debt_accounts', 'debt_items', 'user_subscriptions'
   ])
   LOOP
     BEGIN
