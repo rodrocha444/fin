@@ -253,35 +253,37 @@ export default function ReportsPage() {
     })
   }
 
+  const isCurrentMonth = month === currentMonth()
+
   return (
     <div className="fade-in pb-16">
       {/* ── Header com Seletor de Regime, Mês e Ocultar Categorias ─────────── */}
       <div
-        className="px-3 sm:px-6 pb-3 border-b border-slate-800 bg-slate-900 sticky top-0 z-20"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
+        className="px-3 sm:px-6 py-2 border-b border-slate-800/80 bg-slate-900/95 backdrop-blur-sm sticky top-0 z-20"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)' }}
       >
-        <div className="flex items-center justify-between gap-2.5 flex-wrap">
-          {/* Seletor de Mês */}
+        <div className="flex items-center justify-between gap-1.5 sm:gap-2 flex-wrap">
+          {/* Seletor de Mês e Botão de Mês Atual */}
           <div className="flex items-center gap-1.5">
-            <div className="flex items-center bg-slate-950/80 rounded-xl border border-slate-800 p-0.5 shadow-inner">
+            <div className="h-8 flex items-center bg-slate-950/80 rounded-lg border border-slate-800 p-0.5 shadow-inner">
               <button
                 type="button"
                 onClick={handlePrevMonth}
                 disabled={isMonthBeforeAccountingStart(month)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                className="h-full px-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                 title="Mês anterior"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
 
-              <span className="px-3 py-1 text-xs font-bold text-slate-200 capitalize min-w-[110px] text-center">
+              <span className="px-2 sm:px-3 text-xs sm:text-sm font-semibold text-slate-200 capitalize min-w-[86px] sm:min-w-[104px] text-center select-none truncate">
                 {formatMonthLabel(month)}
               </span>
 
               <button
                 type="button"
                 onClick={handleNextMonth}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                className="h-full px-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
                 title="Próximo mês"
               >
                 <ChevronRight className="w-4 h-4" />
@@ -291,18 +293,30 @@ export default function ReportsPage() {
             <button
               type="button"
               onClick={handleCurrentMonth}
-              className="btn-secondary text-xs py-1.5 px-2.5 hidden sm:inline-flex"
+              disabled={isCurrentMonth}
+              className={`h-8 px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                isCurrentMonth
+                  ? 'bg-slate-800/40 text-slate-400 border border-slate-700/50 cursor-default'
+                  : 'bg-indigo-600/15 hover:bg-indigo-600/25 active:bg-indigo-600/40 text-indigo-300 hover:text-indigo-100 border border-indigo-500/40 hover:border-indigo-500/60 shadow-sm'
+              }`}
+              title={isCurrentMonth ? 'Você já está no mês atual' : 'Ir para o mês atual'}
             >
-              Mês Atual
+              <span
+                className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                  isCurrentMonth ? 'bg-emerald-400' : 'bg-indigo-400 animate-pulse'
+                }`}
+              />
+              <span className="hidden sm:inline">Mês Atual</span>
+              <span className="sm:hidden">{isCurrentMonth ? 'Atual' : 'Hoje'}</span>
             </button>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             {/* Botão de Categorias Ocultas */}
             <button
               type="button"
               onClick={() => setShowHiddenModal(true)}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+              className={`h-8 flex items-center gap-1.5 px-2.5 rounded-lg border text-xs font-semibold transition-all ${
                 hiddenCategoryIds.size > 0
                   ? 'bg-rose-950/50 text-rose-300 border-rose-800/60 hover:bg-rose-900/40 shadow-sm'
                   : 'bg-slate-950/80 text-slate-400 border-slate-800 hover:text-slate-200 hover:bg-slate-800/50'
@@ -310,11 +324,11 @@ export default function ReportsPage() {
               title="Gerenciar quais categorias são incluídas ou ocultadas dos relatórios"
             >
               {hiddenCategoryIds.size > 0 ? (
-                <EyeOff className="w-3.5 h-3.5 text-rose-400" />
+                <EyeOff className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
               ) : (
-                <Filter className="w-3.5 h-3.5 text-slate-400" />
+                <Filter className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
               )}
-              <span className="hidden md:inline">Filtro de Categorias</span>
+              <span className="hidden md:inline">Categorias</span>
               <span className="md:hidden">Filtro</span>
               {hiddenCategoryIds.size > 0 && (
                 <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded-full bg-rose-500 text-white leading-none">
@@ -324,11 +338,11 @@ export default function ReportsPage() {
             </button>
 
             {/* Seletor de Regime Contábil */}
-            <div className="flex items-center bg-slate-950/90 rounded-xl border border-slate-800 p-0.5 shadow-inner">
+            <div className="h-8 flex items-center bg-slate-950/90 rounded-lg border border-slate-800 p-0.5 shadow-inner">
               <button
                 type="button"
                 onClick={() => handleRegimeChange('accrual')}
-                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                className={`h-full flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 rounded-md text-xs font-semibold transition-all ${
                   regime === 'accrual'
                     ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
@@ -336,14 +350,13 @@ export default function ReportsPage() {
                 title="Regime de Competência: Contabiliza compras parceladas integralmente na data da compra"
               >
                 <CalendarDays className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>Data da Compra</span>
-                <span className="hidden md:inline text-[10px] opacity-75">(Competência)</span>
+                <span>Competência</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleRegimeChange('cash')}
-                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                className={`h-full flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 rounded-md text-xs font-semibold transition-all ${
                   regime === 'cash'
                     ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
@@ -351,52 +364,47 @@ export default function ReportsPage() {
                 title="Regime de Caixa: Contabiliza compras parceladas no mês de vencimento de cada fatura"
               >
                 <Receipt className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>Por Fatura</span>
-                <span className="hidden md:inline text-[10px] opacity-75">(Caixa)</span>
+                <span>Caixa</span>
               </button>
             </div>
 
-
-            <div className="lg:hidden">
+            <div className="lg:hidden flex-shrink-0">
               <SyncStatusBadge compact={true} />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="p-3 sm:p-6 space-y-6">
+      <div className="p-3 sm:p-5 space-y-4 sm:space-y-5">
         {/* ── Banner Informativo do Regime Contábil e Categorias Ocultas ─────── */}
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <div
-            className={`flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-xs transition-colors ${
+            className={`flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg border text-[11px] sm:text-xs transition-colors ${
               regime === 'accrual'
-                ? 'bg-indigo-950/30 border-indigo-800/40 text-indigo-200'
-                : 'bg-slate-950/40 border-slate-800 text-slate-300'
+                ? 'bg-indigo-950/20 border-indigo-800/30 text-indigo-300'
+                : 'bg-slate-950/30 border-slate-800 text-slate-400'
             }`}
           >
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2 min-w-0">
               {regime === 'accrual' ? (
-                <CalendarDays className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                <CalendarDays className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
               ) : (
-                <Receipt className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                <Receipt className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
               )}
-              <div>
-                {regime === 'accrual' ? (
-                  <p>
-                    <strong className="text-indigo-300">Regime de Competência (Data da Compra):</strong> As compras parceladas e rateios são contabilizados integralmente na data em que foram realizados, refletindo o consumo real deste mês.
-                  </p>
-                ) : (
-                  <p>
-                    <strong className="text-slate-200">Regime de Caixa (Por Fatura):</strong> As compras parceladas são contabilizadas no mês de vencimento de cada fatura ou parcela individual.
-                  </p>
-                )}
+              <div className="truncate">
+                <strong className={regime === 'accrual' ? 'text-indigo-200' : 'text-slate-300'}>
+                  {regime === 'accrual' ? 'Competência:' : 'Caixa:'}
+                </strong>{' '}
+                {regime === 'accrual'
+                  ? 'Compras parceladas contabilizadas integralmente no mês da compra.'
+                  : 'Compras parceladas contabilizadas no vencimento de cada fatura.'}
               </div>
             </div>
           </div>
 
           {/* Aviso se houver categorias ocultadas */}
           {hiddenCategoryIds.size > 0 && (
-            <div className="flex items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-rose-950/30 border border-rose-900/40 text-xs text-rose-300 animate-in fade-in duration-150">
+            <div className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-rose-950/30 border border-rose-900/40 text-xs text-rose-300 animate-in fade-in duration-150">
               <div className="flex items-center gap-2">
                 <EyeOff className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
                 <span>
