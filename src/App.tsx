@@ -2,10 +2,13 @@
 import { lazy, Suspense } from 'react'
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from '@/components/templates/Layout'
+import ProtectedRoute from '@/components/organisms/ProtectedRoute'
+import { AuthProvider } from '@/context/AuthContext'
 import { FinancialDataProvider } from '@/context/FinancialDataContext'
 import { ConfirmProvider } from '@/context/ConfirmContext'
 
 // Code-splitting das páginas para redução do bundle inicial
+const LoginPage = lazy(() => import('@/components/pages/LoginPage'))
 const BudgetPage = lazy(() => import('@/components/pages/BudgetPage'))
 const AccountsPage = lazy(() => import('@/components/pages/AccountsPage'))
 const AccountDetailPage = lazy(() => import('@/components/pages/AccountDetailPage'))
@@ -28,29 +31,40 @@ function PageFallback() {
 
 export default function App() {
   return (
-    <FinancialDataProvider>
-      <ConfirmProvider>
-        <HashRouter>
-          <Suspense fallback={<PageFallback />}>
-            <Routes>
-              <Route path="/" element={<Layout />}>
-                <Route index element={<Navigate to="/budget" replace />} />
-                <Route path="budget" element={<BudgetPage />} />
-                <Route path="accounts" element={<AccountsPage />} />
-                <Route path="accounts/:id" element={<AccountDetailPage />} />
-                <Route path="accounts/:id/invoice" element={<AccountInvoicePage />} />
-                <Route path="accounts/debt/:id" element={<DebtAccountPage />} />
-                <Route path="transactions" element={<TransactionsPage />} />
-                <Route path="debts" element={<Navigate to="/accounts" replace />} />
-                <Route path="debts/:id" element={<DebtAccountPage />} />
-                <Route path="scheduled" element={<Navigate to="/budget" replace />} />
-                <Route path="reports" element={<ReportsPage />} />
-                <Route path="settings" element={<SettingsPage />} />
-              </Route>
-            </Routes>
-          </Suspense>
-        </HashRouter>
-      </ConfirmProvider>
-    </FinancialDataProvider>
+    <AuthProvider>
+      <FinancialDataProvider>
+        <ConfirmProvider>
+          <HashRouter>
+            <Suspense fallback={<PageFallback />}>
+              <Routes>
+                {/* Rota pública de Autenticação */}
+                <Route path="/login" element={<LoginPage />} />
+
+                {/* Rotas protegidas (exigem sessão ativa) */}
+                <Route element={<ProtectedRoute />}>
+                  <Route path="/" element={<Layout />}>
+                    <Route index element={<Navigate to="/budget" replace />} />
+                    <Route path="budget" element={<BudgetPage />} />
+                    <Route path="accounts" element={<AccountsPage />} />
+                    <Route path="accounts/:id" element={<AccountDetailPage />} />
+                    <Route path="accounts/:id/invoice" element={<AccountInvoicePage />} />
+                    <Route path="accounts/debt/:id" element={<DebtAccountPage />} />
+                    <Route path="transactions" element={<TransactionsPage />} />
+                    <Route path="debts" element={<Navigate to="/accounts" replace />} />
+                    <Route path="debts/:id" element={<DebtAccountPage />} />
+                    <Route path="scheduled" element={<Navigate to="/budget" replace />} />
+                    <Route path="reports" element={<ReportsPage />} />
+                    <Route path="settings" element={<SettingsPage />} />
+                  </Route>
+                </Route>
+
+                {/* Fallback de rotas desconhecidas */}
+                <Route path="*" element={<Navigate to="/budget" replace />} />
+              </Routes>
+            </Suspense>
+          </HashRouter>
+        </ConfirmProvider>
+      </FinancialDataProvider>
+    </AuthProvider>
   )
 }

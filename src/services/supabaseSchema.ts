@@ -8,6 +8,7 @@ export const SUPABASE_SCHEMA_SQL = `-- ─────────────�
 -- 1. Contas Bancárias e Cartões
 CREATE TABLE IF NOT EXISTS public.accounts (
   id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
   name TEXT NOT NULL,
   type TEXT NOT NULL,
   initial_balance NUMERIC NOT NULL DEFAULT 0,
@@ -25,6 +26,7 @@ CREATE TABLE IF NOT EXISTS public.accounts (
 -- 2. Grupos de Categorias
 CREATE TABLE IF NOT EXISTS public.category_groups (
   id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
   name TEXT NOT NULL,
   type TEXT,
   sort_order INTEGER NOT NULL DEFAULT 0,
@@ -38,6 +40,7 @@ CREATE TABLE IF NOT EXISTS public.category_groups (
 -- 3. Categorias
 CREATE TABLE IF NOT EXISTS public.categories (
   id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
   group_id TEXT NOT NULL,
   name TEXT NOT NULL,
   sort_order INTEGER NOT NULL DEFAULT 0,
@@ -50,6 +53,7 @@ CREATE TABLE IF NOT EXISTS public.categories (
 -- 4. Orçamento Mensal
 CREATE TABLE IF NOT EXISTS public.budget_months (
   id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
   month TEXT NOT NULL, -- Formato: YYYY-MM
   category_id TEXT NOT NULL,
   budget_type TEXT NOT NULL DEFAULT 'cash', -- 'cash' (por fatura/parcelado) ou 'accrual' (por data da compra)
@@ -60,11 +64,11 @@ CREATE TABLE IF NOT EXISTS public.budget_months (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   deleted_at TIMESTAMPTZ
 );
-ALTER TABLE public.budget_months ADD COLUMN IF NOT EXISTS budget_type TEXT NOT NULL DEFAULT 'cash';
 
 -- 5. Transações
 CREATE TABLE IF NOT EXISTS public.transactions (
   id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
   account_id TEXT NOT NULL,
   date TIMESTAMPTZ NOT NULL,
   amount NUMERIC NOT NULL,
@@ -85,11 +89,11 @@ CREATE TABLE IF NOT EXISTS public.transactions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   deleted_at TIMESTAMPTZ
 );
-ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS split_group_id TEXT;
 
 -- 6. Grupos de Parcelamento
 CREATE TABLE IF NOT EXISTS public.installment_groups (
   id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
   description TEXT NOT NULL,
   total_amount NUMERIC NOT NULL,
   installment_count INTEGER NOT NULL,
@@ -105,6 +109,7 @@ CREATE TABLE IF NOT EXISTS public.installment_groups (
 -- 7. Transações Agendadas
 CREATE TABLE IF NOT EXISTS public.scheduled_transactions (
   id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
   account_id TEXT NOT NULL,
   amount NUMERIC NOT NULL,
   payee TEXT NOT NULL,
@@ -124,6 +129,7 @@ CREATE TABLE IF NOT EXISTS public.scheduled_transactions (
 -- 8. Beneficiários (Payees)
 CREATE TABLE IF NOT EXISTS public.payees (
   id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
   name TEXT NOT NULL,
   default_category_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -134,6 +140,7 @@ CREATE TABLE IF NOT EXISTS public.payees (
 -- 9. Contas de Cobrança / Terceiros (Debts)
 CREATE TABLE IF NOT EXISTS public.debt_accounts (
   id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
   name TEXT NOT NULL,
   phone TEXT,
   notes TEXT,
@@ -147,6 +154,7 @@ CREATE TABLE IF NOT EXISTS public.debt_accounts (
 -- 10. Itens de Cobrança / Pendências
 CREATE TABLE IF NOT EXISTS public.debt_items (
   id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
   debt_account_id TEXT NOT NULL,
   description TEXT NOT NULL,
   type TEXT NOT NULL,
@@ -176,7 +184,19 @@ CREATE INDEX IF NOT EXISTS idx_payees_updated_at ON public.payees(updated_at);
 CREATE INDEX IF NOT EXISTS idx_debt_accounts_updated_at ON public.debt_accounts(updated_at);
 CREATE INDEX IF NOT EXISTS idx_debt_items_updated_at ON public.debt_items(updated_at);
 
--- ── Desativar RLS para sincronização anon direta ou permitir acesso total anon ──
+-- Índices de Isolamento por Usuário
+CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON public.accounts(user_id);
+CREATE INDEX IF NOT EXISTS idx_category_groups_user_id ON public.category_groups(user_id);
+CREATE INDEX IF NOT EXISTS idx_categories_user_id ON public.categories(user_id);
+CREATE INDEX IF NOT EXISTS idx_budget_months_user_id ON public.budget_months(user_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON public.transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_installment_groups_user_id ON public.installment_groups(user_id);
+CREATE INDEX IF NOT EXISTS idx_scheduled_transactions_user_id ON public.scheduled_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_payees_user_id ON public.payees(user_id);
+CREATE INDEX IF NOT EXISTS idx_debt_accounts_user_id ON public.debt_accounts(user_id);
+CREATE INDEX IF NOT EXISTS idx_debt_items_user_id ON public.debt_items(user_id);
+
+-- ── Row Level Security (RLS) — Isolamento Estrito por Usuário Autenticado ──
 ALTER TABLE public.accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.category_groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
@@ -188,7 +208,6 @@ ALTER TABLE public.payees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.debt_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.debt_items ENABLE ROW LEVEL SECURITY;
 
--- Políticas de acesso irrestrito para chave anon (dados não sensíveis / uso direto)
 DO $$
 DECLARE
   t TEXT;
@@ -200,9 +219,12 @@ BEGIN
   ])
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS "Anon All Access" ON public.%I;', t);
-    EXECUTE format('CREATE POLICY "Anon All Access" ON public.%I FOR ALL TO anon USING (true) WITH CHECK (true);', t);
     EXECUTE format('DROP POLICY IF EXISTS "Authenticated All Access" ON public.%I;', t);
-    EXECUTE format('CREATE POLICY "Authenticated All Access" ON public.%I FOR ALL TO authenticated USING (true) WITH CHECK (true);', t);
+    EXECUTE format('DROP POLICY IF EXISTS "User Data Access" ON public.%I;', t);
+    EXECUTE format(
+      'CREATE POLICY "User Data Access" ON public.%I FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);',
+      t
+    );
   END LOOP;
 END
 $$;
@@ -227,4 +249,3 @@ BEGIN
 END
 $$;
 `
-

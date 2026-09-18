@@ -1,5 +1,6 @@
 // src/hooks/queries.ts — Hooks de consulta dedicados do TanStack Query v5
 import { useQuery } from '@tanstack/react-query'
+import { useAuth } from '@/context/AuthContext'
 import { getSupabaseClient, getSupabaseConfig } from '@/services/supabase'
 import {
   rowToAccount,
@@ -129,8 +130,9 @@ export async function fetchPayees(): Promise<Payee[]> {
 // ── Opções comuns ────────────────────────────────────────────────────────────
 function useQueryOptions() {
   const isConfigured = Boolean(getSupabaseConfig())
+  const { user } = useAuth()
   return {
-    enabled: isConfigured,
+    enabled: isConfigured && Boolean(user),
     staleTime: 1000 * 30,
   }
 }

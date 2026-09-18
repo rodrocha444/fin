@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { getSupabaseClient, getSupabaseConfig } from '@/services/supabase'
+import { getSupabaseClient } from '@/services/supabase'
+import { useAuth } from '@/context/AuthContext'
 import { syncAccountingStartDateWithRemote } from '@/utils/accountingPeriod'
 import {
   QUERY_KEYS,
@@ -51,7 +52,7 @@ const FinancialDataContext = createContext<FinancialDataContextValue | null>(nul
 // ── Provider ─────────────────────────────────────────────────────────────────
 export const FinancialDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const queryClient = useQueryClient()
-  const isConfigured = Boolean(getSupabaseConfig())
+  const { isConfigured, user } = useAuth()
 
   const { data: accounts = [], isLoading: l1 } = useAccountsQuery()
   const { data: categoryGroups = [], isLoading: l2 } = useCategoryGroupsQuery()
@@ -63,10 +64,11 @@ export const FinancialDataProvider: React.FC<{ children: React.ReactNode }> = ({
   const { data: debtItems = [], isLoading: l8 } = useDebtItemsQuery()
   const { data: payees = [], isLoading: l9 } = usePayeesQuery()
 
-  const isLoading = l1 || l2 || l3 || l4 || l5 || l6 || l7 || l8 || l9
+  const isLoading = user ? (l1 || l2 || l3 || l4 || l5 || l6 || l7 || l8 || l9) : false
 
   // ── Supabase Realtime: invalida queries em vez de setar estado manualmente ──
   useEffect(() => {
+    if (!user) return
     const client = getSupabaseClient()
     if (!client) return
 
@@ -96,10 +98,11 @@ export const FinancialDataProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => {
       client.removeChannel(channel)
     }
-  }, [queryClient])
+  }, [user, queryClient])
 
   // ── Barramento de eventos local — integração com notifyDataChanged() ────────
   useEffect(() => {
+    if (!user) return
     // Sincroniza o período contábil nuvem com o dispositivo local
     syncAccountingStartDateWithRemote()
 
@@ -116,7 +119,7 @@ export const FinancialDataProvider: React.FC<{ children: React.ReactNode }> = ({
 
     window.addEventListener('finplan_data_changed', handleLocalDataChanged)
     return () => window.removeEventListener('finplan_data_changed', handleLocalDataChanged)
-  }, [queryClient])
+  }, [user, queryClient])
 
   // ── refetch manual (compatibilidade com chamadas existentes) ────────────────
   const refetch = useCallback(async (tableName?: string) => {

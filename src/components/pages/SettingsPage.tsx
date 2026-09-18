@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Plus, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronRight,
   Download, Upload, Database, CheckCircle2, Cloud, RefreshCw,
   Copy, Check, ExternalLink, KeyRound, Server, AlertCircle,
-  CalendarRange, CalendarCheck, ShieldAlert
+  CalendarRange, CalendarCheck, ShieldAlert, LogOut, User as UserIcon
 } from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
 import { useFinancialData } from '@/context/FinancialDataContext'
 import {
   createGroup, updateGroup, deleteGroup, toggleGroupVisibility,
@@ -57,6 +59,22 @@ export default function SettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const confirm = useConfirm()
   const showAlert = useAlert()
+  const { user, signOut } = useAuth()
+  const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    const ok = await confirm({
+      title: 'Sair da Conta',
+      message: 'Deseja realmente encerrar a sessão da sua conta?',
+      confirmText: 'Sair',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    })
+    if (ok) {
+      await signOut()
+      navigate('/login', { replace: true })
+    }
+  }
 
   const handleSaveSupabase = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
@@ -526,6 +544,43 @@ export default function SettingsPage() {
               </div>
             )
           })}
+        </div>
+
+        {/* ── Card Sessão / Conta de Usuário ───────────────── */}
+        <div className="card p-5 space-y-4 bg-slate-900 border border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                <UserIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-200">Sua Conta</h2>
+                <p className="text-xs text-slate-500">Dados do usuário autenticado no FinPlan</p>
+              </div>
+            </div>
+
+            {user && (
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 hover:border-rose-800/60"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sair da Conta</span>
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-2 text-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-slate-800/60 gap-1">
+              <span className="text-slate-400 font-medium">E-mail:</span>
+              <span className="text-slate-200 font-mono">{user?.email || 'Nenhum usuário logado'}</span>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 gap-1">
+              <span className="text-slate-400 font-medium">User UID:</span>
+              <span className="text-slate-400 font-mono text-[11px] select-all break-all">{user?.id || '—'}</span>
+            </div>
+          </div>
         </div>
 
         {/* ── Card Sincronização em Nuvem (Supabase) ─────────── */}

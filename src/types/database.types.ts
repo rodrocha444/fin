@@ -1,6 +1,5 @@
 // src/types/database.types.ts — Tipos gerados do schema PostgreSQL do Supabase (FinPlan)
-// Gerado manualmente com base em src/services/supabaseSchema.ts
-// Para regenerar via CLI: npx supabase gen types typescript --project-id xlshtwvnaqkfrbcucjwq --schema public > src/types/database.types.ts
+// Gerado com base em src/services/supabaseSchema.ts
 
 export type Json =
   | string
@@ -16,6 +15,7 @@ export interface Database {
       accounts: {
         Row: {
           id: string
+          user_id: string
           name: string
           type: string
           initial_balance: number
@@ -31,6 +31,7 @@ export interface Database {
         }
         Insert: {
           id: string
+          user_id?: string
           name: string
           type: string
           initial_balance?: number
@@ -46,6 +47,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          user_id?: string
           name?: string
           type?: string
           initial_balance?: number
@@ -63,6 +65,7 @@ export interface Database {
       category_groups: {
         Row: {
           id: string
+          user_id: string
           name: string
           type: string | null
           sort_order: number
@@ -74,6 +77,7 @@ export interface Database {
         }
         Insert: {
           id: string
+          user_id?: string
           name: string
           type?: string | null
           sort_order?: number
@@ -85,6 +89,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          user_id?: string
           name?: string
           type?: string | null
           sort_order?: number
@@ -98,6 +103,7 @@ export interface Database {
       categories: {
         Row: {
           id: string
+          user_id: string
           group_id: string
           name: string
           sort_order: number
@@ -108,6 +114,7 @@ export interface Database {
         }
         Insert: {
           id: string
+          user_id?: string
           group_id: string
           name: string
           sort_order?: number
@@ -118,6 +125,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          user_id?: string
           group_id?: string
           name?: string
           sort_order?: number
@@ -130,6 +138,7 @@ export interface Database {
       budget_months: {
         Row: {
           id: string
+          user_id: string
           month: string
           category_id: string
           budget_type?: string | null
@@ -142,6 +151,7 @@ export interface Database {
         }
         Insert: {
           id: string
+          user_id?: string
           month: string
           category_id: string
           budget_type?: string | null
@@ -154,6 +164,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          user_id?: string
           month?: string
           category_id?: string
           budget_type?: string | null
@@ -168,6 +179,7 @@ export interface Database {
       transactions: {
         Row: {
           id: string
+          user_id: string
           account_id: string
           date: string
           amount: number
@@ -190,6 +202,7 @@ export interface Database {
         }
         Insert: {
           id: string
+          user_id?: string
           account_id: string
           date: string
           amount: number
@@ -212,6 +225,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          user_id?: string
           account_id?: string
           date?: string
           amount?: number
@@ -236,6 +250,7 @@ export interface Database {
       installment_groups: {
         Row: {
           id: string
+          user_id: string
           description: string
           total_amount: number
           installment_count: number
@@ -249,6 +264,7 @@ export interface Database {
         }
         Insert: {
           id: string
+          user_id?: string
           description: string
           total_amount: number
           installment_count: number
@@ -262,6 +278,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          user_id?: string
           description?: string
           total_amount?: number
           installment_count?: number
@@ -277,6 +294,7 @@ export interface Database {
       scheduled_transactions: {
         Row: {
           id: string
+          user_id: string
           account_id: string
           amount: number
           payee: string
@@ -294,6 +312,7 @@ export interface Database {
         }
         Insert: {
           id: string
+          user_id?: string
           account_id: string
           amount: number
           payee: string
@@ -311,6 +330,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          user_id?: string
           account_id?: string
           amount?: number
           payee?: string
@@ -330,6 +350,7 @@ export interface Database {
       payees: {
         Row: {
           id: string
+          user_id: string
           name: string
           default_category_id: string | null
           created_at: string
@@ -338,6 +359,7 @@ export interface Database {
         }
         Insert: {
           id: string
+          user_id?: string
           name: string
           default_category_id?: string | null
           created_at?: string
@@ -346,6 +368,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          user_id?: string
           name?: string
           default_category_id?: string | null
           created_at?: string
@@ -356,6 +379,7 @@ export interface Database {
       debt_accounts: {
         Row: {
           id: string
+          user_id: string
           name: string
           phone: string | null
           notes: string | null
@@ -367,6 +391,7 @@ export interface Database {
         }
         Insert: {
           id: string
+          user_id?: string
           name: string
           phone?: string | null
           notes?: string | null
@@ -378,6 +403,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          user_id?: string
           name?: string
           phone?: string | null
           notes?: string | null
@@ -391,6 +417,7 @@ export interface Database {
       debt_items: {
         Row: {
           id: string
+          user_id: string
           debt_account_id: string
           description: string
           type: string
@@ -409,6 +436,7 @@ export interface Database {
         }
         Insert: {
           id: string
+          user_id?: string
           debt_account_id: string
           description: string
           type: string
@@ -427,6 +455,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          user_id?: string
           debt_account_id?: string
           description?: string
           type?: string
@@ -457,7 +486,7 @@ export interface Database {
   }
 }
 
-// Helpers de conveniência — mesma API do supabase gen types oficial
+// Helpers de conveniência
 export type Tables<T extends keyof Database['public']['Tables']> =
   Database['public']['Tables'][T]['Row']
 
