@@ -299,7 +299,12 @@
   }
 
   /* Ajuste de cores para impressão */
-  .bg-rose-100, .bg-emerald-100, .bg-slate-100, .bg-slate-50 {
+  #printable-invoice-container,
+  #printable-invoice-container *,
+  #printable-debt-container,
+  #printable-debt-container *,
+  .bg-rose-100, .bg-emerald-100, .bg-slate-100, .bg-slate-50,
+  .bg-rose-50, .bg-emerald-50, .bg-indigo-50 {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
