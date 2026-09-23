@@ -172,7 +172,20 @@ CREATE TABLE IF NOT EXISTS public.debt_items (
   deleted_at TIMESTAMPTZ
 );
 
--- 11. Assinaturas e Status Pro (RevenueCat)
+-- 11. Histórico de Alterações de Valores de Cobrança / Dívida
+CREATE TABLE IF NOT EXISTS public.debt_item_changes (
+  id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
+  debt_item_id TEXT NOT NULL REFERENCES public.debt_items(id) ON DELETE CASCADE,
+  previous_amount NUMERIC NOT NULL,
+  new_amount NUMERIC NOT NULL,
+  changed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 12. Assinaturas e Status Pro (RevenueCat)
 CREATE TABLE IF NOT EXISTS public.user_subscriptions (
   user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
   customer_id TEXT,
@@ -196,6 +209,8 @@ CREATE INDEX IF NOT EXISTS idx_scheduled_transactions_updated_at ON public.sched
 CREATE INDEX IF NOT EXISTS idx_payees_updated_at ON public.payees(updated_at);
 CREATE INDEX IF NOT EXISTS idx_debt_accounts_updated_at ON public.debt_accounts(updated_at);
 CREATE INDEX IF NOT EXISTS idx_debt_items_updated_at ON public.debt_items(updated_at);
+CREATE INDEX IF NOT EXISTS idx_debt_item_changes_updated_at ON public.debt_item_changes(updated_at);
+CREATE INDEX IF NOT EXISTS idx_debt_item_changes_debt_item_id ON public.debt_item_changes(debt_item_id);
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_updated_at ON public.user_subscriptions(updated_at);
 
 -- Índices de Isolamento por Usuário
@@ -209,6 +224,7 @@ CREATE INDEX IF NOT EXISTS idx_scheduled_transactions_user_id ON public.schedule
 CREATE INDEX IF NOT EXISTS idx_payees_user_id ON public.payees(user_id);
 CREATE INDEX IF NOT EXISTS idx_debt_accounts_user_id ON public.debt_accounts(user_id);
 CREATE INDEX IF NOT EXISTS idx_debt_items_user_id ON public.debt_items(user_id);
+CREATE INDEX IF NOT EXISTS idx_debt_item_changes_user_id ON public.debt_item_changes(user_id);
 
 -- ── Row Level Security (RLS) — Isolamento Estrito por Usuário Autenticado ──
 ALTER TABLE public.accounts ENABLE ROW LEVEL SECURITY;
@@ -221,6 +237,7 @@ ALTER TABLE public.scheduled_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.debt_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.debt_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.debt_item_changes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_subscriptions ENABLE ROW LEVEL SECURITY;
 
 DO $$
@@ -230,7 +247,7 @@ BEGIN
   FOR t IN SELECT unnest(ARRAY[
     'accounts', 'category_groups', 'categories', 'budget_months',
     'transactions', 'installment_groups', 'scheduled_transactions',
-    'payees', 'debt_accounts', 'debt_items', 'user_subscriptions'
+    'payees', 'debt_accounts', 'debt_items', 'debt_item_changes', 'user_subscriptions'
   ])
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS "Anon All Access" ON public.%I;', t);
@@ -252,7 +269,7 @@ BEGIN
   FOR t IN SELECT unnest(ARRAY[
     'accounts', 'category_groups', 'categories', 'budget_months',
     'transactions', 'installment_groups', 'scheduled_transactions',
-    'payees', 'debt_accounts', 'debt_items', 'user_subscriptions'
+    'payees', 'debt_accounts', 'debt_items', 'debt_item_changes', 'user_subscriptions'
   ])
   LOOP
     BEGIN

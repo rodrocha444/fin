@@ -10,7 +10,8 @@ import {
 import { createId } from '@/utils/id'
 import { addMonths } from 'date-fns'
 import { notifyDataChanged } from './events'
-import type { DebtAccount, DebtItem, DebtSummary, DebtStatus, DebtType } from '@/types'
+import { parseDebtItemNotesAndChanges } from '@/utils/debts'
+import type { DebtAccount, DebtItem, DebtItemChange, DebtSummary, DebtStatus, DebtType } from '@/types'
 
 export interface CreateDebtInstallmentsInput {
   debtAccountId: string
@@ -160,7 +161,46 @@ export async function createDebtInstallments(input: CreateDebtInstallmentsInput)
 
 export async function updateDebtItem(id: string, data: Partial<Omit<DebtItem, 'id' | 'createdAt'>>): Promise<void> {
   const client = getClient()
-  const row = debtItemToUpdateRow(data)
+
+  let changesList: DebtItemChange[] | undefined = data.changes
+
+  if (data.amount !== undefined) {
+    const { data: currentItem } = await client
+      .from('debt_items')
+      .select('amount, notes')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (currentItem && Math.abs(Number(currentItem.amount) - Number(data.amount)) > 0.001) {
+      const { changes: existingChanges } = parseDebtItemNotesAndChanges(currentItem.notes)
+      const newChange: DebtItemChange = {
+        id: `chg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        debtItemId: id,
+        previousAmount: Number(currentItem.amount),
+        newAmount: Number(data.amount),
+        changedAt: new Date(),
+        notes: data.notes,
+      }
+      changesList = [...existingChanges, newChange]
+
+      // Tentativa resiliente de gravação na tabela relacional se presente
+      try {
+        await client.from('debt_item_changes').insert({
+          id: newChange.id,
+          debt_item_id: id,
+          previous_amount: newChange.previousAmount,
+          new_amount: newChange.newAmount,
+          changed_at: newChange.changedAt.toISOString(),
+          notes: newChange.notes || null,
+        })
+      } catch {
+        // Ignora silenciosamente caso a tabela opcional não tenha sido criada no Supabase remoto
+      }
+    }
+  }
+
+  const payloadToUpdate = changesList !== undefined ? { ...data, changes: changesList } : data
+  const row = debtItemToUpdateRow(payloadToUpdate)
 
   const { error } = await client.from('debt_items').update(row).eq('id', id)
   if (error) throw new Error(`Erro ao atualizar item de cobrança: ${error.message}`)

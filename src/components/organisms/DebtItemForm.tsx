@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ArrowDownLeft, ArrowUpRight, Plus, Pencil, Layers } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, Plus, Pencil, Layers, History, TrendingUp, TrendingDown } from 'lucide-react'
 import { format } from 'date-fns'
 import { createDebtItem, updateDebtItem, createDebtInstallments } from '@/services/api/debts'
 import { formatCurrency } from '@/utils/format'
@@ -77,6 +77,7 @@ export default function DebtItemForm({
         amount: data.amount,
         dueDate: dueDateParsed,
         notes: data.notes?.trim() || undefined,
+        changes: item.changes,
         installmentGroupId: item.installmentGroupId,
         installmentNumber: item.installmentNumber,
         installmentTotal: item.installmentTotal,
@@ -172,6 +173,23 @@ export default function DebtItemForm({
             )}
           />
           {errors.amount && <p className="text-rose-400 text-xs mt-1">{errors.amount.message}</p>}
+
+          {/* Aviso quando o valor for alterado */}
+          {isEdit && item && Math.abs(currentAmount - item.amount) > 0.001 && (
+            <div className="mt-2.5 p-2.5 rounded-xl bg-indigo-950/40 border border-indigo-800/60 flex items-start gap-2 text-xs">
+              <History className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="font-semibold text-indigo-200">
+                  Alteração de valor detectada
+                </p>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  Valor anterior: <span className="font-semibold text-slate-300">{formatCurrency(item.amount)}</span> ➔ Novo valor: <span className="font-semibold text-indigo-300">{formatCurrency(currentAmount)}</span>
+                  {' '}({currentAmount > item.amount ? '+' : ''}{formatCurrency(currentAmount - item.amount)}).
+                  Essa alteração será registrada no histórico hoje, atualizando a evolução patrimonial nos relatórios.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Parcelamento (apenas no modo de criação) */}
@@ -236,6 +254,44 @@ export default function DebtItemForm({
             autoComplete="off"
           />
         </div>
+
+        {/* Histórico de Alterações de Valor */}
+        {isEdit && item?.changes && item.changes.length > 0 && (
+          <div className="pt-2 border-t border-slate-800/80 space-y-2">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
+              <History className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Histórico de Alterações ({item.changes.length})</span>
+            </div>
+            <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+              {[...item.changes]
+                .sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime())
+                .map((ch, idx) => {
+                  const diff = ch.newAmount - ch.previousAmount
+                  const isUp = diff > 0
+                  return (
+                    <div key={ch.id || idx} className="p-2 rounded-lg bg-slate-900/80 border border-slate-800/60 flex items-center justify-between text-[11px]">
+                      <div>
+                        <p className="font-medium text-slate-200 flex items-center gap-1">
+                          <span>{formatCurrency(ch.previousAmount)}</span>
+                          <span className="text-slate-500">➔</span>
+                          <span className="font-bold text-slate-100">{formatCurrency(ch.newAmount)}</span>
+                        </p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">
+                          {format(new Date(ch.changedAt), 'dd/MM/yyyy HH:mm')}
+                        </p>
+                      </div>
+                      <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                        isUp ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/40' : 'bg-rose-950/60 text-rose-400 border border-rose-800/40'
+                      }`}>
+                        {isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                        {isUp ? '+' : ''}{formatCurrency(diff)}
+                      </span>
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex gap-2.5 pt-2">

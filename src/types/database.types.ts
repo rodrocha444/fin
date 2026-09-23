@@ -473,6 +473,41 @@ export interface Database {
           deleted_at?: string | null
         }
       }
+      debt_item_changes: {
+        Row: {
+          id: string
+          user_id: string
+          debt_item_id: string
+          previous_amount: number
+          new_amount: number
+          changed_at: string
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          user_id?: string
+          debt_item_id: string
+          previous_amount: number
+          new_amount: number
+          changed_at?: string
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          debt_item_id?: string
+          previous_amount?: number
+          new_amount?: number
+          changed_at?: string
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

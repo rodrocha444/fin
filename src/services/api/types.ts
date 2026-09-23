@@ -407,7 +407,10 @@ export function debtAccountToUpdateRow(changes: Partial<DebtAccount>): Record<st
 }
 
 // 10. Itens de Cobrança / Pendências
+import { parseDebtItemNotesAndChanges, formatDebtItemNotesWithChanges } from '@/utils/debts'
+
 export function rowToDebtItem(row: Tables<'debt_items'>): DebtItem {
+  const { notes, changes } = parseDebtItemNotesAndChanges(row.notes)
   return {
     id: row.id,
     debtAccountId: row.debt_account_id,
@@ -417,7 +420,8 @@ export function rowToDebtItem(row: Tables<'debt_items'>): DebtItem {
     dueDate: toDate(row.due_date),
     settledDate: toDate(row.settled_date),
     status: (row.status as DebtItem['status']) || 'pending',
-    notes: row.notes || undefined,
+    notes,
+    changes,
     installmentGroupId: row.installment_group_id || undefined,
     installmentNumber: row.installment_number ?? undefined,
     installmentTotal: row.installment_total ?? undefined,
@@ -428,6 +432,7 @@ export function rowToDebtItem(row: Tables<'debt_items'>): DebtItem {
 
 export function debtItemToRow(item: Partial<DebtItem>): Record<string, unknown> {
   const now = new Date().toISOString()
+  const notesFormatted = formatDebtItemNotesWithChanges(item.notes, item.changes)
   return {
     ...(item.id ? { id: item.id } : {}),
     debt_account_id: item.debtAccountId ?? '',
@@ -437,7 +442,7 @@ export function debtItemToRow(item: Partial<DebtItem>): Record<string, unknown> 
     due_date: toIso(item.dueDate) || null,
     settled_date: toIso(item.settledDate) || null,
     status: item.status || 'pending',
-    notes: item.notes || null,
+    notes: notesFormatted,
     installment_group_id: item.installmentGroupId || null,
     installment_number: item.installmentNumber ?? null,
     installment_total: item.installmentTotal ?? null,
@@ -458,7 +463,9 @@ export function debtItemToUpdateRow(changes: Partial<DebtItem>): Record<string, 
   if (changes.dueDate !== undefined) row.due_date = toIso(changes.dueDate)
   if (changes.settledDate !== undefined) row.settled_date = toIso(changes.settledDate)
   if (changes.status !== undefined) row.status = changes.status
-  if (changes.notes !== undefined) row.notes = changes.notes || null
+  if (changes.notes !== undefined || changes.changes !== undefined) {
+    row.notes = formatDebtItemNotesWithChanges(changes.notes, changes.changes)
+  }
   if (changes.installmentGroupId !== undefined) row.installment_group_id = changes.installmentGroupId || null
   if (changes.installmentNumber !== undefined) row.installment_number = changes.installmentNumber ?? null
   if (changes.installmentTotal !== undefined) row.installment_total = changes.installmentTotal ?? null

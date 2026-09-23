@@ -13,6 +13,7 @@ import {
   Calendar,
   ChevronRight,
   HandCoins,
+  History,
 } from 'lucide-react'
 import { useDebtAccountWithItems } from '@/hooks/useDebts'
 import {
@@ -347,6 +348,21 @@ export default function DebtAccountPage() {
                               Quitado {item.settledDate ? `em ${formatDate(item.settledDate)}` : ''}
                             </span>
                           )}
+                          {item.changes && item.changes.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setEditingItem(item)
+                                setShowItemModal(true)
+                              }}
+                              className="text-[10px] inline-flex items-center gap-1 bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full hover:bg-amber-500/25 transition-colors cursor-pointer"
+                              title={`Valor alterado ${item.changes.length}x. Clique para ver histórico.`}
+                            >
+                              <History className="w-2.5 h-2.5 text-amber-400" />
+                              <span>{item.changes.length === 1 ? '1 alteração de valor' : `${item.changes.length} alterações de valor`}</span>
+                            </button>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-500 mt-1">
                           <span>Criado em {formatDate(item.createdAt)}</span>
@@ -481,6 +497,21 @@ export default function DebtAccountPage() {
                                 )}
                                 {isSettled && item.settledDate && (
                                   <span className="ml-2 text-[10px] text-slate-500">Quitado em {formatDate(item.settledDate)}</span>
+                                )}
+                                {item.changes && item.changes.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setEditingItem(item)
+                                      setShowItemModal(true)
+                                    }}
+                                    className="ml-2 text-[9px] inline-flex items-center gap-1 bg-amber-500/15 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded-full hover:bg-amber-500/25 transition-colors cursor-pointer"
+                                    title={`Valor alterado ${item.changes.length}x. Clique para ver histórico.`}
+                                  >
+                                    <History className="w-2 h-2 text-amber-400" />
+                                    <span>Alterado ({item.changes.length}x)</span>
+                                  </button>
                                 )}
                               </div>
                             </div>

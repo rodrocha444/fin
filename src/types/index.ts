@@ -202,6 +202,15 @@ export interface PendingIssue {
 export type DebtType = 'receivable' | 'payable'
 export type DebtStatus = 'pending' | 'settled' | 'cancelled'
 
+export interface DebtItemChange {
+  id: string
+  debtItemId: string
+  previousAmount: number
+  newAmount: number
+  changedAt: Date
+  notes?: string
+}
+
 export interface DebtAccount {
   id?: string
   name: string
@@ -227,6 +236,7 @@ export interface DebtItem {
   installmentTotal?: number
   totalAmount?: number
   createdAt: Date
+  changes?: DebtItemChange[]
 }
 
 export interface DebtSummary {

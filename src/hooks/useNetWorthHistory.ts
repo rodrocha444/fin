@@ -9,6 +9,7 @@ import {
 import { format, addDays, addWeeks, addMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { getAccountingStartDate } from '@/utils/accountingPeriod'
+import { getDebtItemAmountAtDate } from '@/utils/debts'
 
 export type Granularity = 'daily' | 'weekly' | 'monthly'
 
@@ -160,18 +161,21 @@ export function useNetWorthHistory(
             item.status === 'settled' && item.settledDate && new Date(item.settledDate) <= pDate
 
           if (!isSettledAtDate && item.status !== 'cancelled') {
-            if (item.type === 'receivable') {
-              dBal += item.amount
-              debtReceivableTotal += item.amount
-              totalAssets += item.amount
-              totalNetWorth += item.amount
-              offBudgetTotal += item.amount
-            } else if (item.type === 'payable') {
-              dBal -= item.amount
-              debtPayableTotal += item.amount
-              totalLiabilities += item.amount
-              totalNetWorth -= item.amount
-              offBudgetTotal -= item.amount
+            const effectiveAmount = getDebtItemAmountAtDate(item, pDate)
+            if (effectiveAmount > 0) {
+              if (item.type === 'receivable') {
+                dBal += effectiveAmount
+                debtReceivableTotal += effectiveAmount
+                totalAssets += effectiveAmount
+                totalNetWorth += effectiveAmount
+                offBudgetTotal += effectiveAmount
+              } else if (item.type === 'payable') {
+                dBal -= effectiveAmount
+                debtPayableTotal += effectiveAmount
+                totalLiabilities += effectiveAmount
+                totalNetWorth -= effectiveAmount
+                offBudgetTotal -= effectiveAmount
+              }
             }
           }
         }
