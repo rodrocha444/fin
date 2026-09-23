@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Copy,
@@ -19,7 +19,6 @@ import { formatCurrency, currentMonth, formatMonthLabel, shiftMonth } from '@/ut
 import { useAccountingPeriod } from '@/utils/accountingPeriod'
 import { getSavedBudgetRegime, saveBudgetRegime, type AccountingRegime } from '@/utils/accountingRegime'
 import { useConfirm, useAlert } from '@/context/ConfirmContext'
-import PriceInput from '@/components/atoms/PriceInput'
 import MonthNavigator from '@/components/atoms/MonthNavigator'
 import BudgetRegimeSelector from '@/components/atoms/BudgetRegimeSelector'
 import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
@@ -44,95 +43,7 @@ export interface CategoryModalData {
   isIncome?: boolean
 }
 
-// ── Célula editável inline ────────────────────────────────────
-
-function BudgetCell({
-  value,
-  onSave,
-}: {
-  value: number
-  onSave: (v: number) => Promise<void> | void
-}) {
-  const [editing, setEditing] = useState(false)
-  const [currentVal, setCurrentVal] = useState(value)
-  const [loading, setLoading] = useState(false)
-  const isSavingRef = useRef(false)
-
-  const startEdit = () => {
-    if (loading) return
-    setCurrentVal(value)
-    setEditing(true)
-  }
-
-  const commitEdit = async () => {
-    if (isSavingRef.current) return
-    isSavingRef.current = true
-    setEditing(false)
-
-    if (currentVal === value) {
-      isSavingRef.current = false
-      return
-    }
-
-    try {
-      setLoading(true)
-      await onSave(currentVal)
-    } catch (err) {
-      console.error('Erro ao salvar valor orçado:', err)
-    } finally {
-      setLoading(false)
-      isSavingRef.current = false
-    }
-  }
-
-  const cancelEdit = () => {
-    isSavingRef.current = true
-    setCurrentVal(value)
-    setEditing(false)
-    setTimeout(() => {
-      isSavingRef.current = false
-    }, 50)
-  }
-
-  if (loading) {
-    return (
-      <div className="w-full flex items-center justify-end px-2 py-1 min-h-[32px] text-xs sm:text-sm text-indigo-400 gap-1.5 animate-pulse">
-        <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0 text-indigo-400" />
-        <span className="tabular-nums font-medium">
-          {currentVal === 0 ? <span className="text-slate-600">—</span> : formatCurrency(currentVal)}
-        </span>
-      </div>
-    )
-  }
-
-  if (editing) {
-    return (
-      <PriceInput
-        autoFocus
-        className="w-full text-right bg-slate-900 border border-indigo-500 rounded px-2 py-1 text-xs sm:text-sm text-slate-100 tabular-nums focus:outline-none min-h-[32px]"
-        value={currentVal}
-        onChange={v => setCurrentVal(v)}
-        onBlur={commitEdit}
-        onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-          if (e.key === 'Enter') commitEdit()
-          if (e.key === 'Escape') cancelEdit()
-        }}
-        placeholder="0,00"
-      />
-    )
-  }
-
-  return (
-    <button
-      onClick={startEdit}
-      className="w-full text-right text-xs sm:text-sm text-slate-300 hover:text-indigo-300 tabular-nums transition-colors rounded px-2 py-1 hover:bg-slate-700/50 active:bg-slate-700 min-h-[32px] font-normal"
-    >
-      {value === 0 ? <span className="text-slate-600">—</span> : formatCurrency(value)}
-    </button>
-  )
-}
-
-// ── Linhas de Receitas / Renda ────────────────────────────────
+// ── Linhas de Receitas / Renda (2 Colunas) ────────────────────
 
 function IncomeCategoryRow({
   row,
@@ -149,35 +60,17 @@ function IncomeCategoryRow({
   onAdjustIncome?: (row: IncomeCategoryBudgetRow) => void
   isRowSaving?: boolean
 }) {
-  const [isCellSaving, setIsCellSaving] = useState(false)
-
-  const handleSave = useCallback(
-    async (v: number) => {
-      if (row.category.id !== undefined) {
-        try {
-          setIsCellSaving(true)
-          await setBudget(month, row.category.id, v, true, budgetRegime)
-        } finally {
-          setIsCellSaving(false)
-        }
-      }
-    },
-    [month, row.category.id, budgetRegime]
-  )
-
-  const isLoading = isRowSaving || isCellSaving
   const diff = Math.round((row.expected - row.received) * 100) / 100
-
-  const diffColor =
-    diff < -0.005
-      ? 'text-emerald-400 font-medium'
-      : diff > 0.005
-      ? 'text-amber-400/90 font-medium'
-      : 'text-slate-500 font-normal'
+  const hasGoal = row.expected > 0.005
+  const percentReceived = hasGoal
+    ? Math.min(100, Math.round((row.received / row.expected) * 100))
+    : row.received > 0
+    ? 100
+    : 0
 
   return (
-    <tr className="group hover:bg-slate-800/30 transition-colors">
-      {/* Nome da categoria */}
+    <tr className="group hover:bg-slate-800/30 transition-colors border-b border-slate-800/40">
+      {/* Coluna 1: Categoria + Resumo & Progresso */}
       <td
         onClick={() =>
           onSelectCategory({
@@ -187,38 +80,38 @@ function IncomeCategoryRow({
             isIncome: true,
           })
         }
-        className="py-2.5 pl-6 sm:pl-10 pr-2 text-xs sm:text-sm text-slate-300 cursor-pointer"
-        title="Clique para ver as transações desta categoria no mês"
+        className="py-2.5 pl-3 sm:pl-6 pr-2 cursor-pointer"
+        title="Toque para ver as transações desta receita"
       >
-        <span className="break-words leading-tight block group-hover:text-emerald-300 transition-colors" title={row.category.name}>
-          {row.category.name}
-        </span>
+        <div className="flex flex-col min-w-0 pr-1">
+          <span
+            className="text-xs sm:text-sm font-medium text-slate-200 group-hover:text-emerald-300 transition-colors break-words leading-tight"
+            title={row.category.name}
+          >
+            {row.category.name}
+          </span>
+          <span className="text-[10.5px] sm:text-[11px] text-slate-400 font-normal truncate mt-0.5">
+            {hasGoal
+              ? `Recebido ${formatCurrency(row.received)} de ${formatCurrency(row.expected)}`
+              : row.received > 0
+              ? `Recebido: ${formatCurrency(row.received)}`
+              : 'Sem entradas'}
+          </span>
+          {hasGoal && (
+            <div className="w-full max-w-[170px] sm:max-w-[210px] h-1 bg-slate-800 rounded-full mt-1 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-300 bg-emerald-500"
+                style={{ width: `${percentReceived}%` }}
+              />
+            </div>
+          )}
+        </div>
       </td>
-      {/* Previsto / Orçado */}
-      <td className="py-2.5 px-2 text-right">
-        <BudgetCell value={row.expected} onSave={handleSave} />
-      </td>
-      {/* Recebido */}
-      <td
-        onClick={() =>
-          onSelectCategory({
-            category: row.category,
-            budgeted: row.expected,
-            activity: row.received,
-            isIncome: true,
-          })
-        }
-        className="py-2.5 px-2 text-right text-xs sm:text-sm text-slate-300 tabular-nums font-normal cursor-pointer hover:bg-slate-800/50"
-        title="Clique para ver as transações desta categoria no mês"
-      >
-        {Math.abs(row.received) > 0.005
-          ? formatCurrency(Math.abs(row.received))
-          : <span className="text-slate-600">—</span>}
-      </td>
-      {/* A Receber / Diferença */}
+
+      {/* Coluna 2: A Receber / Status */}
       <td
         onClick={(e) => {
-          if (isLoading) return
+          if (isRowSaving) return
           e.stopPropagation()
           if (onAdjustIncome) {
             onAdjustIncome(row)
@@ -231,29 +124,39 @@ function IncomeCategoryRow({
             })
           }
         }}
-        className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums cursor-pointer hover:bg-slate-800/60 transition-colors ${diffColor}`}
-        title={
-          isLoading
-            ? 'Salvando meta…'
-            : 'Clique para definir a meta prevista desta receita'
-        }
+        className="py-2.5 pl-2 pr-3 sm:pr-6 text-right cursor-pointer select-none"
+        title="Toque para definir a meta desta receita"
       >
-        {isLoading ? (
-          <div className="flex items-center justify-end text-xs sm:text-sm text-emerald-400 gap-1.5 animate-pulse">
-            <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0 text-emerald-400" />
-            <span className="tabular-nums font-medium">
-              {diff === 0 ? <span className="text-slate-600">—</span> : formatCurrency(Math.abs(diff))}
-            </span>
-          </div>
-        ) : diff === 0 ? (
-          <span className="text-slate-600">—</span>
-        ) : diff > 0 ? (
-          formatCurrency(diff)
-        ) : (
-          <span className="text-emerald-400 font-semibold" title="Superou a meta prevista!">
-            {formatCurrency(Math.abs(diff))}
-          </span>
-        )}
+        <div className="flex items-center justify-end">
+          {isRowSaving ? (
+            <div className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 text-xs animate-pulse">
+              <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+              <span className="tabular-nums font-medium text-[11px]">Salvando…</span>
+            </div>
+          ) : (
+            <div
+              className={`inline-flex items-center justify-center px-2.5 py-1 rounded-lg border text-xs sm:text-sm tabular-nums font-semibold transition-colors hover:brightness-110 active:scale-95 ${
+                diff > 0.005
+                  ? 'bg-amber-950/40 border-amber-800/40 text-amber-400'
+                  : diff < -0.005
+                  ? 'bg-emerald-950/50 border-emerald-800/40 text-emerald-400'
+                  : hasGoal
+                  ? 'bg-emerald-950/30 border-emerald-800/30 text-emerald-400'
+                  : 'bg-slate-800/50 border-slate-700/50 text-slate-400'
+              }`}
+            >
+              {diff > 0.005
+                ? formatCurrency(diff)
+                : diff < -0.005
+                ? `+${formatCurrency(Math.abs(diff))}`
+                : hasGoal
+                ? 'Concluído'
+                : row.received > 0
+                ? formatCurrency(row.received)
+                : <span className="text-slate-500 font-normal">R$ 0,00</span>}
+            </div>
+          )}
+        </div>
       </td>
     </tr>
   )
@@ -283,52 +186,65 @@ function IncomeGroupRow({
         className="cursor-pointer select-none bg-emerald-950/30 border-t-2 border-emerald-900/60 border-b border-emerald-900/40 hover:bg-emerald-950/45 active:bg-emerald-950/60 transition-colors group/grow"
         onClick={() => setOpen(o => !o)}
       >
-        <td className="py-2.5 pl-3 sm:pl-6 pr-2 text-xs sm:text-sm font-bold text-emerald-300 uppercase tracking-wide">
+        <td className="py-2.5 pl-3 sm:pl-6 pr-2">
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
             <div className="w-1 h-3.5 sm:h-4 rounded-full bg-emerald-500 flex-shrink-0" />
             <span className="text-emerald-400 group-hover/grow:text-emerald-200 transition-transform flex-shrink-0">
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? '' : '-rotate-90'}`} />
             </span>
-            <span className="break-words leading-tight" title={row.group.name}>{row.group.name}</span>
-            <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400/90 bg-emerald-900/50 border border-emerald-700/50 rounded-full flex-shrink-0">
-              {row.categories.length}
-            </span>
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="break-words leading-tight text-xs sm:text-sm font-bold text-emerald-300 uppercase tracking-wide"
+                  title={row.group.name}
+                >
+                  {row.group.name}
+                </span>
+                <span className="inline-flex items-center px-1.5 py-0.2 text-[9px] font-semibold text-emerald-400/90 bg-emerald-900/50 border border-emerald-700/50 rounded-full flex-shrink-0">
+                  {row.categories.length}
+                </span>
+              </div>
+              <span className="text-[10px] text-emerald-400/80 font-normal truncate mt-0.5">
+                Recebido {formatCurrency(Math.abs(row.totalReceived))} de {formatCurrency(Math.abs(row.totalExpected))}
+              </span>
+            </div>
           </div>
         </td>
-        <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-bold text-slate-200 tabular-nums">
-          {Math.abs(row.totalExpected) > 0.005 ? formatCurrency(Math.abs(row.totalExpected)) : <span className="text-slate-600">—</span>}
-        </td>
-        <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-bold text-slate-200 tabular-nums">
-          {Math.abs(row.totalReceived) > 0.005 ? formatCurrency(Math.abs(row.totalReceived)) : <span className="text-slate-600">—</span>}
-        </td>
-        <td className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm font-bold tabular-nums ${
-          groupDiff > 0 ? 'text-amber-400' : groupDiff < 0 ? 'text-emerald-400' : 'text-slate-500'
-        }`}>
-          {groupDiff === 0 ? (
-            <span className="text-slate-600">—</span>
-          ) : groupDiff > 0 ? (
-            formatCurrency(groupDiff)
-          ) : (
-            formatCurrency(Math.abs(groupDiff))
-          )}
+        <td className="py-2.5 pl-2 pr-3 sm:pr-6 text-right">
+          <span
+            className={`text-xs sm:text-sm font-bold tabular-nums ${
+              groupDiff > 0.005
+                ? 'text-amber-400'
+                : groupDiff < -0.005
+                ? 'text-emerald-400'
+                : 'text-slate-400'
+            }`}
+          >
+            {groupDiff > 0.005
+              ? formatCurrency(groupDiff)
+              : groupDiff < -0.005
+              ? `+${formatCurrency(Math.abs(groupDiff))}`
+              : <span className="text-slate-600">—</span>}
+          </span>
         </td>
       </tr>
-      {open && row.categories.map(c => (
-        <IncomeCategoryRow
-          key={c.category.id}
-          row={c}
-          month={month}
-          budgetRegime={budgetRegime}
-          onSelectCategory={onSelectCategory}
-          onAdjustIncome={onAdjustIncome}
-          isRowSaving={savingCategoryId === c.category.id}
-        />
-      ))}
+      {open &&
+        row.categories.map(c => (
+          <IncomeCategoryRow
+            key={c.category.id}
+            row={c}
+            month={month}
+            budgetRegime={budgetRegime}
+            onSelectCategory={onSelectCategory}
+            onAdjustIncome={onAdjustIncome}
+            isRowSaving={savingCategoryId === c.category.id}
+          />
+        ))}
     </>
   )
 }
 
-// ── Linha de categoria de Despesas ────────────────────────────
+// ── Linha de categoria de Despesas (2 Colunas) ─────────────────
 
 function CategoryRow({
   row,
@@ -345,31 +261,33 @@ function CategoryRow({
   onAdjustEnvelope: (row: CategoryBudgetRow) => void
   isRowSaving?: boolean
 }) {
-  const [isCellSaving, setIsCellSaving] = useState(false)
+  const budgeted = row.budgeted || 0
+  const spent = Math.abs(row.activity || 0)
+  const available = row.available || 0
+  const isOverspent = available < -0.005
+  const hasBudget = budgeted > 0.005
 
-  const handleSave = useCallback(
-    async (v: number) => {
-      if (row.category.id !== undefined) {
-        try {
-          setIsCellSaving(true)
-          await setBudget(month, row.category.id, v, true, budgetRegime)
-        } finally {
-          setIsCellSaving(false)
-        }
-      }
-    },
-    [month, row.category.id, budgetRegime]
-  )
+  const percentSpent = hasBudget
+    ? Math.min(100, Math.round((spent / budgeted) * 100))
+    : spent > 0
+    ? 100
+    : 0
 
-  const isLoading = isRowSaving || isCellSaving
+  const availColor = isOverspent
+    ? 'text-rose-400 bg-rose-950/60 border-rose-800/60'
+    : available > 0.005
+    ? 'text-emerald-400 bg-emerald-950/40 border-emerald-800/40'
+    : 'text-slate-400 bg-slate-800/50 border-slate-700/50'
 
-  const availColor =
-    row.available > 0.005 ? 'text-emerald-400 font-medium' :
-    row.available < -0.005 ? 'text-rose-400 font-semibold' : 'text-slate-500 font-normal'
+  const progressBarColor = isOverspent
+    ? 'bg-rose-500'
+    : percentSpent >= 90
+    ? 'bg-amber-400'
+    : 'bg-indigo-500'
 
   return (
-    <tr className="group hover:bg-slate-800/30 transition-colors">
-      {/* Nome da categoria */}
+    <tr className="group hover:bg-slate-800/30 transition-colors border-b border-slate-800/40">
+      {/* Coluna 1: Categoria + Resumo & Progresso */}
       <td
         onClick={() =>
           onSelectCategory({
@@ -380,67 +298,72 @@ function CategoryRow({
             isIncome: false,
           })
         }
-        className="py-2.5 pl-6 sm:pl-10 pr-2 text-xs sm:text-sm text-slate-300 cursor-pointer"
-        title="Clique para ver as transações desta categoria no mês"
+        className="py-2.5 pl-3 sm:pl-6 pr-2 cursor-pointer"
+        title="Toque para ver as transações desta categoria"
       >
-        <span className="break-words leading-tight block group-hover:text-indigo-300 transition-colors" title={row.category.name}>
-          {row.category.name}
-        </span>
+        <div className="flex flex-col min-w-0 pr-1">
+          <span
+            className="text-xs sm:text-sm font-medium text-slate-200 group-hover:text-indigo-300 transition-colors break-words leading-tight"
+            title={row.category.name}
+          >
+            {row.category.name}
+          </span>
+          <span className="text-[10.5px] sm:text-[11px] text-slate-400 font-normal truncate mt-0.5">
+            {hasBudget
+              ? `Gasto ${formatCurrency(spent)} de ${formatCurrency(budgeted)}`
+              : spent > 0
+              ? `Gasto: ${formatCurrency(spent)} (sem teto)`
+              : 'Sem gastos'}
+          </span>
+          {(hasBudget || spent > 0) && (
+            <div className="w-full max-w-[170px] sm:max-w-[210px] h-1 bg-slate-800 rounded-full mt-1 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${progressBarColor}`}
+                style={{ width: `${percentSpent}%` }}
+              />
+            </div>
+          )}
+        </div>
       </td>
-      {/* Orçado */}
-      <td className="py-2.5 px-2 text-right">
-        <BudgetCell value={row.budgeted} onSave={handleSave} />
-      </td>
-      {/* Gasto */}
-      <td
-        onClick={() =>
-          onSelectCategory({
-            category: row.category,
-            budgeted: row.budgeted,
-            activity: row.activity,
-            available: row.available,
-            isIncome: false,
-          })
-        }
-        className="py-2.5 px-2 text-right text-xs sm:text-sm text-slate-300 tabular-nums font-normal cursor-pointer hover:bg-slate-800/50"
-        title="Clique para ver as transações desta categoria no mês"
-      >
-        {Math.abs(row.activity) > 0.005
-          ? formatCurrency(Math.abs(row.activity))
-          : <span className="text-slate-600">—</span>}
-      </td>
-      {/* Disponível */}
+
+      {/* Coluna 2: Saldo Disponível (Toque para ajustar envelope) */}
       <td
         onClick={(e) => {
-          if (isLoading) return
+          if (isRowSaving) return
           e.stopPropagation()
           onAdjustEnvelope(row)
         }}
-        className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums cursor-pointer hover:bg-slate-800/60 transition-colors ${availColor}`}
+        className="py-2.5 pl-2 pr-3 sm:pr-6 text-right cursor-pointer select-none"
         title={
-          isLoading
-            ? 'Salvando envelope…'
-            : row.available < -0.005
-            ? `Atenção: faltam ${formatCurrency(Math.abs(row.available))}. Clique para cobrir rombo ou adicionar ao envelope.`
-            : 'Clique para definir o saldo disponível deste envelope'
+          isOverspent
+            ? `Atenção: faltam ${formatCurrency(Math.abs(available))}. Toque para ajustar envelope.`
+            : 'Toque para ajustar o saldo disponível deste envelope'
         }
       >
-        {isLoading ? (
-          <div className="flex items-center justify-end text-xs sm:text-sm text-indigo-400 gap-1.5 animate-pulse">
-            <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0 text-indigo-400" />
-            <span className="tabular-nums font-medium">
-              {formatCurrency(Math.abs(row.available))}
-            </span>
-          </div>
-        ) : (
-          formatCurrency(Math.abs(row.available))
-        )}
+        <div className="flex items-center justify-end">
+          {isRowSaving ? (
+            <div className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-950/40 border border-indigo-500/30 text-indigo-400 text-xs animate-pulse">
+              <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+              <span className="tabular-nums font-medium text-[11px]">Salvando…</span>
+            </div>
+          ) : (
+            <div
+              className={`inline-flex items-center justify-center px-2.5 py-1 rounded-lg border text-xs sm:text-sm tabular-nums font-semibold transition-colors hover:brightness-110 active:scale-95 ${availColor}`}
+            >
+              {isOverspent
+                ? `-${formatCurrency(Math.abs(available))}`
+                : available > 0.005
+                ? formatCurrency(available)
+                : <span className="text-slate-500 font-normal">R$ 0,00</span>}
+            </div>
+          )}
+        </div>
       </td>
     </tr>
   )
 }
 
-// ── Linha de grupo de Despesas ────────────────────────────────
+// ── Linha de grupo de Despesas (2 Colunas) ────────────────────
 
 function GroupRow({
   row,
@@ -459,10 +382,13 @@ function GroupRow({
 }) {
   const [open, setOpen] = useState(true)
 
+  const isOverspent = row.totalAvailable < -0.005
   const totalAvailColor =
-    row.totalAvailable > 0.005 ? 'text-emerald-400 font-bold' :
-    row.totalAvailable < -0.005 ? 'text-rose-400 font-bold' :
-    'text-slate-300 font-bold'
+    row.totalAvailable > 0.005
+      ? 'text-emerald-400 font-bold'
+      : isOverspent
+      ? 'text-rose-400 font-bold'
+      : 'text-slate-400 font-bold'
 
   return (
     <>
@@ -470,39 +396,50 @@ function GroupRow({
         className="cursor-pointer select-none bg-slate-900/90 border-t-2 border-slate-800/90 border-b border-slate-800/60 hover:bg-slate-850 active:bg-slate-800 transition-colors group/grow"
         onClick={() => setOpen(o => !o)}
       >
-        <td className="py-2.5 pl-3 sm:pl-6 pr-2 text-xs sm:text-sm font-bold text-slate-100 uppercase tracking-wide">
+        <td className="py-2.5 pl-3 sm:pl-6 pr-2">
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
             <div className="w-1 h-3.5 sm:h-4 rounded-full bg-indigo-500 flex-shrink-0" />
             <span className="text-slate-400 group-hover/grow:text-slate-200 transition-transform flex-shrink-0">
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? '' : '-rotate-90'}`} />
             </span>
-            <span className="break-words leading-tight" title={row.group.name}>{row.group.name}</span>
-            <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 bg-slate-800/80 border border-slate-700/60 rounded-full flex-shrink-0">
-              {row.categories.length}
-            </span>
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="break-words leading-tight text-xs sm:text-sm font-bold text-slate-100 uppercase tracking-wide"
+                  title={row.group.name}
+                >
+                  {row.group.name}
+                </span>
+                <span className="inline-flex items-center px-1.5 py-0.2 text-[9px] font-semibold text-slate-400 bg-slate-800/80 border border-slate-700/60 rounded-full flex-shrink-0">
+                  {row.categories.length}
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-400 font-normal truncate mt-0.5">
+                Gasto {formatCurrency(Math.abs(row.totalActivity))} de {formatCurrency(row.totalBudgeted)}
+              </span>
+            </div>
           </div>
         </td>
-        <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-bold text-slate-200 tabular-nums">
-          {row.totalBudgeted > 0 ? formatCurrency(row.totalBudgeted) : <span className="text-slate-600">—</span>}
-        </td>
-        <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-bold text-slate-200 tabular-nums">
-          {Math.abs(row.totalActivity) > 0.005 ? formatCurrency(Math.abs(row.totalActivity)) : <span className="text-slate-600">—</span>}
-        </td>
-        <td className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums ${totalAvailColor}`}>
-          {formatCurrency(Math.abs(row.totalAvailable))}
+        <td className="py-2.5 pl-2 pr-3 sm:pr-6 text-right">
+          <span className={`text-xs sm:text-sm tabular-nums ${totalAvailColor}`}>
+            {isOverspent
+              ? `-${formatCurrency(Math.abs(row.totalAvailable))}`
+              : formatCurrency(row.totalAvailable)}
+          </span>
         </td>
       </tr>
-      {open && row.categories.map(cat => (
-        <CategoryRow
-          key={cat.category.id}
-          row={cat}
-          month={month}
-          budgetRegime={budgetRegime}
-          onSelectCategory={onSelectCategory}
-          onAdjustEnvelope={onAdjustEnvelope}
-          isRowSaving={savingCategoryId === cat.category.id}
-        />
-      ))}
+      {open &&
+        row.categories.map(cat => (
+          <CategoryRow
+            key={cat.category.id}
+            row={cat}
+            month={month}
+            budgetRegime={budgetRegime}
+            onSelectCategory={onSelectCategory}
+            onAdjustEnvelope={onAdjustEnvelope}
+            isRowSaving={savingCategoryId === cat.category.id}
+          />
+        ))}
     </>
   )
 }
@@ -1088,29 +1025,21 @@ export default function BudgetPage() {
         ) : (
           <table className="w-full table-fixed">
             <colgroup>
-              <col className="w-[35%] sm:w-[37%]" />
-              <col className="w-[22%] sm:w-[21%]" />
-              <col className="w-[21.5%] sm:w-[21%]" />
-              <col className="w-[21.5%] sm:w-[21%]" />
+              <col className="w-[62%] sm:w-[65%]" />
+              <col className="w-[38%] sm:w-[35%]" />
             </colgroup>
             <tbody>
-              {/* ── Seção de Despesas (com 3 colunas) ── */}
+              {/* ── Seção de Despesas (2 Colunas) ── */}
               {rows && rows.length > 0 && (
                 <>
                   <tr className="bg-slate-900/95 text-[10px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider border-b-2 border-indigo-500/40 sticky top-0 backdrop-blur-md z-10 select-none shadow-md shadow-black/30">
-                    <th className="py-2.5 sm:py-3 pl-3 sm:pl-6 pr-1 text-left" title="Envelopes de despesas organizados por grupos">
+                    <th className="py-2.5 sm:py-3 pl-3 sm:pl-6 pr-2 text-left" title="Envelopes de despesas organizados por grupos">
                       <div className="flex items-center gap-1.5 sm:gap-2">
                         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 font-bold text-[10px] sm:text-xs tracking-wider uppercase shadow-sm">
                           <Layers className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
                           Despesas
                         </span>
                       </div>
-                    </th>
-                    <th className="py-2.5 sm:py-3 px-2 text-right text-slate-300 font-bold" title="Meta planejada para o envelope no mês">
-                      Orçado
-                    </th>
-                    <th className="py-2.5 sm:py-3 px-2 text-right text-slate-300 font-bold" title="Total já gasto no mês nesta categoria">
-                      Gasto
                     </th>
                     <th className="py-2.5 sm:py-3 pl-2 pr-3 sm:pr-6 text-right text-slate-300 font-bold" title="Saldo restante no envelope (verde = sobrou, vermelho = estourou o teto)">
                       Disponível
@@ -1141,15 +1070,15 @@ export default function BudgetPage() {
               {/* ── Espaçamento entre Seções ── */}
               {rows && rows.length > 0 && incomeRows && incomeRows.length > 0 && (
                 <tr className="h-4 bg-slate-950/60 select-none" aria-hidden="true">
-                  <td colSpan={4} />
+                  <td colSpan={2} />
                 </tr>
               )}
 
-              {/* ── Seção de Renda / Receitas ── */}
+              {/* ── Seção de Renda / Receitas (2 Colunas) ── */}
               {incomeRows && incomeRows.length > 0 && (
                 <>
                   <tr className="bg-slate-900/95 text-[10px] sm:text-xs font-bold text-emerald-300 uppercase tracking-wider border-t-2 border-emerald-500/50 border-b border-emerald-900/40 select-none shadow-md shadow-black/30">
-                    <th className="py-2.5 sm:py-3 pl-3 sm:pl-6 pr-1 text-left" title="Entradas e receitas previstas e realizadas">
+                    <th className="py-2.5 sm:py-3 pl-3 sm:pl-6 pr-2 text-left" title="Entradas e receitas previstas e realizadas">
                       <div className="flex items-center gap-1.5 sm:gap-2">
                         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold text-[10px] sm:text-xs tracking-wider uppercase shadow-sm">
                           <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
@@ -1157,9 +1086,9 @@ export default function BudgetPage() {
                         </span>
                       </div>
                     </th>
-                    <th className="py-2.5 sm:py-3 px-2 text-right text-emerald-300 font-bold">Previsto</th>
-                    <th className="py-2.5 sm:py-3 px-2 text-right text-emerald-300 font-bold">Recebido</th>
-                    <th className="py-2.5 sm:py-3 pl-2 pr-3 sm:pr-6 text-right text-emerald-300 font-bold">A Receber</th>
+                    <th className="py-2.5 sm:py-3 pl-2 pr-3 sm:pr-6 text-right text-emerald-300 font-bold" title="Diferença ou saldo a receber">
+                      A Receber
+                    </th>
                   </tr>
                   {incomeRows.map(row => (
                     <IncomeGroupRow
