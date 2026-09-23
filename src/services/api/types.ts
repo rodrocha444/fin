@@ -16,6 +16,13 @@ import type {
 
 export function toDate(val: string | null | undefined): Date | undefined {
   if (!val) return undefined
+  if (typeof val === 'string') {
+    const match = val.match(/^(\d{4})-(\d{2})-(\d{2})(?:T00:00:00(?:\.000)?Z?)?$/)
+    if (match) {
+      const [, y, m, d] = match.map(Number)
+      return new Date(y, m - 1, d, 12, 0, 0)
+    }
+  }
   const d = new Date(val)
   return isNaN(d.getTime()) ? undefined : d
 }

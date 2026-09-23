@@ -128,6 +128,18 @@ export function getInvoiceCycle(
 }
 
 /**
+ * Converte Date ou string para 'YYYY-MM-DD' de forma segura contra offsets e desvios de timezone
+ */
+export function toCalendarDateString(date: Date | string): string {
+  if (typeof date === 'string') {
+    const match = date.match(/^(\d{4}-\d{2}-\d{2})/)
+    if (match) return match[1]
+  }
+  const d = typeof date === 'string' ? new Date(date) : date
+  return format(d, 'yyyy-MM-dd')
+}
+
+/**
  * Filtra as transações de uma conta que pertencem ao ciclo da fatura
  * (ignora transferências/pagamentos entre contas para não abater indevidamente das compras da fatura seguinte)
  */
@@ -135,10 +147,13 @@ export function getInvoiceData(
   transactions: Transaction[],
   cycle: InvoiceCycle
 ): InvoiceData {
+  const startStr = toCalendarDateString(cycle.startDate)
+  const closeStr = toCalendarDateString(cycle.closingDate)
+
   const invoiceTransactions = transactions.filter(tx => {
     if (tx.type === 'transfer') return false
-    const d = new Date(tx.date)
-    return d >= cycle.startDate && d <= cycle.closingDate
+    const txDateStr = toCalendarDateString(tx.date)
+    return txDateStr >= startStr && txDateStr <= closeStr
   })
 
   // Ordenar por data contábil/efetiva decrescente (mais recente primeiro)
@@ -237,9 +252,29 @@ export function isInvoicePaid(
     return false
   }
 
+  // Faturas com valor nulo ou zerado estão quitadas
+  if (totalAmount <= 0.005) {
+    return true
+  }
+
   const cycleTag1 = `[invoice_paid:${accountId}:${cycle.monthKey}]`
   const cycleTag2 = `[invoice_paid:${cycle.monthKey}]`
   const cycleLabelLower = cycle.label.toLowerCase() // ex: 'ago 2026'
+
+  const [yearStr, monthStr] = cycle.monthKey.split('-')
+  const monthIdx = parseInt(monthStr, 10) - 1
+  const monthNames = [
+    'janeiro', 'fevereiro', 'março', 'marco', 'abril', 'maio', 'junho',
+    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'
+  ]
+  const fullMonthName = monthNames[monthIdx]
+
+  // Janela flexível de pagamento: desde 10 dias antes do fechamento até 180 dias após
+  // (reconhece pagamentos atrasados mesmo após o vencimento / após o dia de pagar)
+  const windowStart = new Date(cycle.closingDate.getTime() - 10 * 24 * 60 * 60 * 1000)
+  const windowEnd = new Date(cycle.closingDate.getTime() + 180 * 24 * 60 * 60 * 1000)
+
+  let totalPaymentsInWindow = 0
 
   for (const tx of transactions) {
     const isTargetCard = tx.accountId === accountId || tx.transferAccountId === accountId
@@ -250,25 +285,44 @@ export function isInvoicePaid(
       return true
     }
 
-    // 2. Transferência para o cartão
-    if (tx.transferAccountId === accountId && tx.type === 'transfer') {
-      const payeeLower = (tx.payee || '').toLowerCase()
-      if (payeeLower.includes(cycleLabelLower) || payeeLower.includes(cycle.monthKey)) {
+    // 2. Pagamento de cartão: transferência para o cartão ou receita registrada na conta do cartão
+    const isPayment =
+      (tx.transferAccountId === accountId && tx.type === 'transfer') ||
+      (tx.accountId === accountId && tx.type === 'income')
+    if (!isPayment) continue
+
+    const payeeLower = (tx.payee || '').toLowerCase()
+    const notesLower = (tx.notes || '').toLowerCase()
+    const combinedText = `${payeeLower} ${notesLower}`
+
+    // 2a. Menção explícita ao mês ou ciclo no favorecido/notas
+    if (
+      combinedText.includes(cycleLabelLower) ||
+      combinedText.includes(cycle.monthKey) ||
+      combinedText.includes(`${monthStr}/${yearStr}`) ||
+      combinedText.includes(`${monthStr}/${yearStr.slice(-2)}`) ||
+      (fullMonthName && combinedText.includes(fullMonthName) && (combinedText.includes(yearStr) || combinedText.includes('fatura') || combinedText.includes('cart')))
+    ) {
+      return true
+    }
+
+    // 3. Verificação por janela e valor
+    const txDate = new Date(tx.date)
+    if (txDate >= windowStart && txDate <= windowEnd) {
+      // Cobertura individual: exata ou tolerando juros/multas por atraso (até 30% + R$ 100)
+      if (
+        Math.abs(tx.amount - totalAmount) < 1.00 ||
+        (tx.amount >= totalAmount - 1.00 && tx.amount <= totalAmount * 1.30 + 100)
+      ) {
         return true
       }
-
-      // 3. Janela de pagamento: 3 dias antes do fechamento até 35 dias após
-      if (totalAmount > 0) {
-        const txDate = new Date(tx.date)
-        const windowStart = new Date(cycle.closingDate.getTime() - 3 * 24 * 60 * 60 * 1000)
-        const windowEnd = new Date(cycle.closingDate.getTime() + 35 * 24 * 60 * 60 * 1000)
-        if (txDate >= windowStart && txDate <= windowEnd) {
-          if (Math.abs(tx.amount - totalAmount) < 1.00) {
-            return true
-          }
-        }
-      }
+      totalPaymentsInWindow += tx.amount
     }
+  }
+
+  // 4. Se a soma dos pagamentos na janela cobre o total da fatura (pagamento parcelado/múltiplo)
+  if (totalPaymentsInWindow >= totalAmount - 1.00) {
+    return true
   }
 
   return false
@@ -354,22 +408,24 @@ export function getTransactionEffectiveMonth(
   tx: Transaction,
   accountMap?: Map<string, Account> | Account[]
 ): string {
-  const txDate = new Date(tx.date)
-  if (!tx.accountId || !accountMap) return format(txDate, 'yyyy-MM')
+  const dateStr = toCalendarDateString(tx.date)
+  if (!tx.accountId || !accountMap) return dateStr.substring(0, 7)
 
   const map = Array.isArray(accountMap) ? new Map(accountMap.map(a => [a.id!, a])) : accountMap
   const account = map.get(tx.accountId)
   if (!account || account.type !== 'credit_card' || !account.statementClosingDay) {
-    return format(txDate, 'yyyy-MM')
+    return dateStr.substring(0, 7)
   }
 
   // Cartão de crédito: calcular o mês da fatura com base no dia de fechamento
   const closingDay = account.statementClosingDay
   const dueDay = account.paymentDueDay
-  const txDay = txDate.getDate()
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const txDay = d
+  const refDate = new Date(y, m - 1, 1)
 
   // Se o dia da compra >= closingDay, a fatura aberta já é a do mês seguinte
-  const cycleMonthDate = txDay < closingDay ? txDate : addMonths(txDate, 1)
+  const cycleMonthDate = txDay < closingDay ? refDate : addMonths(refDate, 1)
   const cycleMonthKey = format(cycleMonthDate, 'yyyy-MM')
 
   // Obter o ciclo completo para saber a data de vencimento real da fatura

@@ -18,7 +18,7 @@ import {
   ArrowDownLeft,
   TrendingUp,
 } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, addMonths } from 'date-fns'
 import { useAccount, useAccounts, useAccountBalance } from '@/hooks/useAccounts'
 import {
   useAccountTransactions,
@@ -35,6 +35,7 @@ import {
   getInvoiceCycle,
   getInvoiceData,
   getInvoicesOverview,
+  toCalendarDateString,
   type InvoiceData,
 } from '@/utils/invoices'
 import TransactionForm from '@/components/organisms/TransactionForm'
@@ -581,15 +582,29 @@ export default function AccountDetailPage() {
                   </button>
                 </div>
               ) : (
-                filteredPurchases.map(p => (
-                  <CreditCardPurchaseItem
-                    key={p.id}
-                    purchase={p}
-                    categoryName={p.categoryId ? categoryMap.get(p.categoryId)?.name : undefined}
-                    onEdit={() => handleEditPurchase(p)}
-                    onDelete={() => handleDeletePurchase(p)}
-                  />
-                ))
+                filteredPurchases.map(p => {
+                  let invoiceLabel: string | undefined
+                  if (isCreditCard && account.statementClosingDay) {
+                    const dateStr = toCalendarDateString(p.date)
+                    const [y, m, d] = dateStr.split('-').map(Number)
+                    const refDate = new Date(y, m - 1, 1)
+                    const cycleDate = d < account.statementClosingDay ? refDate : addMonths(refDate, 1)
+                    const cycleKey = format(cycleDate, 'yyyy-MM')
+                    const cyc = getInvoiceCycle(cycleKey, account.statementClosingDay, account.paymentDueDay)
+                    invoiceLabel = `Fatura ${cyc.label}`
+                  }
+
+                  return (
+                    <CreditCardPurchaseItem
+                      key={p.id}
+                      purchase={p}
+                      categoryName={p.categoryId ? categoryMap.get(p.categoryId)?.name : undefined}
+                      invoiceLabel={invoiceLabel}
+                      onEdit={() => handleEditPurchase(p)}
+                      onDelete={() => handleDeletePurchase(p)}
+                    />
+                  )
+                })
               )
             ) : (
               // Modo Padrão: Transações normais de conta corrente/poupança do mês

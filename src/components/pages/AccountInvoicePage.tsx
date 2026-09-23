@@ -110,23 +110,28 @@ export default function AccountInvoicePage() {
     const overview = getInvoicesOverview(transactions, closingDay, dueDay, 12)
     if (!overview) return []
 
-    // Incluir também a fatura anterior fechada se tiver histórico
-    const prevMonthKey = shiftMonth(openInvoiceMonth, -1)
-    const prevCycle = getInvoiceCycle(prevMonthKey, closingDay, dueDay)
-    const prevInvoice = getInvoiceData(transactions, prevCycle)
-
-    const baseList = prevInvoice.totalAmount > 0 || prevInvoice.transactions.length > 0
-      ? [prevInvoice, ...overview.allInvoices]
-      : overview.allInvoices
-
-    // Garantir que a activeMonth atual sempre apareça na lista de abas mesmo se tiver 0 compras
-    const hasActive = baseList.some(inv => inv.cycle.monthKey === activeMonth)
-    if (!hasActive && cycle) {
-      const activeInvoice = getInvoiceData(transactions, cycle)
-      return [...baseList, activeInvoice].sort((a, b) => a.cycle.monthKey.localeCompare(b.cycle.monthKey))
+    // Incluir faturas passadas (até 6 meses anteriores) que possuam transações ou saldo
+    const map = new Map<string, InvoiceData>()
+    for (let delta = -6; delta <= -1; delta++) {
+      const pastMonthKey = shiftMonth(openInvoiceMonth, delta)
+      const pastCycle = getInvoiceCycle(pastMonthKey, closingDay, dueDay)
+      const pastInvoice = getInvoiceData(transactions, pastCycle)
+      if (pastInvoice.totalAmount > 0 || pastInvoice.transactions.length > 0) {
+        map.set(pastMonthKey, pastInvoice)
+      }
     }
 
-    return baseList
+    for (const inv of overview.allInvoices) {
+      map.set(inv.cycle.monthKey, inv)
+    }
+
+    // Garantir que a activeMonth atual sempre apareça na lista de abas mesmo se tiver 0 compras
+    if (cycle && !map.has(activeMonth)) {
+      const activeInvoice = getInvoiceData(transactions, cycle)
+      map.set(activeMonth, activeInvoice)
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.cycle.monthKey.localeCompare(b.cycle.monthKey))
   })()
 
   const isOpenCurrent = activeMonth === openInvoiceMonth

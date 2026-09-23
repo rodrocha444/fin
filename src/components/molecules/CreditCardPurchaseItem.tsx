@@ -7,6 +7,7 @@ import type { CreditCardPurchase } from '@/hooks/useTransactions'
 interface CreditCardPurchaseItemProps {
   purchase: CreditCardPurchase
   categoryName?: string
+  invoiceLabel?: string
   onEdit?: () => void
   onDelete: () => void
 }
@@ -14,6 +15,7 @@ interface CreditCardPurchaseItemProps {
 export default function CreditCardPurchaseItem({
   purchase,
   categoryName,
+  invoiceLabel,
   onEdit,
   onDelete,
 }: CreditCardPurchaseItemProps) {
@@ -31,6 +33,11 @@ export default function CreditCardPurchaseItem({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-sm font-medium text-slate-200 truncate">{purchase.payee}</p>
+          {invoiceLabel && (
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-indigo-950/80 text-indigo-300 border border-indigo-800/40">
+              {invoiceLabel}
+            </span>
+          )}
           {purchase.isInstallment && purchase.installmentCount && (
             <Badge variant="violet">
               {purchase.installmentCount}x{' '}

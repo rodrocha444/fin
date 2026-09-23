@@ -4,7 +4,7 @@ import { createId } from '@/utils/id'
 import { format, addMonths } from 'date-fns'
 import { isInitialSetupCategory, currentMonth, shiftMonth } from '@/utils/format'
 
-import { getInvoiceCycle, getInvoiceData, isInvoicePaid } from '@/utils/invoices'
+import { getInvoiceCycle, getInvoiceData, isInvoicePaid, toCalendarDateString } from '@/utils/invoices'
 import { extractPaidInvoicesMap } from '@/services/api/invoices'
 import { isDateBeforeAccountingStart, isMonthBeforeAccountingStart } from '@/utils/accountingPeriod'
 import { buildGroupPurchaseMonthMap, type AccountingRegime } from '@/utils/accountingRegime'
@@ -353,8 +353,10 @@ function getExpenseEffectiveMonth(
     // compra no dia < closingDay → fatura do próprio mês da compra
     // compra no dia >= closingDay → fatura do mês seguinte
     const closingDay = account.statementClosingDay
-    const txDay = txDate.getDate()
-    const cycleMonthDate = txDay < closingDay ? txDate : new Date(txDate.getFullYear(), txDate.getMonth() + 1, 1)
+    const dateStr = toCalendarDateString(tx.date)
+    const [y, m, d] = dateStr.split('-').map(Number)
+    const refDate = new Date(y, m - 1, 1)
+    const cycleMonthDate = d < closingDay ? refDate : addMonths(refDate, 1)
     // Mês orçamentário = mês do fechamento da fatura (não o de vencimento)
     return toMonthKey(cycleMonthDate)
   }
