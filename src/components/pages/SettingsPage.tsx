@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Plus, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronRight,
   Download, Upload, Database, CheckCircle2, Cloud, RefreshCw,
-  Copy, Check, ExternalLink, KeyRound, Server, AlertCircle,
+  Copy, Check, AlertCircle,
   CalendarRange, CalendarCheck, ShieldAlert, LogOut, User as UserIcon,
   Smartphone, SlidersHorizontal, Sparkles, BookOpen,
 } from 'lucide-react'
@@ -14,11 +14,7 @@ import {
   createCategory, updateCategory, deleteCategory, toggleCategoryVisibility,
 } from '@/services/api/categories'
 import { downloadDatabaseBackup, importDatabase, type DatabaseBackup } from '@/services/api/backup'
-import {
-  getSupabaseConfig, saveSupabaseConfig, clearSupabaseConfig,
-  testSupabaseConnection, isServiceRoleKey
-} from '@/services/supabase'
-import { SUPABASE_SCHEMA_SQL } from '@/services/supabaseSchema'
+import { getSupabaseConfig, testSupabaseConnection } from '@/services/supabase'
 import { copyToClipboard } from '@/utils/clipboard'
 import { useConfirm, useAlert } from '@/context/ConfirmContext'
 import { useAccountingPeriod } from '@/utils/accountingPeriod'
@@ -37,8 +33,7 @@ export default function SettingsPage() {
   const { isPro, subscription, openPaywall, restore, isLoading: isSubLoading } = useSubscription()
   const [isRestoringSub, setIsRestoringSub] = useState(false)
 
-  const [supabaseUrl, setSupabaseUrl] = useState(() => getSupabaseConfig()?.url || '')
-  const [supabaseKey, setSupabaseKey] = useState(() => getSupabaseConfig()?.anonKey || '')
+  const supabaseConfig = getSupabaseConfig()
   const [inputStartDate, setInputStartDate] = useState(startDate || '')
 
   useEffect(() => {
@@ -47,8 +42,6 @@ export default function SettingsPage() {
 
   const [testResult, setTestResult] = useState<{ success?: boolean; message: string } | null>(null)
   const [isTestingConnection, setIsTestingConnection] = useState(false)
-  const [showSqlGuide, setShowSqlGuide] = useState(false)
-  const [copiedSql, setCopiedSql] = useState(false)
   const [copiedTestResult, setCopiedTestResult] = useState(false)
   const [copiedBackupStatus, setCopiedBackupStatus] = useState(false)
 
@@ -97,57 +90,12 @@ export default function SettingsPage() {
     }
   }
 
-  const handleSaveSupabase = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault()
-    if (!supabaseUrl.trim() || !supabaseKey.trim()) {
-      setTestResult({ success: false, message: 'Preencha a URL e a Chave Anon.' })
-      return
-    }
-
+  const handleTestConnection = async () => {
     setIsTestingConnection(true)
     setTestResult(null)
-
-    const cleanUrl = supabaseUrl.trim().replace(/\/$/, '')
-    const cleanKey = supabaseKey.trim()
-
-    if (isServiceRoleKey(cleanKey)) {
-      setTestResult({
-        success: false,
-        message: 'Atenção de Segurança: Você forneceu a chave "service_role" (chave mestra). É estritamente proibido utilizá-la no navegador porque ela anula o isolamento RLS do banco. Utilize a chave "anon" (pública).',
-      })
-      return
-    }
-
-    const result = await testSupabaseConnection({ url: cleanUrl, anonKey: cleanKey })
+    const result = await testSupabaseConnection()
     setIsTestingConnection(false)
     setTestResult(result)
-
-    if (result.success) {
-      saveSupabaseConfig({ url: cleanUrl, anonKey: cleanKey })
-      refetch()
-    }
-  }
-
-  const handleDisconnectSupabase = async () => {
-    const ok = await confirm({
-      title: 'Desconectar Supabase?',
-      message: 'Deseja desconectar o Supabase? Os dados locais permanecerão salvos no navegador.',
-      confirmText: 'Desconectar',
-      variant: 'warning',
-    })
-    if (!ok) return
-    clearSupabaseConfig()
-    setSupabaseUrl('')
-    setSupabaseKey('')
-    setTestResult(null)
-  }
-
-  const handleCopySql = async () => {
-    const success = await copyToClipboard(SUPABASE_SCHEMA_SQL)
-    if (success) {
-      setCopiedSql(true)
-      setTimeout(() => setCopiedSql(false), 2500)
-    }
   }
 
   const handleSaveAccountingPeriod = async () => {
@@ -974,112 +922,37 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* Formulário de Configuração */}
-          <form onSubmit={handleSaveSupabase} className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="label flex items-center gap-1.5">
-                  <Server className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Project URL</span>
-                </label>
-                <input
-                  type="url"
-                  className="input-base text-xs font-mono"
-                  placeholder="https://xyzcompany.supabase.co"
-                  value={supabaseUrl}
-                  onChange={e => setSupabaseUrl(e.target.value)}
-                  autoComplete="off"
-                />
-              </div>
-
-              <div>
-                <label className="label flex items-center gap-1.5">
-                  <KeyRound className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Anon Public Key</span>
-                </label>
-                <input
-                  type="password"
-                  className="input-base text-xs font-mono"
-                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
-                  value={supabaseKey}
-                  onChange={e => setSupabaseKey(e.target.value)}
-                  autoComplete="off"
-                />
-              </div>
+          {/* Informações da Conexão */}
+          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <span className="text-slate-400">Origem da Configuração:</span>
+              <span className="font-mono text-slate-200 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                Variáveis de Ambiente (.env / GitHub Secrets)
+              </span>
             </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-              <div className="flex items-center gap-2">
-                <button
-                  type="submit"
-                  disabled={isTestingConnection}
-                  className="btn-primary py-2 px-3.5 text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-600/20"
-                >
-                  {isTestingConnection ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                  <span>{isTestingConnection ? 'Conectando…' : 'Salvar e Conectar'}</span>
-                </button>
-
-                {getSupabaseConfig() && (
-                  <button
-                    type="button"
-                    onClick={handleDisconnectSupabase}
-                    className="btn-ghost py-2 px-3 text-xs text-slate-400 hover:text-rose-400"
-                  >
-                    Desconectar
-                  </button>
-                )}
+            {supabaseConfig?.url && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <span className="text-slate-400">Endpoint do Projeto:</span>
+                <span className="font-mono text-slate-300 break-all">
+                  {supabaseConfig.url}
+                </span>
               </div>
-
+            )}
+            <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11px] text-slate-500">
+                Credenciais protegidas em tempo de build (anon key pública com RLS).
+              </span>
               <button
                 type="button"
-                onClick={() => setShowSqlGuide(!showSqlGuide)}
-                className="text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 py-1"
+                onClick={handleTestConnection}
+                disabled={isTestingConnection || !isConfigured}
+                className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 disabled:opacity-50"
               >
-                <span>{showSqlGuide ? 'Ocultar Script SQL' : 'Ver Script SQL de Criação das Tabelas'}</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showSqlGuide ? 'rotate-180' : ''}`} />
+                {isTestingConnection ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+                <span>{isTestingConnection ? 'Testando…' : 'Testar Conexão'}</span>
               </button>
             </div>
-          </form>
-
-          {/* Guia e Script SQL */}
-          {showSqlGuide && (
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3 text-xs text-slate-300">
-              <div className="flex items-center justify-between">
-                <div className="font-semibold text-slate-200 flex items-center gap-1.5">
-                  <span>Passo a Passo para Configurar o Supabase</span>
-                  <a
-                    href="https://supabase.com"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-indigo-400 hover:underline inline-flex items-center gap-0.5 text-[11px]"
-                  >
-                    supabase.com <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-                <button
-                  onClick={handleCopySql}
-                  className="btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5 text-indigo-300 hover:text-white"
-                >
-                  {copiedSql ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedSql ? 'Copiado!' : 'Copiar Script SQL'}</span>
-                </button>
-              </div>
-
-              <ol className="list-decimal list-inside space-y-1 text-slate-400 text-[11px] leading-relaxed">
-                <li>Acesse o <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">painel do Supabase</a> e crie um novo projeto gratuito.</li>
-                <li>No menu lateral esquerdo, clique em <strong>SQL Editor</strong>.</li>
-                <li>Clique em <strong>New Query</strong>, cole o script copiado acima e clique no botão verde <strong>Run</strong>.</li>
-                <li>Vá em <strong>Project Settings (ícone de engrenagem) &gt; API</strong>.</li>
-                <li>Copie a <strong>Project URL</strong> e a <strong>anon public key</strong> e cole nos campos acima.</li>
-              </ol>
-
-              <div className="relative">
-                <pre className="p-3 bg-slate-900 rounded-lg text-[11px] font-mono text-slate-300 max-h-48 overflow-y-auto border border-slate-800 select-all">
-                  {SUPABASE_SCHEMA_SQL}
-                </pre>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
 
         {/* Card Início do Período Contábil */}

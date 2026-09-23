@@ -7,8 +7,15 @@ export interface SupabaseConfig {
   anonKey: string
 }
 
-const STORAGE_KEY = 'fin_supabase_config'
-const LEGACY_STORAGE_KEY = 'finplan_supabase_config'
+// Limpeza preventiva de chaves legadas armazenadas no navegador
+if (typeof window !== 'undefined') {
+  try {
+    localStorage.removeItem('fin_supabase_config')
+    localStorage.removeItem('finplan_supabase_config')
+  } catch {
+    // Silencioso em caso de restrição de storage
+  }
+}
 
 /**
  * Verifica se uma chave JWT do Supabase possui a role "service_role".
@@ -32,29 +39,8 @@ export function isServiceRoleKey(key: string): boolean {
   return false
 }
 
-/** Retorna as credenciais configuradas (ou do .env ou do localStorage) */
+/** Retorna as credenciais configuradas a partir das variáveis de ambiente Vite */
 export function getSupabaseConfig(): SupabaseConfig | null {
-  // 1. Tenta pegar do localStorage (prioridade caso o usuário configure pela interface)
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      if (parsed.url && parsed.anonKey) {
-        if (isServiceRoleKey(parsed.anonKey)) {
-          console.error('Segurança: Chave service_role detectada no storage local e ignorada!')
-          return null
-        }
-        return {
-          url: parsed.url.trim(),
-          anonKey: parsed.anonKey.trim(),
-        }
-      }
-    }
-  } catch (e) {
-    console.error('Erro ao ler credenciais do localStorage:', e)
-  }
-
-  // 2. Fallback para variáveis de ambiente Vite (.env)
   const envUrl = import.meta.env.VITE_SUPABASE_URL
   const envAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
@@ -70,34 +56,6 @@ export function getSupabaseConfig(): SupabaseConfig | null {
   }
 
   return null
-}
-
-/** Salva as credenciais no localStorage */
-export function saveSupabaseConfig(config: SupabaseConfig): void {
-  if (isServiceRoleKey(config.anonKey)) {
-    throw new Error('Chave rejeitada por segurança: você inseriu a chave "service_role" (admin secreta). Utilize apenas a chave "anon" (pública).')
-  }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({
-    url: config.url.trim(),
-    anonKey: config.anonKey.trim(),
-  }))
-  localStorage.removeItem(LEGACY_STORAGE_KEY)
-  resetSupabaseClient()
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('fin_supabase_config_changed'))
-    window.dispatchEvent(new Event('finplan_supabase_config_changed'))
-  }
-}
-
-/** Limpa as credenciais salvas */
-export function clearSupabaseConfig(): void {
-  localStorage.removeItem(STORAGE_KEY)
-  localStorage.removeItem(LEGACY_STORAGE_KEY)
-  resetSupabaseClient()
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('fin_supabase_config_changed'))
-    window.dispatchEvent(new Event('finplan_supabase_config_changed'))
-  }
 }
 
 // Instância singleton em cache do cliente, tipado com o schema do banco
@@ -126,10 +84,6 @@ export function getSupabaseClient(): SupabaseClient<Database> | null {
   }
 }
 
-/** Reseta a instância cached */
-function resetSupabaseClient(): void {
-  cachedClient = null
-}
 
 /** Testa a conexão com o Supabase */
 export async function testSupabaseConnection(customConfig?: SupabaseConfig): Promise<{ success: boolean; message: string }> {
