@@ -1055,7 +1055,7 @@ export default function BudgetPage() {
                       <div className="flex items-center gap-1.5 sm:gap-2">
                         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold text-[10px] sm:text-xs tracking-wider uppercase shadow-sm">
                           <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-                          Receitas & Rendas
+                          Receitas
                         </span>
                       </div>
                     </th>
