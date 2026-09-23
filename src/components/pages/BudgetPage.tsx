@@ -154,7 +154,7 @@ function IncomeCategoryRow({
   const diff = Math.round((row.expected - row.received) * 100) / 100
 
   const diffColor =
-    diff <= 0.005 && (row.received > 0.005 || row.expected > 0.005)
+    diff < -0.005
       ? 'text-emerald-400 font-medium'
       : diff > 0.005
       ? 'text-amber-400/90 font-medium'
@@ -213,16 +213,14 @@ function IncomeCategoryRow({
         className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums cursor-pointer hover:bg-slate-800/50 ${diffColor}`}
         title="Clique para ver as transações desta categoria no mês"
       >
-        {row.expected === 0 && row.received === 0 ? (
+        {diff === 0 ? (
           <span className="text-slate-600">—</span>
         ) : diff > 0 ? (
           formatCurrency(diff)
-        ) : diff < 0 ? (
+        ) : (
           <span className="text-emerald-400 font-semibold" title="Superou a meta prevista!">
             {formatCurrency(Math.abs(diff))}
           </span>
-        ) : (
-          <span className="text-emerald-400 text-xs font-semibold">100%</span>
         )}
       </td>
     </tr>
@@ -268,16 +266,14 @@ function IncomeGroupRow({
           {Math.abs(row.totalReceived) > 0.005 ? formatCurrency(Math.abs(row.totalReceived)) : <span className="text-slate-600">—</span>}
         </td>
         <td className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm font-bold tabular-nums ${
-          groupDiff <= 0 ? 'text-emerald-400' : 'text-amber-400'
+          groupDiff > 0 ? 'text-amber-400' : groupDiff < 0 ? 'text-emerald-400' : 'text-slate-500'
         }`}>
-          {row.totalExpected === 0 && row.totalReceived === 0 ? (
+          {groupDiff === 0 ? (
             <span className="text-slate-600">—</span>
           ) : groupDiff > 0 ? (
             formatCurrency(groupDiff)
-          ) : groupDiff < 0 ? (
-            formatCurrency(Math.abs(groupDiff))
           ) : (
-            '100%'
+            formatCurrency(Math.abs(groupDiff))
           )}
         </td>
       </tr>
