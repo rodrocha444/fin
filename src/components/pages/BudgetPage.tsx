@@ -9,6 +9,9 @@ import {
   HelpCircle,
   Sparkles,
   SlidersHorizontal,
+  ChevronDown,
+  Layers,
+  ArrowUpRight,
 } from 'lucide-react'
 import { useBudgetRows, useIncomeBudgetRows, useBudgetSummary } from '@/hooks/useBudget'
 import { setBudget, copyFromPreviousMonth, clearMonthBudgets, coverMonthSpent } from '@/services/api/budget'
@@ -243,23 +246,29 @@ function IncomeGroupRow({
   return (
     <>
       <tr
-        className="cursor-pointer select-none bg-emerald-950/20 border-t border-emerald-900/30 hover:bg-emerald-950/30 active:bg-emerald-950/40 transition-colors"
+        className="cursor-pointer select-none bg-emerald-950/30 border-t-2 border-emerald-900/60 border-b border-emerald-900/40 hover:bg-emerald-950/45 active:bg-emerald-950/60 transition-colors group/grow"
         onClick={() => setOpen(o => !o)}
       >
-        <td className="py-2.5 pl-3 sm:pl-6 pr-2 text-xs sm:text-sm font-semibold text-emerald-400 uppercase tracking-wider">
-          <span className="flex items-center gap-1.5 min-w-0">
-            <span className="text-emerald-500 text-xs flex-shrink-0">{open ? '▾' : '▸'}</span>
+        <td className="py-2.5 pl-3 sm:pl-6 pr-2 text-xs sm:text-sm font-bold text-emerald-300 uppercase tracking-wide">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <div className="w-1 h-3.5 sm:h-4 rounded-full bg-emerald-500 flex-shrink-0" />
+            <span className="text-emerald-400 group-hover/grow:text-emerald-200 transition-transform flex-shrink-0">
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? '' : '-rotate-90'}`} />
+            </span>
             <span className="break-words leading-tight" title={row.group.name}>{row.group.name}</span>
-          </span>
+            <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400/90 bg-emerald-900/50 border border-emerald-700/50 rounded-full flex-shrink-0">
+              {row.categories.length}
+            </span>
+          </div>
         </td>
-        <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-semibold text-emerald-300/80 tabular-nums">
+        <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-bold text-emerald-300 tabular-nums">
           {row.totalExpected > 0 ? formatCurrency(row.totalExpected) : <span className="text-slate-600">—</span>}
         </td>
-        <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-semibold text-slate-300 tabular-nums">
+        <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-bold text-slate-200 tabular-nums">
           {Math.abs(row.totalReceived) > 0.005 ? formatCurrency(Math.abs(row.totalReceived)) : <span className="text-slate-600">—</span>}
         </td>
-        <td className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm font-semibold tabular-nums ${
-          groupDiff <= 0 ? 'text-emerald-400' : 'text-amber-400/90'
+        <td className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm font-bold tabular-nums ${
+          groupDiff <= 0 ? 'text-emerald-400' : 'text-amber-400'
         }`}>
           {row.totalExpected === 0 && row.totalReceived === 0 ? (
             <span className="text-slate-600">—</span>
@@ -384,27 +393,36 @@ function GroupRow({
 }) {
   const [open, setOpen] = useState(true)
 
+  const totalAvailColor =
+    row.totalAvailable > 0.005 ? 'text-emerald-400 font-bold' :
+    row.totalAvailable < -0.005 ? 'text-rose-400 font-bold' :
+    'text-slate-300 font-bold'
+
   return (
     <>
       <tr
-        className="cursor-pointer select-none bg-slate-800/40 hover:bg-slate-800/60 active:bg-slate-800/80 transition-colors"
+        className="cursor-pointer select-none bg-slate-900/90 border-t-2 border-slate-800/90 border-b border-slate-800/60 hover:bg-slate-850 active:bg-slate-800 transition-colors group/grow"
         onClick={() => setOpen(o => !o)}
       >
-        <td className="py-2.5 pl-3 sm:pl-6 pr-2 text-xs sm:text-sm font-semibold text-slate-400 uppercase tracking-wider">
-          <span className="flex items-center gap-1.5 min-w-0">
-            <span className="text-slate-500 text-xs flex-shrink-0">{open ? '▾' : '▸'}</span>
+        <td className="py-2.5 pl-3 sm:pl-6 pr-2 text-xs sm:text-sm font-bold text-slate-100 uppercase tracking-wide">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <div className="w-1 h-3.5 sm:h-4 rounded-full bg-indigo-500 flex-shrink-0" />
+            <span className="text-slate-400 group-hover/grow:text-slate-200 transition-transform flex-shrink-0">
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? '' : '-rotate-90'}`} />
+            </span>
             <span className="break-words leading-tight" title={row.group.name}>{row.group.name}</span>
-          </span>
+            <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 bg-slate-800/80 border border-slate-700/60 rounded-full flex-shrink-0">
+              {row.categories.length}
+            </span>
+          </div>
         </td>
-        <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-semibold text-slate-300 tabular-nums">
+        <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-bold text-slate-200 tabular-nums">
           {row.totalBudgeted > 0 ? formatCurrency(row.totalBudgeted) : <span className="text-slate-600">—</span>}
         </td>
-        <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-semibold text-slate-300 tabular-nums">
+        <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-bold text-slate-200 tabular-nums">
           {Math.abs(row.totalActivity) > 0.005 ? formatCurrency(Math.abs(row.totalActivity)) : <span className="text-slate-600">—</span>}
         </td>
-        <td className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm font-semibold tabular-nums ${
-          row.totalAvailable >= -0.005 ? 'text-slate-300' : 'text-rose-400'
-        }`}>
+        <td className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums ${totalAvailColor}`}>
           {formatCurrency(Math.abs(row.totalAvailable))}
         </td>
       </tr>
@@ -997,17 +1015,22 @@ export default function BudgetPage() {
               {/* ── Seção de Despesas (com 3 colunas) ── */}
               {rows && rows.length > 0 && (
                 <>
-                  <tr className="bg-slate-950/90 text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800 sticky top-0 backdrop-blur-sm z-10 select-none">
-                    <th className="py-2 pl-3 sm:pl-6 pr-1 text-left" title="Envelopes de despesas organizados por grupos">
-                      Despesas
+                  <tr className="bg-slate-900/95 text-[10px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider border-b-2 border-indigo-500/40 sticky top-0 backdrop-blur-md z-10 select-none shadow-md shadow-black/30">
+                    <th className="py-2.5 sm:py-3 pl-3 sm:pl-6 pr-1 text-left" title="Envelopes de despesas organizados por grupos">
+                      <div className="flex items-center gap-1.5 sm:gap-2">
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 font-bold text-[10px] sm:text-xs tracking-wider uppercase shadow-sm">
+                          <Layers className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+                          Despesas
+                        </span>
+                      </div>
                     </th>
-                    <th className="py-2 px-2 text-right" title="Meta planejada para o envelope no mês">
+                    <th className="py-2.5 sm:py-3 px-2 text-right text-slate-300 font-bold" title="Meta planejada para o envelope no mês">
                       Orçado
                     </th>
-                    <th className="py-2 px-2 text-right" title="Total já gasto no mês nesta categoria">
+                    <th className="py-2.5 sm:py-3 px-2 text-right text-slate-300 font-bold" title="Total já gasto no mês nesta categoria">
                       Gasto
                     </th>
-                    <th className="py-2 pl-2 pr-3 sm:pr-6 text-right" title="Saldo restante no envelope (verde = sobrou, vermelho = estourou o teto)">
+                    <th className="py-2.5 sm:py-3 pl-2 pr-3 sm:pr-6 text-right text-slate-300 font-bold" title="Saldo restante no envelope (verde = sobrou, vermelho = estourou o teto)">
                       Disponível
                     </th>
                   </tr>
@@ -1017,14 +1040,28 @@ export default function BudgetPage() {
                 </>
               )}
 
+              {/* ── Espaçamento entre Seções ── */}
+              {rows && rows.length > 0 && incomeRows && incomeRows.length > 0 && (
+                <tr className="h-4 bg-slate-950/60 select-none" aria-hidden="true">
+                  <td colSpan={4} />
+                </tr>
+              )}
+
               {/* ── Seção de Renda / Receitas ── */}
               {incomeRows && incomeRows.length > 0 && (
                 <>
-                  <tr className="bg-slate-950/90 text-[10px] sm:text-xs font-semibold text-emerald-400/90 uppercase tracking-wider border-t border-b border-emerald-900/40 select-none">
-                    <th className="py-2 pl-3 sm:pl-6 pr-1 text-left">Receitas & Rendas</th>
-                    <th className="py-2 px-2 text-right">Previsto</th>
-                    <th className="py-2 px-2 text-right">Recebido</th>
-                    <th className="py-2 pl-2 pr-3 sm:pr-6 text-right">A Receber</th>
+                  <tr className="bg-slate-900/95 text-[10px] sm:text-xs font-bold text-emerald-300 uppercase tracking-wider border-t-2 border-emerald-500/50 border-b border-emerald-900/40 select-none shadow-md shadow-black/30">
+                    <th className="py-2.5 sm:py-3 pl-3 sm:pl-6 pr-1 text-left" title="Entradas e receitas previstas e realizadas">
+                      <div className="flex items-center gap-1.5 sm:gap-2">
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold text-[10px] sm:text-xs tracking-wider uppercase shadow-sm">
+                          <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                          Receitas & Rendas
+                        </span>
+                      </div>
+                    </th>
+                    <th className="py-2.5 sm:py-3 px-2 text-right text-emerald-300 font-bold">Previsto</th>
+                    <th className="py-2.5 sm:py-3 px-2 text-right text-emerald-300 font-bold">Recebido</th>
+                    <th className="py-2.5 sm:py-3 pl-2 pr-3 sm:pr-6 text-right text-emerald-300 font-bold">A Receber</th>
                   </tr>
                   {incomeRows.map(row => (
                     <IncomeGroupRow key={row.group.id} row={row} month={month} budgetRegime={budgetRegime} onSelectCategory={setSelectedCategoryModal} />
