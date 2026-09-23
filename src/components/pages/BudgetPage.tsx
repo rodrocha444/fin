@@ -218,23 +218,18 @@ function IncomeCategoryRow({
             })
           }
         }}
-        className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums cursor-pointer hover:bg-slate-800/60 transition-colors group/incavail ${diffColor}`}
+        className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums cursor-pointer hover:bg-slate-800/60 transition-colors ${diffColor}`}
         title="Clique para adicionar valor ou ajustar a meta prevista desta receita"
       >
-        <div className="flex items-center justify-end gap-1.5">
-          {diff === 0 ? (
-            <span className="text-slate-600">—</span>
-          ) : diff > 0 ? (
-            formatCurrency(diff)
-          ) : (
-            <span className="text-emerald-400 font-semibold" title="Superou a meta prevista!">
-              {formatCurrency(Math.abs(diff))}
-            </span>
-          )}
-          <span className="opacity-0 group-hover/incavail:opacity-100 transition-opacity text-[10px] font-bold px-1 py-0.2 bg-emerald-500/20 text-emerald-300 rounded border border-emerald-500/30">
-            +
+        {diff === 0 ? (
+          <span className="text-slate-600">—</span>
+        ) : diff > 0 ? (
+          formatCurrency(diff)
+        ) : (
+          <span className="text-emerald-400 font-semibold" title="Superou a meta prevista!">
+            {formatCurrency(Math.abs(diff))}
           </span>
-        </div>
+        )}
       </td>
     </tr>
   )
@@ -380,19 +375,14 @@ function CategoryRow({
           e.stopPropagation()
           onAdjustEnvelope(row)
         }}
-        className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums cursor-pointer hover:bg-slate-800/60 transition-colors group/avail ${availColor}`}
+        className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums cursor-pointer hover:bg-slate-800/60 transition-colors ${availColor}`}
         title={
           row.available < -0.005
             ? `Atenção: faltam ${formatCurrency(Math.abs(row.available))}. Clique para cobrir rombo ou adicionar ao envelope.`
             : 'Clique para adicionar valor ou ajustar este envelope'
         }
       >
-        <div className="flex items-center justify-end gap-1.5">
-          <span>{formatCurrency(Math.abs(row.available))}</span>
-          <span className="opacity-0 group-hover/avail:opacity-100 transition-opacity text-[10px] font-bold px-1 py-0.2 bg-indigo-500/20 text-indigo-300 rounded border border-indigo-500/30">
-            +
-          </span>
-        </div>
+        {formatCurrency(Math.abs(row.available))}
       </td>
     </tr>
   )
