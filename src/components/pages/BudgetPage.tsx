@@ -338,11 +338,11 @@ function CategoryRow({
             isIncome: false,
           })
         }
-        className="py-2.5 px-2 text-right text-xs sm:text-sm text-slate-400 tabular-nums font-normal cursor-pointer hover:bg-slate-800/50"
+        className="py-2.5 px-2 text-right text-xs sm:text-sm text-slate-300 tabular-nums font-normal cursor-pointer hover:bg-slate-800/50"
         title="Clique para ver as transações desta categoria no mês"
       >
-        {row.activity > 0
-          ? <span className="text-rose-400 font-medium">{formatCurrency(row.activity)}</span>
+        {Math.abs(row.activity) > 0.005
+          ? formatCurrency(Math.abs(row.activity))
           : <span className="text-slate-600">—</span>}
       </td>
       {/* Disponível */}
@@ -399,8 +399,8 @@ function GroupRow({
         <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-semibold text-slate-300 tabular-nums">
           {row.totalBudgeted > 0 ? formatCurrency(row.totalBudgeted) : <span className="text-slate-600">—</span>}
         </td>
-        <td className="py-2.5 px-2 text-right text-xs sm:text-sm text-rose-400/80 font-semibold tabular-nums">
-          {row.totalActivity > 0 ? formatCurrency(row.totalActivity) : <span className="text-slate-600">—</span>}
+        <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-semibold text-slate-300 tabular-nums">
+          {Math.abs(row.totalActivity) > 0.005 ? formatCurrency(Math.abs(row.totalActivity)) : <span className="text-slate-600">—</span>}
         </td>
         <td className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm font-semibold tabular-nums ${
           row.totalAvailable >= -0.005 ? 'text-slate-300' : 'text-rose-400'
