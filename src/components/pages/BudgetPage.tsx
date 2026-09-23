@@ -219,7 +219,7 @@ function IncomeCategoryRow({
           formatCurrency(diff)
         ) : diff < 0 ? (
           <span className="text-emerald-400 font-semibold" title="Superou a meta prevista!">
-            +{formatCurrency(Math.abs(diff))}
+            {formatCurrency(Math.abs(diff))}
           </span>
         ) : (
           <span className="text-emerald-400 text-xs font-semibold">100%</span>
@@ -261,8 +261,8 @@ function IncomeGroupRow({
             </span>
           </div>
         </td>
-        <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-bold text-emerald-300 tabular-nums">
-          {row.totalExpected > 0 ? formatCurrency(row.totalExpected) : <span className="text-slate-600">—</span>}
+        <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-bold text-slate-200 tabular-nums">
+          {Math.abs(row.totalExpected) > 0.005 ? formatCurrency(Math.abs(row.totalExpected)) : <span className="text-slate-600">—</span>}
         </td>
         <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-bold text-slate-200 tabular-nums">
           {Math.abs(row.totalReceived) > 0.005 ? formatCurrency(Math.abs(row.totalReceived)) : <span className="text-slate-600">—</span>}
@@ -275,7 +275,7 @@ function IncomeGroupRow({
           ) : groupDiff > 0 ? (
             formatCurrency(groupDiff)
           ) : groupDiff < 0 ? (
-            `+${formatCurrency(Math.abs(groupDiff))}`
+            formatCurrency(Math.abs(groupDiff))
           ) : (
             '100%'
           )}
