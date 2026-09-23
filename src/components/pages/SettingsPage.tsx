@@ -924,12 +924,6 @@ export default function SettingsPage() {
 
           {/* Informações da Conexão */}
           <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-              <span className="text-slate-400">Origem da Configuração:</span>
-              <span className="font-mono text-slate-200 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                Variáveis de Ambiente (.env / GitHub Secrets)
-              </span>
-            </div>
             {supabaseConfig?.url && (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                 <span className="text-slate-400">Endpoint do Projeto:</span>
