@@ -146,17 +146,6 @@ export default function Layout() {
           </div>
         </main>
 
-        {/* Botão Flutuante (FAB) Mobile de Nova Transação — sem ocupar slot do menu */}
-        <button
-          type="button"
-          onClick={() => setShowQuickAddModal(true)}
-          className="lg:hidden fixed bottom-16 right-4 z-40 w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-xl shadow-indigo-950/60 border border-indigo-400/40 active:scale-95 transition-transform"
-          aria-label="Nova Transação"
-          title="Nova Transação"
-        >
-          <Plus className="w-6 h-6 stroke-[2.5]" />
-        </button>
-
         {/* ── Bottom Nav mobile original (sm/md) sem safe area bottom e com Relatórios ─────────────────── */}
         <nav className="lg:hidden flex items-center bg-slate-900 border-t border-slate-800 flex-shrink-0 print:hidden">
           {NAV.map(({ to, label, icon: Icon }) => (
