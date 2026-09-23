@@ -79,9 +79,7 @@ export default function MonthlyEvolutionCard({
     }
 
     if (viewMode === 'expense') {
-      const expenseGroups = categoryGroups.filter(
-        g => !isIncomeGroup(g) && g.name !== 'Faturas Atuais' && g.name !== 'Faturas de Cartão'
-      )
+      const expenseGroups = categoryGroups.filter(g => !isIncomeGroup(g))
       for (const group of expenseGroups) {
         if (group.isHidden) continue
         const groupCats = categories.filter(c => c.groupId === group.id && !c.isHidden)

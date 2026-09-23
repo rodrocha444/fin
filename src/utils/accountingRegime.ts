@@ -279,9 +279,7 @@ export function buildExpensePieItems(
   const catMap = new Map(categories.map(c => [c.id!, c]))
   const groupMap = new Map(categoryGroups.map(g => [g.id!, g]))
 
-  const expenseGroups = categoryGroups.filter(
-    g => g.type !== 'income' && g.name !== 'Faturas Atuais' && g.name !== 'Faturas de Cartão'
-  )
+  const expenseGroups = categoryGroups.filter(g => g.type !== 'income')
 
   // 1. Itera por grupos e categorias estruturadas
   for (const group of expenseGroups) {

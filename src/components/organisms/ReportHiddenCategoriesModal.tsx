@@ -29,9 +29,7 @@ export default function ReportHiddenCategoriesModal({
   const [activeTab, setActiveTab] = useState<'all' | 'expense' | 'income'>('all')
 
   const expenseGroups = useMemo(() => {
-    return categoryGroups.filter(
-      g => g.type !== 'income' && g.name !== 'Faturas Atuais' && g.name !== 'Faturas de Cartão'
-    )
+    return categoryGroups.filter(g => g.type !== 'income')
   }, [categoryGroups])
 
   const incomeGroups = useMemo(() => {
