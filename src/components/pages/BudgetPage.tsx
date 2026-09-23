@@ -1153,7 +1153,6 @@ export default function BudgetPage() {
           currentBudgeted={adjustEnvelopeData.budgeted}
           currentActivity={adjustEnvelopeData.activity}
           currentAvailable={adjustEnvelopeData.available}
-          toBeBudgeted={summary?.toBeBudgeted}
           budgetRegime={budgetRegime}
           isIncome={adjustEnvelopeData.isIncome}
         />
