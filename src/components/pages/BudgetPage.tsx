@@ -25,6 +25,7 @@ import BudgetRegimeSelector from '@/components/atoms/BudgetRegimeSelector'
 import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
 import PendingIssuesCard from '@/components/organisms/PendingIssuesCard'
 import CategoryTransactionsModal from '@/components/organisms/CategoryTransactionsModal'
+import AdjustEnvelopeModal from '@/components/organisms/AdjustEnvelopeModal'
 import OnboardingWizardModal from '@/components/organisms/OnboardingWizardModal'
 import Modal from '@/components/atoms/Modal'
 import type {
@@ -138,11 +139,13 @@ function IncomeCategoryRow({
   month,
   budgetRegime = 'cash',
   onSelectCategory,
+  onAdjustIncome,
 }: {
   row: IncomeCategoryBudgetRow
   month: string
   budgetRegime?: AccountingRegime
   onSelectCategory: (data: CategoryModalData) => void
+  onAdjustIncome?: (row: IncomeCategoryBudgetRow) => void
 }) {
   const handleSave = useCallback(
     async (v: number) => {
@@ -202,26 +205,36 @@ function IncomeCategoryRow({
       </td>
       {/* A Receber / Diferença */}
       <td
-        onClick={() =>
-          onSelectCategory({
-            category: row.category,
-            budgeted: row.expected,
-            activity: row.received,
-            isIncome: true,
-          })
-        }
-        className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums cursor-pointer hover:bg-slate-800/50 ${diffColor}`}
-        title="Clique para ver as transações desta categoria no mês"
+        onClick={(e) => {
+          e.stopPropagation()
+          if (onAdjustIncome) {
+            onAdjustIncome(row)
+          } else {
+            onSelectCategory({
+              category: row.category,
+              budgeted: row.expected,
+              activity: row.received,
+              isIncome: true,
+            })
+          }
+        }}
+        className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums cursor-pointer hover:bg-slate-800/60 transition-colors group/incavail ${diffColor}`}
+        title="Clique para adicionar valor ou ajustar a meta prevista desta receita"
       >
-        {diff === 0 ? (
-          <span className="text-slate-600">—</span>
-        ) : diff > 0 ? (
-          formatCurrency(diff)
-        ) : (
-          <span className="text-emerald-400 font-semibold" title="Superou a meta prevista!">
-            {formatCurrency(Math.abs(diff))}
+        <div className="flex items-center justify-end gap-1.5">
+          {diff === 0 ? (
+            <span className="text-slate-600">—</span>
+          ) : diff > 0 ? (
+            formatCurrency(diff)
+          ) : (
+            <span className="text-emerald-400 font-semibold" title="Superou a meta prevista!">
+              {formatCurrency(Math.abs(diff))}
+            </span>
+          )}
+          <span className="opacity-0 group-hover/incavail:opacity-100 transition-opacity text-[10px] font-bold px-1 py-0.2 bg-emerald-500/20 text-emerald-300 rounded border border-emerald-500/30">
+            +
           </span>
-        )}
+        </div>
       </td>
     </tr>
   )
@@ -232,11 +245,13 @@ function IncomeGroupRow({
   month,
   budgetRegime = 'cash',
   onSelectCategory,
+  onAdjustIncome,
 }: {
   row: IncomeGroupBudgetRow
   month: string
   budgetRegime?: AccountingRegime
   onSelectCategory: (data: CategoryModalData) => void
+  onAdjustIncome?: (row: IncomeCategoryBudgetRow) => void
 }) {
   const [open, setOpen] = useState(true)
   const groupDiff = Math.round((row.totalExpected - row.totalReceived) * 100) / 100
@@ -278,7 +293,14 @@ function IncomeGroupRow({
         </td>
       </tr>
       {open && row.categories.map(c => (
-        <IncomeCategoryRow key={c.category.id} row={c} month={month} budgetRegime={budgetRegime} onSelectCategory={onSelectCategory} />
+        <IncomeCategoryRow
+          key={c.category.id}
+          row={c}
+          month={month}
+          budgetRegime={budgetRegime}
+          onSelectCategory={onSelectCategory}
+          onAdjustIncome={onAdjustIncome}
+        />
       ))}
     </>
   )
@@ -291,11 +313,13 @@ function CategoryRow({
   month,
   budgetRegime = 'cash',
   onSelectCategory,
+  onAdjustEnvelope,
 }: {
   row: CategoryBudgetRow
   month: string
   budgetRegime?: AccountingRegime
   onSelectCategory: (data: CategoryModalData) => void
+  onAdjustEnvelope: (row: CategoryBudgetRow) => void
 }) {
   const handleSave = useCallback(
     async (v: number) => {
@@ -352,23 +376,23 @@ function CategoryRow({
       </td>
       {/* Disponível */}
       <td
-        onClick={() =>
-          onSelectCategory({
-            category: row.category,
-            budgeted: row.budgeted,
-            activity: row.activity,
-            available: row.available,
-            isIncome: false,
-          })
-        }
-        className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums cursor-pointer hover:bg-slate-800/50 ${availColor}`}
+        onClick={(e) => {
+          e.stopPropagation()
+          onAdjustEnvelope(row)
+        }}
+        className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums cursor-pointer hover:bg-slate-800/60 transition-colors group/avail ${availColor}`}
         title={
           row.available < -0.005
-            ? `Atenção: faltam ${formatCurrency(Math.abs(row.available))} para cobrir os gastos desta categoria`
-            : 'Clique para ver as transações desta categoria no mês'
+            ? `Atenção: faltam ${formatCurrency(Math.abs(row.available))}. Clique para cobrir rombo ou adicionar ao envelope.`
+            : 'Clique para adicionar valor ou ajustar este envelope'
         }
       >
-        {formatCurrency(Math.abs(row.available))}
+        <div className="flex items-center justify-end gap-1.5">
+          <span>{formatCurrency(Math.abs(row.available))}</span>
+          <span className="opacity-0 group-hover/avail:opacity-100 transition-opacity text-[10px] font-bold px-1 py-0.2 bg-indigo-500/20 text-indigo-300 rounded border border-indigo-500/30">
+            +
+          </span>
+        </div>
       </td>
     </tr>
   )
@@ -381,11 +405,13 @@ function GroupRow({
   month,
   budgetRegime = 'cash',
   onSelectCategory,
+  onAdjustEnvelope,
 }: {
   row: GroupBudgetRow
   month: string
   budgetRegime?: AccountingRegime
   onSelectCategory: (data: CategoryModalData) => void
+  onAdjustEnvelope: (row: CategoryBudgetRow) => void
 }) {
   const [open, setOpen] = useState(true)
 
@@ -423,7 +449,14 @@ function GroupRow({
         </td>
       </tr>
       {open && row.categories.map(cat => (
-        <CategoryRow key={cat.category.id} row={cat} month={month} budgetRegime={budgetRegime} onSelectCategory={onSelectCategory} />
+        <CategoryRow
+          key={cat.category.id}
+          row={cat}
+          month={month}
+          budgetRegime={budgetRegime}
+          onSelectCategory={onSelectCategory}
+          onAdjustEnvelope={onAdjustEnvelope}
+        />
       ))}
     </>
   )
@@ -436,6 +469,13 @@ export default function BudgetPage() {
   const [budgetRegime, setBudgetRegime] = useState<AccountingRegime>(getSavedBudgetRegime)
   const [showMenu, setShowMenu] = useState(false)
   const [selectedCategoryModal, setSelectedCategoryModal] = useState<CategoryModalData | null>(null)
+  const [adjustEnvelopeData, setAdjustEnvelopeData] = useState<{
+    category: Category
+    budgeted: number
+    activity: number
+    available: number
+    isIncome?: boolean
+  } | null>(null)
   const [showHelpModal, setShowHelpModal] = useState(false)
   const [showOnboardingModal, setShowOnboardingModal] = useState(false)
   const [showAdvancedMode, setShowAdvancedMode] = useState<boolean>(() => {
@@ -1031,7 +1071,22 @@ export default function BudgetPage() {
                     </th>
                   </tr>
                   {rows.map(row => (
-                    <GroupRow key={row.group.id} row={row} month={month} budgetRegime={budgetRegime} onSelectCategory={setSelectedCategoryModal} />
+                    <GroupRow
+                      key={row.group.id}
+                      row={row}
+                      month={month}
+                      budgetRegime={budgetRegime}
+                      onSelectCategory={setSelectedCategoryModal}
+                      onAdjustEnvelope={cat =>
+                        setAdjustEnvelopeData({
+                          category: cat.category,
+                          budgeted: cat.budgeted,
+                          activity: cat.activity,
+                          available: cat.available,
+                          isIncome: false,
+                        })
+                      }
+                    />
                   ))}
                 </>
               )}
@@ -1060,7 +1115,22 @@ export default function BudgetPage() {
                     <th className="py-2.5 sm:py-3 pl-2 pr-3 sm:pr-6 text-right text-emerald-300 font-bold">A Receber</th>
                   </tr>
                   {incomeRows.map(row => (
-                    <IncomeGroupRow key={row.group.id} row={row} month={month} budgetRegime={budgetRegime} onSelectCategory={setSelectedCategoryModal} />
+                    <IncomeGroupRow
+                      key={row.group.id}
+                      row={row}
+                      month={month}
+                      budgetRegime={budgetRegime}
+                      onSelectCategory={setSelectedCategoryModal}
+                      onAdjustIncome={cat =>
+                        setAdjustEnvelopeData({
+                          category: cat.category,
+                          budgeted: cat.expected,
+                          activity: cat.received,
+                          available: Math.round((cat.expected - cat.received) * 100) / 100,
+                          isIncome: true,
+                        })
+                      }
+                    />
                   ))}
                 </>
               )}
@@ -1080,6 +1150,33 @@ export default function BudgetPage() {
           isIncome={selectedCategoryModal.isIncome}
           regime={budgetRegime}
           onClose={() => setSelectedCategoryModal(null)}
+        />
+      )}
+
+      {/* Modal para Adicionar Valor ou Ajustar Envelope */}
+      {adjustEnvelopeData && (
+        <AdjustEnvelopeModal
+          isOpen={Boolean(adjustEnvelopeData)}
+          onClose={() => setAdjustEnvelopeData(null)}
+          category={adjustEnvelopeData.category}
+          month={month}
+          currentBudgeted={adjustEnvelopeData.budgeted}
+          currentActivity={adjustEnvelopeData.activity}
+          currentAvailable={adjustEnvelopeData.available}
+          toBeBudgeted={summary?.toBeBudgeted}
+          budgetRegime={budgetRegime}
+          isIncome={adjustEnvelopeData.isIncome}
+          onOpenTransactions={() => {
+            const currentData = adjustEnvelopeData
+            setAdjustEnvelopeData(null)
+            setSelectedCategoryModal({
+              category: currentData.category,
+              budgeted: currentData.budgeted,
+              activity: currentData.activity,
+              available: currentData.available,
+              isIncome: currentData.isIncome,
+            })
+          }}
         />
       )}
 
