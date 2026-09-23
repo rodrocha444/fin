@@ -190,11 +190,11 @@ function IncomeCategoryRow({
             isIncome: true,
           })
         }
-        className="py-2.5 px-2 text-right text-xs sm:text-sm text-emerald-400 font-medium tabular-nums cursor-pointer hover:bg-slate-800/50"
+        className="py-2.5 px-2 text-right text-xs sm:text-sm text-slate-300 tabular-nums font-normal cursor-pointer hover:bg-slate-800/50"
         title="Clique para ver as transações desta categoria no mês"
       >
-        {row.received > 0
-          ? `+${formatCurrency(row.received)}`
+        {Math.abs(row.received) > 0.005
+          ? formatCurrency(Math.abs(row.received))
           : <span className="text-slate-600">—</span>}
       </td>
       {/* A Receber / Diferença */}
@@ -255,8 +255,8 @@ function IncomeGroupRow({
         <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-semibold text-emerald-300/80 tabular-nums">
           {row.totalExpected > 0 ? formatCurrency(row.totalExpected) : <span className="text-slate-600">—</span>}
         </td>
-        <td className="py-2.5 px-2 text-right text-xs sm:text-sm text-emerald-400 font-semibold tabular-nums">
-          {row.totalReceived > 0 ? `+${formatCurrency(row.totalReceived)}` : <span className="text-slate-600">—</span>}
+        <td className="py-2.5 px-2 text-right text-xs sm:text-sm font-semibold text-slate-300 tabular-nums">
+          {Math.abs(row.totalReceived) > 0.005 ? formatCurrency(Math.abs(row.totalReceived)) : <span className="text-slate-600">—</span>}
         </td>
         <td className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm font-semibold tabular-nums ${
           groupDiff <= 0 ? 'text-emerald-400' : 'text-amber-400/90'
