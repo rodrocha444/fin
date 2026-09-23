@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Plus, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronRight,
-  Download, Upload, Database, CheckCircle2, Cloud, RefreshCw,
+  Download, Upload, Database, CheckCircle2, RefreshCw,
   Copy, Check, AlertCircle,
   CalendarRange, CalendarCheck, ShieldAlert, LogOut, User as UserIcon,
   Smartphone, SlidersHorizontal, Sparkles, BookOpen,
@@ -14,7 +14,6 @@ import {
   createCategory, updateCategory, deleteCategory, toggleCategoryVisibility,
 } from '@/services/api/categories'
 import { downloadDatabaseBackup, importDatabase, type DatabaseBackup } from '@/services/api/backup'
-import { getSupabaseConfig, testSupabaseConnection } from '@/services/supabase'
 import { copyToClipboard } from '@/utils/clipboard'
 import { useConfirm, useAlert } from '@/context/ConfirmContext'
 import { useAccountingPeriod } from '@/utils/accountingPeriod'
@@ -28,21 +27,17 @@ import { useSubscription } from '@/context/SubscriptionContext'
 import ProBadge from '@/components/atoms/ProBadge'
 
 export default function SettingsPage() {
-  const { categoryGroups: groups, categories, isLoading: isSyncing, refetch, isConfigured } = useFinancialData()
+  const { categoryGroups: groups, categories, refetch } = useFinancialData()
   const { startDate, setStartDate: updateAccountingStartDate } = useAccountingPeriod()
   const { isPro, subscription, openPaywall, restore, isLoading: isSubLoading } = useSubscription()
   const [isRestoringSub, setIsRestoringSub] = useState(false)
 
-  const supabaseConfig = getSupabaseConfig()
   const [inputStartDate, setInputStartDate] = useState(startDate || '')
 
   useEffect(() => {
     setInputStartDate(startDate || '')
   }, [startDate])
 
-  const [testResult, setTestResult] = useState<{ success?: boolean; message: string } | null>(null)
-  const [isTestingConnection, setIsTestingConnection] = useState(false)
-  const [copiedTestResult, setCopiedTestResult] = useState(false)
   const [copiedBackupStatus, setCopiedBackupStatus] = useState(false)
 
   type SettingsTab = 'account' | 'categories' | 'system'
@@ -88,14 +83,6 @@ export default function SettingsPage() {
       await signOut()
       navigate('/login', { replace: true })
     }
-  }
-
-  const handleTestConnection = async () => {
-    setIsTestingConnection(true)
-    setTestResult(null)
-    const result = await testSupabaseConnection()
-    setIsTestingConnection(false)
-    setTestResult(result)
   }
 
   const handleSaveAccountingPeriod = async () => {
@@ -314,7 +301,7 @@ export default function SettingsPage() {
             <p className="text-xs text-slate-500">
               {settingsTab === 'account' && 'Sua conta, plano Pro e preferências'}
               {settingsTab === 'categories' && 'Grupos e categorias de receitas e despesas'}
-              {settingsTab === 'system' && 'Sincronização, período contábil e dados'}
+              {settingsTab === 'system' && 'Período contábil e gerenciamento de dados'}
             </p>
           </div>
           <button
@@ -363,7 +350,7 @@ export default function SettingsPage() {
             }`}
           >
             <Database className="w-3.5 h-3.5" />
-            <span>Dados & Nuvem</span>
+            <span>Dados & Sistema</span>
           </button>
         </div>
       </div>
@@ -851,104 +838,9 @@ export default function SettingsPage() {
       </div>
     )}
 
-    {/* ── ABA 3: DADOS & NUVEM ───────────────────────────── */}
+    {/* ── ABA 3: DADOS & SISTEMA ─────────────────────────── */}
     {settingsTab === 'system' && (
       <div className="space-y-4 animate-in fade-in duration-150">
-        {/* ── Card Sincronização em Nuvem (Supabase) ─────────── */}
-        <div className="card p-5 space-y-4 bg-slate-900 border border-slate-800">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                <Cloud className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-sm font-semibold text-slate-200">Banco de Dados em Nuvem (Supabase)</h2>
-                <p className="text-xs text-slate-500">Conexão direta e sincronização em tempo real via PostgreSQL</p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
-                isConfigured
-                  ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/60'
-                  : 'bg-amber-950/40 text-amber-300 border-amber-800/60'
-              }`}>
-                <span className={`w-2 h-2 rounded-full ${isConfigured ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-                {isConfigured ? 'Conectado em Nuvem' : 'Não Configurado'}
-              </span>
-
-              {isConfigured && (
-                <button
-                  onClick={() => refetch()}
-                  disabled={isSyncing}
-                  className="btn-secondary py-1.5 px-2.5 text-xs flex items-center gap-1.5 hover:text-sky-300"
-                  title="Recarregar todos os dados do Supabase"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-sky-400' : ''}`} />
-                  <span>{isSyncing ? 'Atualizando…' : 'Recarregar'}</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Feedback de Teste / Erro */}
-          {testResult && (
-            <div className={`p-3 rounded-xl text-xs flex items-start justify-between gap-2 ${
-              testResult.success
-                ? 'bg-emerald-950/40 border border-emerald-800/60 text-emerald-300'
-                : 'bg-rose-950/40 border border-rose-800/60 text-rose-300'
-            }`}>
-              <div className="flex items-start gap-2 min-w-0 flex-1">
-                {testResult.success ? <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />}
-                <span className="break-words">{testResult.message}</span>
-              </div>
-              {!testResult.success && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const success = await copyToClipboard(testResult.message)
-                    if (success) {
-                      setCopiedTestResult(true)
-                      setTimeout(() => setCopiedTestResult(false), 2000)
-                    }
-                  }}
-                  className="p-1.5 px-2.5 rounded-xl bg-rose-900/40 hover:bg-rose-900/60 border border-rose-700/50 text-rose-200 text-[11px] font-medium flex items-center gap-1.5 flex-shrink-0 transition-colors active:scale-95 touch-manipulation"
-                  title="Copiar erro para a área de transferência"
-                >
-                  {copiedTestResult ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedTestResult ? 'Copiado!' : 'Copiar erro'}</span>
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Informações da Conexão */}
-          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-3">
-            {supabaseConfig?.url && (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                <span className="text-slate-400">Endpoint do Projeto:</span>
-                <span className="font-mono text-slate-300 break-all">
-                  {supabaseConfig.url}
-                </span>
-              </div>
-            )}
-            <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
-              <span className="text-[11px] text-slate-500">
-                Credenciais protegidas em tempo de build (anon key pública com RLS).
-              </span>
-              <button
-                type="button"
-                onClick={handleTestConnection}
-                disabled={isTestingConnection || !isConfigured}
-                className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 disabled:opacity-50"
-              >
-                {isTestingConnection ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
-                <span>{isTestingConnection ? 'Testando…' : 'Testar Conexão'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
         {/* Card Início do Período Contábil */}
         <div className="card p-5 space-y-4 bg-slate-900 border border-slate-800">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
