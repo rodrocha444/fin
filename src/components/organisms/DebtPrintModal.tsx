@@ -145,8 +145,11 @@ export default function DebtPrintModal({
     )
   }, [groupedEntries])
 
-  const hasReceivable = receivable > 0.005
-  const hasPayable = payable > 0.005
+  // Ótica do destinatário (responsável pela conta):
+  // O que é 'receivable' no Fin = dinheiro a receber de 'account', logo é 'A Pagar' pelo destinatário.
+  // O que é 'payable' no Fin = dinheiro a pagar a 'account', logo é 'A Receber' pelo destinatário.
+  const hasToPay = receivable > 0.005
+  const hasToReceive = payable > 0.005
 
   const pendingTotal = detailedPendingItems.reduce((acc, item) => acc + item.amount, 0)
   const settledTotal = detailedSettledItems.reduce((acc, item) => acc + item.amount, 0)
@@ -247,21 +250,21 @@ export default function DebtPrintModal({
           </div>
         </div>
 
-        {/* Resumo financeiro discreto mas colorido */}
+        {/* Resumo financeiro discreto na ótica do destinatário */}
         <div className="flex flex-wrap items-center justify-between gap-2.5 py-2.5 px-3.5 rounded-lg bg-slate-950/60 print:bg-slate-50 border border-slate-800/80 print:border-slate-200 text-xs print-avoid-break">
           <div className="flex items-center gap-5 flex-wrap">
-            {hasReceivable && (
+            {hasToPay && (
               <span className="text-slate-400 print:text-slate-600">
-                A Receber:{' '}
-                <strong className="text-emerald-400 print:text-emerald-700 font-bold tabular-nums">
+                A Pagar:{' '}
+                <strong className="text-rose-400 print:text-rose-700 font-bold tabular-nums">
                   {formatCurrency(receivable)}
                 </strong>
               </span>
             )}
-            {hasPayable && (
+            {hasToReceive && (
               <span className="text-slate-400 print:text-slate-600">
-                A Pagar:{' '}
-                <strong className="text-rose-400 print:text-rose-700 font-bold tabular-nums">
+                A Receber:{' '}
+                <strong className="text-emerald-400 print:text-emerald-700 font-bold tabular-nums">
                   {formatCurrency(payable)}
                 </strong>
               </span>
@@ -273,16 +276,16 @@ export default function DebtPrintModal({
               <strong
                 className={`font-bold tabular-nums ${
                   balance > 0.005
-                    ? 'text-emerald-400 print:text-emerald-700'
-                    : balance < -0.005
                     ? 'text-rose-400 print:text-rose-700'
+                    : balance < -0.005
+                    ? 'text-emerald-400 print:text-emerald-700'
                     : 'text-slate-200 print:text-slate-800'
                 }`}
               >
                 {balance > 0.005
-                  ? `${formatCurrency(balance)} a receber`
+                  ? `${formatCurrency(balance)} a pagar`
                   : balance < -0.005
-                  ? `${formatCurrency(Math.abs(balance))} a pagar`
+                  ? `${formatCurrency(Math.abs(balance))} a receber`
                   : 'Quitado'}
               </strong>
             </span>
@@ -339,18 +342,18 @@ export default function DebtPrintModal({
                             <span
                               className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
                                 item.type === 'receivable'
-                                  ? 'bg-emerald-950/60 print:bg-emerald-50 text-emerald-300 print:text-emerald-800 border-emerald-800/40 print:border-emerald-300'
-                                  : 'bg-rose-950/60 print:bg-rose-50 text-rose-300 print:text-rose-800 border-rose-800/40 print:border-rose-300'
+                                  ? 'bg-rose-950/60 print:bg-rose-50 text-rose-300 print:text-rose-800 border-rose-800/40 print:border-rose-300'
+                                  : 'bg-emerald-950/60 print:bg-emerald-50 text-emerald-300 print:text-emerald-800 border-emerald-800/40 print:border-emerald-300'
                               }`}
                             >
-                              {item.type === 'receivable' ? 'A Receber' : 'A Pagar'}
+                              {item.type === 'receivable' ? 'A Pagar' : 'A Receber'}
                             </span>
                           </td>
                           <td
                             className={`py-2 px-3 print:py-1.5 print:px-2.5 text-right font-bold tabular-nums whitespace-nowrap ${
                               item.type === 'receivable'
-                                ? 'text-emerald-400 print:text-emerald-700'
-                                : 'text-rose-400 print:text-rose-700'
+                                ? 'text-rose-400 print:text-rose-700'
+                                : 'text-emerald-400 print:text-emerald-700'
                             }`}
                           >
                             {formatCurrency(item.amount)}
@@ -386,18 +389,18 @@ export default function DebtPrintModal({
                                 <span
                                   className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
                                     item.type === 'receivable'
-                                      ? 'bg-emerald-950/60 print:bg-emerald-50 text-emerald-300 print:text-emerald-800 border-emerald-800/40 print:border-emerald-300'
-                                      : 'bg-rose-950/60 print:bg-rose-50 text-rose-300 print:text-rose-800 border-rose-800/40 print:border-rose-300'
+                                      ? 'bg-rose-950/60 print:bg-rose-50 text-rose-300 print:text-rose-800 border-rose-800/40 print:border-rose-300'
+                                      : 'bg-emerald-950/60 print:bg-emerald-50 text-emerald-300 print:text-emerald-800 border-emerald-800/40 print:border-emerald-300'
                                   }`}
                                 >
-                                  {item.type === 'receivable' ? 'A Receber' : 'A Pagar'}
+                                  {item.type === 'receivable' ? 'A Pagar' : 'A Receber'}
                                 </span>
                               </td>
                               <td
                                 className={`py-2 px-3 print:py-1.5 print:px-2.5 text-right font-bold tabular-nums whitespace-nowrap ${
                                   item.type === 'receivable'
-                                    ? 'text-emerald-400 print:text-emerald-700'
-                                    : 'text-rose-400 print:text-rose-700'
+                                    ? 'text-rose-400 print:text-rose-700'
+                                    : 'text-emerald-400 print:text-emerald-700'
                                 }`}
                               >
                                 {formatCurrency(item.amount)}
@@ -431,18 +434,18 @@ export default function DebtPrintModal({
                               <span
                                 className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
                                   entry.type === 'receivable'
-                                    ? 'bg-emerald-950/60 print:bg-emerald-50 text-emerald-300 print:text-emerald-800 border-emerald-800/40 print:border-emerald-300'
-                                    : 'bg-rose-950/60 print:bg-rose-50 text-rose-300 print:text-rose-800 border-rose-800/40 print:border-rose-300'
+                                    ? 'bg-rose-950/60 print:bg-rose-50 text-rose-300 print:text-rose-800 border-rose-800/40 print:border-rose-300'
+                                    : 'bg-emerald-950/60 print:bg-emerald-50 text-emerald-300 print:text-emerald-800 border-emerald-800/40 print:border-emerald-300'
                                 }`}
                               >
-                                {entry.type === 'receivable' ? 'A Receber' : 'A Pagar'}
+                                {entry.type === 'receivable' ? 'A Pagar' : 'A Receber'}
                               </span>
                             </td>
                             <td
                               className={`py-2 px-3 print:py-1.5 print:px-2.5 text-right font-bold tabular-nums whitespace-nowrap ${
                                 entry.type === 'receivable'
-                                  ? 'text-emerald-400 print:text-emerald-700'
-                                  : 'text-rose-400 print:text-rose-700'
+                                  ? 'text-rose-400 print:text-rose-700'
+                                  : 'text-emerald-400 print:text-emerald-700'
                               }`}
                             >
                               {formatCurrency(entry.pendingAmount)}
@@ -503,11 +506,11 @@ export default function DebtPrintModal({
                             <span
                               className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
                                 item.type === 'receivable'
-                                  ? 'bg-emerald-950/40 print:bg-emerald-50/70 text-emerald-400 print:text-emerald-800 border-emerald-800/30 print:border-emerald-200'
-                                  : 'bg-rose-950/40 print:bg-rose-50/70 text-rose-400 print:text-rose-800 border-rose-800/30 print:border-rose-200'
+                                  ? 'bg-rose-950/40 print:bg-rose-50/70 text-rose-400 print:text-rose-800 border-rose-800/30 print:border-rose-200'
+                                  : 'bg-emerald-950/40 print:bg-emerald-50/70 text-emerald-400 print:text-emerald-800 border-emerald-800/30 print:border-emerald-200'
                               }`}
                             >
-                              {item.type === 'receivable' ? 'Recebido' : 'Pago'}
+                              {item.type === 'receivable' ? 'Pago' : 'Recebido'}
                             </span>
                           </td>
                           <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-right font-medium text-slate-400 print:text-slate-600 tabular-nums whitespace-nowrap">
@@ -535,15 +538,15 @@ export default function DebtPrintModal({
                                 <span
                                   className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
                                     item.type === 'receivable'
-                                      ? 'bg-emerald-950/40 print:bg-emerald-50/70 text-emerald-400 print:text-emerald-800 border-emerald-800/30 print:border-emerald-200'
-                                      : 'bg-rose-950/40 print:bg-rose-50/70 text-rose-400 print:text-rose-800 border-rose-800/30 print:border-rose-200'
+                                      ? 'bg-rose-950/40 print:bg-rose-50/70 text-rose-400 print:text-rose-800 border-rose-800/30 print:border-rose-200'
+                                      : 'bg-emerald-950/40 print:bg-emerald-50/70 text-emerald-400 print:text-emerald-800 border-emerald-800/30 print:border-emerald-200'
                                   }`}
                                 >
-                                  {item.type === 'receivable' ? 'Recebido' : 'Pago'}
+                                  {item.type === 'receivable' ? 'Pago' : 'Recebido'}
                                 </span>
                               </td>
                               <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-right font-medium text-slate-400 print:text-slate-600 tabular-nums whitespace-nowrap">
-                                {formatCurrency(entry.item.amount)}
+                                {formatCurrency(item.amount)}
                               </td>
                             </tr>
                           )
@@ -572,11 +575,11 @@ export default function DebtPrintModal({
                               <span
                                 className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
                                   entry.type === 'receivable'
-                                    ? 'bg-emerald-950/40 print:bg-emerald-50/70 text-emerald-400 print:text-emerald-800 border-emerald-800/30 print:border-emerald-200'
-                                    : 'bg-rose-950/40 print:bg-rose-50/70 text-rose-400 print:text-rose-800 border-rose-800/30 print:border-rose-200'
+                                    ? 'bg-rose-950/40 print:bg-rose-50/70 text-rose-400 print:text-rose-800 border-rose-800/30 print:border-rose-200'
+                                    : 'bg-emerald-950/40 print:bg-emerald-50/70 text-emerald-400 print:text-emerald-800 border-emerald-800/30 print:border-emerald-200'
                                 }`}
                               >
-                                {entry.type === 'receivable' ? 'Recebido' : 'Pago'}
+                                {entry.type === 'receivable' ? 'Pago' : 'Recebido'}
                               </span>
                             </td>
                             <td className="py-2 px-3 print:py-1.5 print:px-2.5 text-right font-medium text-slate-400 print:text-slate-600 tabular-nums whitespace-nowrap">
