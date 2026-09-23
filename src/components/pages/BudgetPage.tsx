@@ -140,20 +140,32 @@ function IncomeCategoryRow({
   budgetRegime = 'cash',
   onSelectCategory,
   onAdjustIncome,
+  isRowSaving = false,
 }: {
   row: IncomeCategoryBudgetRow
   month: string
   budgetRegime?: AccountingRegime
   onSelectCategory: (data: CategoryModalData) => void
   onAdjustIncome?: (row: IncomeCategoryBudgetRow) => void
+  isRowSaving?: boolean
 }) {
+  const [isCellSaving, setIsCellSaving] = useState(false)
+
   const handleSave = useCallback(
     async (v: number) => {
-      if (row.category.id !== undefined) await setBudget(month, row.category.id, v, true, budgetRegime)
+      if (row.category.id !== undefined) {
+        try {
+          setIsCellSaving(true)
+          await setBudget(month, row.category.id, v, true, budgetRegime)
+        } finally {
+          setIsCellSaving(false)
+        }
+      }
     },
     [month, row.category.id, budgetRegime]
   )
 
+  const isLoading = isRowSaving || isCellSaving
   const diff = Math.round((row.expected - row.received) * 100) / 100
 
   const diffColor =
@@ -206,6 +218,7 @@ function IncomeCategoryRow({
       {/* A Receber / Diferença */}
       <td
         onClick={(e) => {
+          if (isLoading) return
           e.stopPropagation()
           if (onAdjustIncome) {
             onAdjustIncome(row)
@@ -219,9 +232,20 @@ function IncomeCategoryRow({
           }
         }}
         className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums cursor-pointer hover:bg-slate-800/60 transition-colors ${diffColor}`}
-        title="Clique para adicionar valor ou ajustar a meta prevista desta receita"
+        title={
+          isLoading
+            ? 'Salvando meta…'
+            : 'Clique para definir a meta prevista desta receita'
+        }
       >
-        {diff === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-end text-xs sm:text-sm text-emerald-400 gap-1.5 animate-pulse">
+            <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0 text-emerald-400" />
+            <span className="tabular-nums font-medium">
+              {diff === 0 ? <span className="text-slate-600">—</span> : formatCurrency(Math.abs(diff))}
+            </span>
+          </div>
+        ) : diff === 0 ? (
           <span className="text-slate-600">—</span>
         ) : diff > 0 ? (
           formatCurrency(diff)
@@ -241,12 +265,14 @@ function IncomeGroupRow({
   budgetRegime = 'cash',
   onSelectCategory,
   onAdjustIncome,
+  savingCategoryId,
 }: {
   row: IncomeGroupBudgetRow
   month: string
   budgetRegime?: AccountingRegime
   onSelectCategory: (data: CategoryModalData) => void
   onAdjustIncome?: (row: IncomeCategoryBudgetRow) => void
+  savingCategoryId?: string | null
 }) {
   const [open, setOpen] = useState(true)
   const groupDiff = Math.round((row.totalExpected - row.totalReceived) * 100) / 100
@@ -295,6 +321,7 @@ function IncomeGroupRow({
           budgetRegime={budgetRegime}
           onSelectCategory={onSelectCategory}
           onAdjustIncome={onAdjustIncome}
+          isRowSaving={savingCategoryId === c.category.id}
         />
       ))}
     </>
@@ -309,19 +336,32 @@ function CategoryRow({
   budgetRegime = 'cash',
   onSelectCategory,
   onAdjustEnvelope,
+  isRowSaving = false,
 }: {
   row: CategoryBudgetRow
   month: string
   budgetRegime?: AccountingRegime
   onSelectCategory: (data: CategoryModalData) => void
   onAdjustEnvelope: (row: CategoryBudgetRow) => void
+  isRowSaving?: boolean
 }) {
+  const [isCellSaving, setIsCellSaving] = useState(false)
+
   const handleSave = useCallback(
     async (v: number) => {
-      if (row.category.id !== undefined) await setBudget(month, row.category.id, v, true, budgetRegime)
+      if (row.category.id !== undefined) {
+        try {
+          setIsCellSaving(true)
+          await setBudget(month, row.category.id, v, true, budgetRegime)
+        } finally {
+          setIsCellSaving(false)
+        }
+      }
     },
     [month, row.category.id, budgetRegime]
   )
+
+  const isLoading = isRowSaving || isCellSaving
 
   const availColor =
     row.available > 0.005 ? 'text-emerald-400 font-medium' :
@@ -372,17 +412,29 @@ function CategoryRow({
       {/* Disponível */}
       <td
         onClick={(e) => {
+          if (isLoading) return
           e.stopPropagation()
           onAdjustEnvelope(row)
         }}
         className={`py-2.5 pl-2 pr-3 sm:pr-6 text-right text-xs sm:text-sm tabular-nums cursor-pointer hover:bg-slate-800/60 transition-colors ${availColor}`}
         title={
-          row.available < -0.005
+          isLoading
+            ? 'Salvando envelope…'
+            : row.available < -0.005
             ? `Atenção: faltam ${formatCurrency(Math.abs(row.available))}. Clique para cobrir rombo ou adicionar ao envelope.`
-            : 'Clique para adicionar valor ou ajustar este envelope'
+            : 'Clique para definir o saldo disponível deste envelope'
         }
       >
-        {formatCurrency(Math.abs(row.available))}
+        {isLoading ? (
+          <div className="flex items-center justify-end text-xs sm:text-sm text-indigo-400 gap-1.5 animate-pulse">
+            <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0 text-indigo-400" />
+            <span className="tabular-nums font-medium">
+              {formatCurrency(Math.abs(row.available))}
+            </span>
+          </div>
+        ) : (
+          formatCurrency(Math.abs(row.available))
+        )}
       </td>
     </tr>
   )
@@ -396,12 +448,14 @@ function GroupRow({
   budgetRegime = 'cash',
   onSelectCategory,
   onAdjustEnvelope,
+  savingCategoryId,
 }: {
   row: GroupBudgetRow
   month: string
   budgetRegime?: AccountingRegime
   onSelectCategory: (data: CategoryModalData) => void
   onAdjustEnvelope: (row: CategoryBudgetRow) => void
+  savingCategoryId?: string | null
 }) {
   const [open, setOpen] = useState(true)
 
@@ -446,6 +500,7 @@ function GroupRow({
           budgetRegime={budgetRegime}
           onSelectCategory={onSelectCategory}
           onAdjustEnvelope={onAdjustEnvelope}
+          isRowSaving={savingCategoryId === cat.category.id}
         />
       ))}
     </>
@@ -466,6 +521,7 @@ export default function BudgetPage() {
     available: number
     isIncome?: boolean
   } | null>(null)
+  const [savingCategoryId, setSavingCategoryId] = useState<string | null>(null)
   const [showHelpModal, setShowHelpModal] = useState(false)
   const [showOnboardingModal, setShowOnboardingModal] = useState(false)
   const [showAdvancedMode, setShowAdvancedMode] = useState<boolean>(() => {
@@ -1067,6 +1123,7 @@ export default function BudgetPage() {
                       month={month}
                       budgetRegime={budgetRegime}
                       onSelectCategory={setSelectedCategoryModal}
+                      savingCategoryId={savingCategoryId}
                       onAdjustEnvelope={cat =>
                         setAdjustEnvelopeData({
                           category: cat.category,
@@ -1111,6 +1168,7 @@ export default function BudgetPage() {
                       month={month}
                       budgetRegime={budgetRegime}
                       onSelectCategory={setSelectedCategoryModal}
+                      savingCategoryId={savingCategoryId}
                       onAdjustIncome={cat =>
                         setAdjustEnvelopeData({
                           category: cat.category,
@@ -1155,6 +1213,16 @@ export default function BudgetPage() {
           currentAvailable={adjustEnvelopeData.available}
           budgetRegime={budgetRegime}
           isIncome={adjustEnvelopeData.isIncome}
+          onSave={async (newBudgeted) => {
+            const catId = adjustEnvelopeData.category.id
+            if (!catId) return
+            try {
+              setSavingCategoryId(catId)
+              await setBudget(month, catId, newBudgeted, true, budgetRegime)
+            } finally {
+              setSavingCategoryId(null)
+            }
+          }}
         />
       )}
 

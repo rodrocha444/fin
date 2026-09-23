@@ -26,7 +26,14 @@
 - **Modais:** Exclusivamente `useConfirm()` e `useAlert()` de `@/context/ConfirmContext` (nunca `window.confirm`/`alert`).
 - **Reatividade:** Disparar `notifyDataChanged(...)` em mutations de `services/api/`.
 
-## 5. Versionamento & Entrega
-1. **Validação:** Rodar `npm run lint` e `npm run build`.
-2. **Versão:** Incrementar `APP_VERSION` e atualizar `BUILD_DATE` em `src/version.ts`.
-3. **Git:** Commits locais permitidos após validação. **`git push` é estritamente proibido** sem ordem textual explícita do usuário.
+## 5. Ciclo de Desenvolvimento, Commits & Push
+- **Desenvolvimento & Commits Locais:**
+  - Commits locais são permitidos a qualquer momento para salvar o progresso.
+  - **PROIBIDO rodar `npm run lint` ou `npm run build` em commits locais ou durante o desenvolvimento rotineiro.** O Vite (`npm run dev`) já valida em tempo de execução.
+- **Preparação e Execução de `git push`:**
+  - **`git push` é ESTRITAMENTE PROIBIDO sem ordem textual explícita do usuário.**
+  - **SOMENTE quando o usuário ordenar explicitamente o push (ex: "faça push", "dê git push", "suba as alterações"):**
+    1. Executar `npm run lint`.
+    2. Executar `npm run build`.
+    3. Incrementar `APP_VERSION` e atualizar `BUILD_DATE` em `src/version.ts`.
+    4. Commitar a versão e aí sim executar o `git push`.

@@ -18,6 +18,7 @@ export interface AdjustEnvelopeModalProps {
   currentAvailable: number
   budgetRegime?: AccountingRegime
   isIncome?: boolean
+  onSave?: (newBudgeted: number) => Promise<void>
 }
 
 export default function AdjustEnvelopeModal({
@@ -29,6 +30,7 @@ export default function AdjustEnvelopeModal({
   currentAvailable,
   budgetRegime = 'cash',
   isIncome = false,
+  onSave,
 }: AdjustEnvelopeModalProps) {
   // Inicializa com o valor disponível atual (se positivo) ou 0 (se estava negativo/estourado)
   const [targetAvailable, setTargetAvailable] = useState<number>(() =>
@@ -49,7 +51,11 @@ export default function AdjustEnvelopeModal({
     try {
       setIsSaving(true)
       setErrorMessage(null)
-      await setBudget(month, category.id, calculatedBudgeted, true, budgetRegime)
+      if (onSave) {
+        await onSave(calculatedBudgeted)
+      } else {
+        await setBudget(month, category.id, calculatedBudgeted, true, budgetRegime)
+      }
       onClose()
     } catch (err: any) {
       console.error('Erro ao ajustar disponível:', err)
