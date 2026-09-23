@@ -2,7 +2,6 @@
 import React, { useState, useMemo } from 'react'
 import {
   Wallet,
-  Receipt,
   Plus,
   Minus,
   Equal,
@@ -30,7 +29,6 @@ export interface AdjustEnvelopeModalProps {
   toBeBudgeted?: number
   budgetRegime?: AccountingRegime
   isIncome?: boolean
-  onOpenTransactions?: () => void
 }
 
 type AdjustMode = 'add' | 'subtract' | 'set'
@@ -46,7 +44,6 @@ export default function AdjustEnvelopeModal({
   toBeBudgeted = 0,
   budgetRegime = 'cash',
   isIncome = false,
-  onOpenTransactions,
 }: AdjustEnvelopeModalProps) {
   const [mode, setMode] = useState<AdjustMode>('add')
   const [inputValue, setInputValue] = useState<number>(0)
@@ -124,36 +121,21 @@ export default function AdjustEnvelopeModal({
       icon={<Wallet className="w-5 h-5 text-indigo-400" />}
       size="md"
       footer={
-        <div className="flex items-center justify-between w-full gap-2">
-          {onOpenTransactions ? (
-            <button
-              type="button"
-              onClick={onOpenTransactions}
-              className="btn-secondary py-2 px-3 text-xs flex items-center gap-1.5 text-slate-300 hover:text-indigo-300"
-              title="Ver todas as transações deste mês"
-            >
-              <Receipt className="w-3.5 h-3.5" />
-              <span>Transações</span>
-            </button>
-          ) : (
-            <div />
-          )}
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSaving}
-              className="btn-secondary py-2 px-3 sm:px-4 text-xs"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={isSaving}
-              className="btn-primary py-2 px-4 text-xs font-semibold flex items-center gap-1.5 min-w-[110px] justify-center"
-            >
+        <div className="flex items-center justify-end w-full gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSaving}
+            className="btn-secondary py-2 px-3 sm:px-4 text-xs"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="btn-primary py-2 px-4 text-xs font-semibold flex items-center gap-1.5 min-w-[110px] justify-center"
+          >
               {isSaving ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -163,7 +145,6 @@ export default function AdjustEnvelopeModal({
                 <span>Confirmar</span>
               )}
             </button>
-          </div>
         </div>
       }
     >

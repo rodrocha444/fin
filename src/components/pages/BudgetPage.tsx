@@ -1156,17 +1156,6 @@ export default function BudgetPage() {
           toBeBudgeted={summary?.toBeBudgeted}
           budgetRegime={budgetRegime}
           isIncome={adjustEnvelopeData.isIncome}
-          onOpenTransactions={() => {
-            const currentData = adjustEnvelopeData
-            setAdjustEnvelopeData(null)
-            setSelectedCategoryModal({
-              category: currentData.category,
-              budgeted: currentData.budgeted,
-              activity: currentData.activity,
-              available: currentData.available,
-              isIncome: currentData.isIncome,
-            })
-          }}
         />
       )}
 
