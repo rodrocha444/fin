@@ -8,10 +8,9 @@ import {
   Loader2,
   HelpCircle,
   Sparkles,
-  SlidersHorizontal,
   ChevronDown,
-  Layers,
   ArrowUpRight,
+  Layers,
 } from 'lucide-react'
 import { useBudgetRows, useIncomeBudgetRows, useBudgetSummary } from '@/hooks/useBudget'
 import { setBudget, copyFromPreviousMonth, clearMonthBudgets, coverMonthSpent } from '@/services/api/budget'
@@ -20,12 +19,10 @@ import { useAccountingPeriod } from '@/utils/accountingPeriod'
 import { getSavedBudgetRegime, saveBudgetRegime, type AccountingRegime } from '@/utils/accountingRegime'
 import { useConfirm, useAlert } from '@/context/ConfirmContext'
 import MonthNavigator from '@/components/atoms/MonthNavigator'
-import BudgetRegimeSelector from '@/components/atoms/BudgetRegimeSelector'
 import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
 import PendingIssuesCard from '@/components/organisms/PendingIssuesCard'
 import CategoryTransactionsModal from '@/components/organisms/CategoryTransactionsModal'
 import AdjustEnvelopeModal from '@/components/organisms/AdjustEnvelopeModal'
-import ReplicateBudgetModal from '@/components/organisms/ReplicateBudgetModal'
 import OnboardingWizardModal from '@/components/organisms/OnboardingWizardModal'
 import Modal from '@/components/atoms/Modal'
 import type {
@@ -91,14 +88,6 @@ function IncomeCategoryRow({
           >
             {row.category.name}
           </span>
-          {hasGoal && (
-            <div className="w-full max-w-[130px] sm:max-w-[180px] h-1 bg-slate-800 rounded-full mt-1.5 overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-300 bg-emerald-500"
-                style={{ width: `${percentReceived}%` }}
-              />
-            </div>
-          )}
         </div>
       </td>
 
@@ -292,14 +281,6 @@ function CategoryRow({
           >
             {row.category.name}
           </span>
-          {(hasBudget || spent > 0) && (
-            <div className="w-full max-w-[130px] sm:max-w-[180px] h-1 bg-slate-800 rounded-full mt-1.5 overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-300 ${progressBarColor}`}
-                style={{ width: `${percentSpent}%` }}
-              />
-            </div>
-          )}
         </div>
       </td>
 
@@ -431,20 +412,7 @@ export default function BudgetPage() {
   } | null>(null)
   const [savingCategoryId, setSavingCategoryId] = useState<string | null>(null)
   const [showHelpModal, setShowHelpModal] = useState(false)
-  const [showReplicateModal, setShowReplicateModal] = useState(false)
   const [showOnboardingModal, setShowOnboardingModal] = useState(false)
-  const [showAdvancedMode, setShowAdvancedMode] = useState<boolean>(() => {
-    return localStorage.getItem('fin_advanced_mode') === 'true' || localStorage.getItem('finplan_advanced_mode') === 'true' || getSavedBudgetRegime() === 'accrual'
-  })
-
-  const toggleAdvancedMode = () => {
-    const next = !showAdvancedMode
-    setShowAdvancedMode(next)
-    localStorage.setItem('fin_advanced_mode', String(next))
-    if (!next && budgetRegime !== 'cash') {
-      handleBudgetRegimeChange('cash')
-    }
-  }
 
   const { startMonth } = useAccountingPeriod()
 
@@ -587,199 +555,166 @@ export default function BudgetPage() {
 
       {/* ── Header Principal ─────────────────────────────────── */}
       <div
-        className="bg-slate-900/95 backdrop-blur-sm border-b border-slate-800/90 flex-shrink-0 relative z-20"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
+        className="bg-slate-900 border-b border-slate-800/80 flex-shrink-0 relative z-20"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
-        <div className="px-2.5 sm:px-6 py-2">
-          
-          {/* Barra Principal: Hero Card (Esquerda) + Mês acima de Sync & Menu (Direita) */}
-          <div className="flex items-center justify-between gap-1.5 sm:gap-3">
-            
-            {/* Esquerda: Card Disponível a Orçar / Resultado Unificado — todas informações concentradas à esquerda */}
-            <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
-              {summary && (
-                <div
-                  className={`px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border flex flex-col justify-center min-w-0 shadow-sm transition-all duration-200 ${heroBgBorder}`}
-                >
-                  {isAccrual ? (
-                    /* Regime de Competência: Resultado + Métricas */
-                    <div className="flex flex-col items-start min-w-0">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className={`text-sm sm:text-base font-extrabold tabular-nums tracking-tight truncate ${heroColor}`}>
-                          {heroValue > 0.005 ? `+${formatCurrency(heroValue)}` : formatCurrency(heroValue)}
-                        </span>
-                        <span className={`text-[9px] sm:text-[10px] uppercase font-bold tracking-wider truncate ${heroValue < -0.005 ? 'text-rose-400' : 'text-slate-400'}`}>
-                          {isFuture ? 'Resultado Previsto' : 'Resultado Real'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 text-[8.5px] sm:text-[9px] text-slate-400 font-medium truncate">
-                        <span className="text-emerald-400 truncate">
-                          Rec: {formatCurrency(isFuture ? (summary.totalExpectedIncome ?? 0) : summary.totalIncome)}
-                        </span>
-                        <span className="text-slate-600 select-none">−</span>
-                        <span className="text-rose-400 truncate">
-                          Desp: {formatCurrency(isFuture ? summary.totalBudgeted : (summary.totalSpent ?? 0))}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    /* Regime de Caixa: Disponível a Orçar / Projeção com todas informações concentradas à esquerda */
-                    <div className="flex flex-col items-start min-w-0">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className={`text-sm sm:text-base font-extrabold tabular-nums tracking-tight truncate ${heroColor}`}>
-                          {formatCurrency(summary.toBeBudgeted)}
-                        </span>
-                        <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate flex items-center gap-0.5">
-                          {summary.isFutureMonth ? 'Projeção a Orçar' : 'Disponível a Orçar'}
-                          <button
-                            type="button"
-                            onClick={() => setShowHelpModal(true)}
-                            className="text-slate-500 hover:text-indigo-400 p-0.5 rounded transition-colors flex-shrink-0"
-                            title="Como funciona o Disponível a Orçar?"
-                            aria-label="Explicação sobre Disponível a Orçar"
-                          >
-                            <HelpCircle className="w-3 h-3" />
-                          </button>
-                        </span>
-                      </div>
+        {/* Linha de topo: navegação de mês */}
+        <div className="flex items-center justify-between px-3 sm:px-6 pt-3 pb-2 gap-3">
 
-                      {/* Badges de Projeção / Saldo Anterior */}
-                      {(Boolean(summary.isFutureMonth && (summary.rolloverFromPreviousMonth ?? 0) !== 0) ||
-                        Boolean((summary.pendingExpectedIncome ?? 0) > 0 || (summary.isFutureMonth && Math.abs((summary.projectedToBeBudgeted ?? 0) - (summary.toBeBudgeted ?? 0)) > 0.005))) && (
-                        <div className="flex items-center gap-1 pt-0.5 flex-wrap">
-                          {summary.isFutureMonth && (summary.rolloverFromPreviousMonth ?? 0) !== 0 && (
-                            <span
-                              className="text-[8.5px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60 flex-shrink-0"
-                              title={`Saldo livre acumulado do mês anterior: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
-                            >
-                              Anterior: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
-                            </span>
-                          )}
+          {/* Esquerda: navegador de mês */}
+          <MonthNavigator
+            month={month}
+            onChangeMonth={handleMonthChange}
+            minMonth={startMonth}
+          />
 
-                          {((summary.pendingExpectedIncome ?? 0) > 0 || (summary.isFutureMonth && Math.abs((summary.projectedToBeBudgeted ?? 0) - (summary.toBeBudgeted ?? 0)) > 0.005)) && (
-                            <span
-                              className="text-[8.5px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60 flex-shrink-0"
-                              title={summary.isFutureMonth
-                                ? `Projeção Otimista: se toda a renda planejada para os meses até aqui entrar, o valor seria ${formatCurrency(summary.projectedToBeBudgeted)}`
-                                : 'Saldo projetado incluindo receitas previstas que ainda não entraram'}
-                            >
-                              {summary.isFutureMonth ? 'Otimista:' : 'Previsto:'} {formatCurrency(summary.projectedToBeBudgeted)}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
+          {/* Direita: sync + menu */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <SyncStatusBadge compact={true} />
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowMenu(s => !s)}
+                disabled={isProcessingBudget}
+                className={`p-1.5 rounded-lg transition-all duration-150 border ${
+                  showMenu
+                    ? 'bg-indigo-950/60 border-indigo-500/50 text-indigo-300'
+                    : 'bg-slate-800/60 hover:bg-slate-800 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                } ${isProcessingBudget ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title="Funções extras do orçamento"
+                aria-label="Opções do orçamento"
+              >
+                {isProcessingBudget ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+                ) : (
+                  <MoreHorizontal className="w-4 h-4" />
+                )}
+              </button>
 
-              {(showAdvancedMode || budgetRegime === 'accrual') && (
-                <div className="flex-shrink-0">
-                  <BudgetRegimeSelector regime={budgetRegime} onChangeRegime={handleBudgetRegimeChange} />
-                </div>
+              {showMenu && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)} />
+                  <div className="absolute right-0 top-full mt-1.5 bg-slate-900/95 backdrop-blur-md border border-slate-700/90 rounded-xl shadow-2xl z-40 p-1.5 min-w-[210px] animate-in fade-in zoom-in-95 duration-150">
+                    <button
+                      onClick={handleCoverSpent}
+                      disabled={isProcessingBudget}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      <CheckCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                      <span>Cobrir gastos do mês</span>
+                    </button>
+                    <button
+                      onClick={handleCopy}
+                      disabled={isProcessingBudget}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2 disabled:opacity-50"
+                    >
+                      <Copy className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                      <span>Copiar mês anterior</span>
+                    </button>
+                    <button
+                      onClick={handleClear}
+                      disabled={isProcessingBudget}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2 disabled:opacity-50"
+                    >
+                      <Trash2 className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                      <span>Zerar orçamento</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowMenu(false)
+                        setShowHelpModal(true)
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-indigo-300 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
+                    >
+                      <HelpCircle className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                      <span>Como funciona o Orçamento</span>
+                    </button>
+                  </div>
+                </>
               )}
             </div>
+          </div>
+        </div>
 
-            {/* Direita: Seletor de Mês acima de Sync & Botão de Funções Extras */}
-            <div className="flex flex-col items-end gap-1 flex-shrink-0">
-              <MonthNavigator
-                month={month}
-                onChangeMonth={handleMonthChange}
-                minMonth={startMonth}
-              />
-
-              <div className="flex items-center gap-1.5">
-                <SyncStatusBadge compact={true} />
-
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowMenu(s => !s)}
-                    disabled={isProcessingBudget}
-                    className={`p-1.5 rounded-lg transition-all duration-150 border ${
-                      showMenu
-                        ? 'bg-slate-800 border-indigo-500/50 text-indigo-300 shadow-sm'
-                        : 'bg-slate-800/70 hover:bg-slate-800 border-slate-700/70 text-slate-400 hover:text-slate-200'
-                    } ${isProcessingBudget ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    title="Funções extras do orçamento"
-                    aria-label="Opções do orçamento"
-                  >
-                    {isProcessingBudget ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
-                    ) : (
-                      <MoreHorizontal className="w-4 h-4" />
-                    )}
-                  </button>
-
-                  {showMenu && (
-                    <>
-                      <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)} />
-                      <div className="absolute right-0 top-full mt-1.5 bg-slate-900/95 backdrop-blur-md border border-slate-700/90 rounded-xl shadow-2xl z-40 p-1.5 min-w-[210px] animate-in fade-in zoom-in-95 duration-150">
-                        <button
-                          onClick={handleCoverSpent}
-                          disabled={isProcessingBudget}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors disabled:opacity-50"
-                        >
-                          <CheckCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                          <span>Cobrir gastos do mês</span>
-                        </button>
-                        <button
-                          onClick={handleCopy}
-                          disabled={isProcessingBudget}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2 disabled:opacity-50"
-                        >
-                          <Copy className="w-4 h-4 text-indigo-400 flex-shrink-0" />
-                          <span>Copiar mês anterior</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowMenu(false)
-                            setShowReplicateModal(true)
-                          }}
-                          disabled={isProcessingBudget}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-amber-300 hover:bg-amber-950/30 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2 disabled:opacity-50"
-                        >
-                          <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                          <span>Replicar para meses futuros</span>
-                        </button>
-                        <button
-                          onClick={handleClear}
-                          disabled={isProcessingBudget}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2 disabled:opacity-50"
-                        >
-                          <Trash2 className="w-4 h-4 text-rose-400 flex-shrink-0" />
-                          <span>Zerar orçamento</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowMenu(false)
-                            setShowHelpModal(true)
-                          }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-indigo-300 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
-                        >
-                          <HelpCircle className="w-4 h-4 text-indigo-400 flex-shrink-0" />
-                          <span>Como funciona o Orçamento</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowMenu(false)
-                            toggleAdvancedMode()
-                          }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-400 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
-                        >
-                          <SlidersHorizontal className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                          <span>{showAdvancedMode ? 'Ocultar Modo Avançado' : 'Modo Avançado (Regimes)'}</span>
-                        </button>
-                      </div>
-                    </>
-                  )}
+        {/* Linha de resumo: hero card + regime */}
+        {summary && (
+          <div className="px-3 sm:px-6 pb-3 flex items-center gap-2">
+            {/* Hero card — valor principal */}
+            <div className={`flex-1 flex items-center justify-between px-3 py-2.5 rounded-xl border shadow-sm transition-all duration-300 ${heroBgBorder}`}>
+              {isAccrual ? (
+                /* Regime de Competência */
+                <div className="flex flex-col min-w-0">
+                  <span className={`text-[10px] uppercase font-bold tracking-wider ${heroValue < -0.005 ? 'text-rose-400' : 'text-slate-400'} mb-0.5`}>
+                    {isFuture ? 'Resultado Previsto' : 'Resultado Real'}
+                  </span>
+                  <span className={`text-xl sm:text-2xl font-extrabold tabular-nums tracking-tight leading-none ${heroColor}`}>
+                    {heroValue > 0.005 ? `+${formatCurrency(heroValue)}` : formatCurrency(heroValue)}
+                  </span>
                 </div>
+              ) : (
+                /* Regime de Caixa */
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-0.5 flex items-center gap-1">
+                    {summary.isFutureMonth ? 'Projeção a Orçar' : 'Disponível a Orçar'}
+                    <button
+                      type="button"
+                      onClick={() => setShowHelpModal(true)}
+                      className="text-slate-500 hover:text-indigo-400 transition-colors"
+                      title="Como funciona o Disponível a Orçar?"
+                    >
+                      <HelpCircle className="w-3 h-3" />
+                    </button>
+                  </span>
+                  <span className={`text-xl sm:text-2xl font-extrabold tabular-nums tracking-tight leading-none ${heroColor}`}>
+                    {formatCurrency(summary.toBeBudgeted)}
+                  </span>
+                </div>
+              )}
+
+              {/* Métricas secundárias — lado direito */}
+              <div className="flex flex-col items-end gap-1 ml-3 flex-shrink-0">
+                {isAccrual ? (
+                  <>
+                    <div className="flex items-center gap-1 text-[10px] tabular-nums">
+                      <span className="text-slate-500">Rec</span>
+                      <span className="font-semibold text-emerald-400">
+                        {formatCurrency(isFuture ? (summary.totalExpectedIncome ?? 0) : summary.totalIncome)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 text-[10px] tabular-nums">
+                      <span className="text-slate-500">Desp</span>
+                      <span className="font-semibold text-rose-400">
+                        {formatCurrency(isFuture ? summary.totalBudgeted : (summary.totalSpent ?? 0))}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {summary.isFutureMonth && (summary.rolloverFromPreviousMonth ?? 0) !== 0 && (
+                      <span
+                        className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md bg-slate-700/80 text-slate-300 border border-slate-600/60"
+                        title={`Saldo livre acumulado do mês anterior: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
+                      >
+                        Saldo Anterior: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
+                      </span>
+                    )}
+                    {((summary.pendingExpectedIncome ?? 0) > 0 || (summary.isFutureMonth && Math.abs((summary.projectedToBeBudgeted ?? 0) - (summary.toBeBudgeted ?? 0)) > 0.005)) && (
+                      <span
+                        className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md bg-sky-950/90 text-sky-300 border border-sky-800/60"
+                        title={summary.isFutureMonth
+                          ? `Projeção Otimista: se toda a renda planejada entrar, o valor seria ${formatCurrency(summary.projectedToBeBudgeted)}`
+                          : 'Saldo projetado incluindo receitas previstas que ainda não entraram'}
+                      >
+                        {summary.isFutureMonth ? 'Otimista:' : 'Previsto:'} {formatCurrency(summary.projectedToBeBudgeted)}
+                      </span>
+                    )}
+                  </>
+                )}
               </div>
             </div>
 
           </div>
-
-        </div>
+        )}
       </div>
 
       {/* ── Tabela ─────────────────────────────────────────── */}
@@ -1027,15 +962,6 @@ export default function BudgetPage() {
         onClose={() => setShowOnboardingModal(false)}
       />
 
-      {/* Modal de Replicação de Orçamento para o Futuro */}
-      {showReplicateModal && (
-        <ReplicateBudgetModal
-          isOpen={showReplicateModal}
-          onClose={() => setShowReplicateModal(false)}
-          sourceMonth={month}
-          budgetRegime={budgetRegime}
-        />
-      )}
     </div>
   )
 }
