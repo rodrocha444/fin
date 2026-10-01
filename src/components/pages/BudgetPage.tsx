@@ -393,28 +393,28 @@ function GroupRow({
   return (
     <>
       <tr
-        className="cursor-pointer select-none bg-slate-800/80 border-t-2 border-slate-700/60 border-b border-slate-800/80 hover:bg-slate-800 active:bg-slate-700/60 transition-colors group/grow"
+        className="cursor-pointer select-none bg-indigo-950/50 border-t-2 border-indigo-900/60 border-b border-indigo-900/40 hover:bg-indigo-950/70 active:bg-indigo-900/50 transition-colors group/grow"
         onClick={() => setOpen(o => !o)}
       >
         <td className="py-2.5 pl-3 sm:pl-6 pr-2">
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
             <div className="w-1 h-3.5 sm:h-4 rounded-full bg-indigo-500 flex-shrink-0" />
-            <span className="text-slate-400 group-hover/grow:text-slate-200 transition-transform flex-shrink-0">
+            <span className="text-indigo-400 group-hover/grow:text-indigo-200 transition-transform flex-shrink-0">
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? '' : '-rotate-90'}`} />
             </span>
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-1.5">
                 <span
-                  className="break-words leading-tight text-xs sm:text-sm font-bold text-slate-100 uppercase tracking-wide"
+                  className="break-words leading-tight text-xs sm:text-sm font-bold text-indigo-200 uppercase tracking-wide"
                   title={row.group.name}
                 >
                   {row.group.name}
                 </span>
-                <span className="inline-flex items-center px-1.5 py-0.2 text-[9px] font-semibold text-slate-300 bg-slate-900/80 border border-slate-700/70 rounded-full flex-shrink-0">
+                <span className="inline-flex items-center px-1.5 py-0.2 text-[9px] font-semibold text-indigo-400/90 bg-indigo-900/50 border border-indigo-700/50 rounded-full flex-shrink-0">
                   {row.categories.length}
                 </span>
               </div>
-              <span className="text-[10px] text-slate-400 font-normal truncate mt-0.5">
+              <span className="text-[10px] text-indigo-400/80 font-normal truncate mt-0.5">
                 Gasto {formatCurrency(Math.abs(row.totalActivity))} de {formatCurrency(row.totalBudgeted)}
               </span>
             </div>
