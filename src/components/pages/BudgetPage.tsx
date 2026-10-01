@@ -159,7 +159,7 @@ function IncomeCategoryRow({
               {diff > 0.005
                 ? formatCurrency(diff)
                 : diff < -0.005
-                ? `+${formatCurrency(Math.abs(diff))}`
+                ? formatCurrency(Math.abs(diff))
                 : hasGoal
                 ? 'Concluído'
                 : row.received > 0
