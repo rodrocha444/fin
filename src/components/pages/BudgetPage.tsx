@@ -178,7 +178,6 @@ function IncomeGroupRow({
   savingCategoryId?: string | null
 }) {
   const [open, setOpen] = useState(true)
-  const groupDiff = Math.round((row.totalExpected - row.totalReceived) * 100) / 100
 
   return (
     <>
@@ -186,46 +185,19 @@ function IncomeGroupRow({
         className="cursor-pointer select-none bg-emerald-950/60 border-t-2 border-emerald-900/70 border-b border-emerald-900/50 hover:bg-emerald-950/80 active:bg-emerald-900/50 transition-colors group/grow"
         onClick={() => setOpen(o => !o)}
       >
-        <td className="py-2.5 pl-3 sm:pl-6 pr-2">
+        <td colSpan={2} className="py-2.5 pl-3 sm:pl-6 pr-3 sm:pr-6">
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
             <div className="w-1 h-3.5 sm:h-4 rounded-full bg-emerald-500 flex-shrink-0" />
             <span className="text-emerald-400 group-hover/grow:text-emerald-200 transition-transform flex-shrink-0">
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? '' : '-rotate-90'}`} />
             </span>
-            <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span
-                  className="break-words leading-tight text-xs sm:text-sm font-bold text-emerald-300 uppercase tracking-wide"
-                  title={row.group.name}
-                >
-                  {row.group.name}
-                </span>
-                <span className="inline-flex items-center px-1.5 py-0.2 text-[9px] font-semibold text-emerald-400/90 bg-emerald-900/50 border border-emerald-700/50 rounded-full flex-shrink-0">
-                  {row.categories.length}
-                </span>
-              </div>
-              <span className="text-[10px] text-emerald-400/80 font-normal truncate mt-0.5">
-                Recebido {formatCurrency(Math.abs(row.totalReceived))} de {formatCurrency(Math.abs(row.totalExpected))}
-              </span>
-            </div>
+            <span
+              className="break-words leading-tight text-xs sm:text-sm font-bold text-emerald-300 uppercase tracking-wide truncate"
+              title={row.group.name}
+            >
+              {row.group.name}
+            </span>
           </div>
-        </td>
-        <td className="py-2.5 pl-2 pr-3 sm:pr-6 text-right">
-          <span
-            className={`text-xs sm:text-sm font-bold tabular-nums ${
-              groupDiff > 0.005
-                ? 'text-amber-400'
-                : groupDiff < -0.005
-                ? 'text-emerald-400'
-                : 'text-slate-400'
-            }`}
-          >
-            {groupDiff > 0.005
-              ? formatCurrency(groupDiff)
-              : groupDiff < -0.005
-              ? `+${formatCurrency(Math.abs(groupDiff))}`
-              : <span className="text-slate-600">—</span>}
-          </span>
         </td>
       </tr>
       {open &&
@@ -382,50 +354,25 @@ function GroupRow({
 }) {
   const [open, setOpen] = useState(true)
 
-  const isOverspent = row.totalAvailable < -0.005
-  const totalAvailColor =
-    row.totalAvailable > 0.005
-      ? 'text-emerald-400 font-bold'
-      : isOverspent
-      ? 'text-rose-400 font-bold'
-      : 'text-slate-400 font-bold'
-
   return (
     <>
       <tr
         className="cursor-pointer select-none bg-indigo-950/50 border-t-2 border-indigo-900/60 border-b border-indigo-900/40 hover:bg-indigo-950/70 active:bg-indigo-900/50 transition-colors group/grow"
         onClick={() => setOpen(o => !o)}
       >
-        <td className="py-2.5 pl-3 sm:pl-6 pr-2">
+        <td colSpan={2} className="py-2.5 pl-3 sm:pl-6 pr-3 sm:pr-6">
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
             <div className="w-1 h-3.5 sm:h-4 rounded-full bg-indigo-500 flex-shrink-0" />
             <span className="text-indigo-400 group-hover/grow:text-indigo-200 transition-transform flex-shrink-0">
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? '' : '-rotate-90'}`} />
             </span>
-            <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span
-                  className="break-words leading-tight text-xs sm:text-sm font-bold text-indigo-200 uppercase tracking-wide"
-                  title={row.group.name}
-                >
-                  {row.group.name}
-                </span>
-                <span className="inline-flex items-center px-1.5 py-0.2 text-[9px] font-semibold text-indigo-400/90 bg-indigo-900/50 border border-indigo-700/50 rounded-full flex-shrink-0">
-                  {row.categories.length}
-                </span>
-              </div>
-              <span className="text-[10px] text-indigo-400/80 font-normal truncate mt-0.5">
-                Gasto {formatCurrency(Math.abs(row.totalActivity))} de {formatCurrency(row.totalBudgeted)}
-              </span>
-            </div>
+            <span
+              className="break-words leading-tight text-xs sm:text-sm font-bold text-indigo-200 uppercase tracking-wide truncate"
+              title={row.group.name}
+            >
+              {row.group.name}
+            </span>
           </div>
-        </td>
-        <td className="py-2.5 pl-2 pr-3 sm:pr-6 text-right">
-          <span className={`text-xs sm:text-sm tabular-nums ${totalAvailColor}`}>
-            {isOverspent
-              ? `-${formatCurrency(Math.abs(row.totalAvailable))}`
-              : formatCurrency(row.totalAvailable)}
-          </span>
         </td>
       </tr>
       {open &&
