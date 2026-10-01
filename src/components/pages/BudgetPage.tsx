@@ -183,7 +183,7 @@ function IncomeGroupRow({
   return (
     <>
       <tr
-        className="cursor-pointer select-none bg-emerald-950/30 border-t-2 border-emerald-900/60 border-b border-emerald-900/40 hover:bg-emerald-950/45 active:bg-emerald-950/60 transition-colors group/grow"
+        className="cursor-pointer select-none bg-emerald-950/60 border-t-2 border-emerald-900/70 border-b border-emerald-900/50 hover:bg-emerald-950/80 active:bg-emerald-900/50 transition-colors group/grow"
         onClick={() => setOpen(o => !o)}
       >
         <td className="py-2.5 pl-3 sm:pl-6 pr-2">
@@ -393,7 +393,7 @@ function GroupRow({
   return (
     <>
       <tr
-        className="cursor-pointer select-none bg-slate-900/90 border-t-2 border-slate-800/90 border-b border-slate-800/60 hover:bg-slate-850 active:bg-slate-800 transition-colors group/grow"
+        className="cursor-pointer select-none bg-slate-800/80 border-t-2 border-slate-700/60 border-b border-slate-800/80 hover:bg-slate-800 active:bg-slate-700/60 transition-colors group/grow"
         onClick={() => setOpen(o => !o)}
       >
         <td className="py-2.5 pl-3 sm:pl-6 pr-2">
@@ -410,7 +410,7 @@ function GroupRow({
                 >
                   {row.group.name}
                 </span>
-                <span className="inline-flex items-center px-1.5 py-0.2 text-[9px] font-semibold text-slate-400 bg-slate-800/80 border border-slate-700/60 rounded-full flex-shrink-0">
+                <span className="inline-flex items-center px-1.5 py-0.2 text-[9px] font-semibold text-slate-300 bg-slate-900/80 border border-slate-700/70 rounded-full flex-shrink-0">
                   {row.categories.length}
                 </span>
               </div>
