@@ -592,24 +592,14 @@ export default function BudgetPage() {
       >
         <div className="px-2.5 sm:px-6 py-2">
           
-          {/* Barra Principal: Mês + Regime + Hero Card Unificado + Sync & Menu */}
+          {/* Barra Principal: Hero Card (Esquerda) + Mês acima de Sync & Menu (Direita) */}
           <div className="flex items-center justify-between gap-1.5 sm:gap-3">
             
-            {/* Esquerda: Navegação de Mês + Seletor de Regime (se ativado) + Card Unificado à Esquerda */}
+            {/* Esquerda: Card Disponível a Orçar / Resultado Unificado — todas informações concentradas à esquerda */}
             <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
-              <MonthNavigator
-                month={month}
-                onChangeMonth={handleMonthChange}
-                minMonth={startMonth}
-              />
-              {(showAdvancedMode || budgetRegime === 'accrual') && (
-                <BudgetRegimeSelector regime={budgetRegime} onChangeRegime={handleBudgetRegimeChange} />
-              )}
-
-              {/* Card Disponível a Orçar / Resultado Unificado — todas informações concentradas à esquerda */}
               {summary && (
                 <div
-                  className={`px-2.5 py-1 sm:px-3 sm:py-1 rounded-xl border flex flex-col justify-center min-w-0 shadow-sm transition-all duration-200 ${heroBgBorder}`}
+                  className={`px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border flex flex-col justify-center min-w-0 shadow-sm transition-all duration-200 ${heroBgBorder}`}
                 >
                   {isAccrual ? (
                     /* Regime de Competência: Resultado + Métricas */
@@ -682,96 +672,108 @@ export default function BudgetPage() {
                   )}
                 </div>
               )}
+
+              {(showAdvancedMode || budgetRegime === 'accrual') && (
+                <div className="flex-shrink-0">
+                  <BudgetRegimeSelector regime={budgetRegime} onChangeRegime={handleBudgetRegimeChange} />
+                </div>
+              )}
             </div>
 
-            {/* Direita: Status de Sync + Menu de Ações (Unificado para todas as telas) */}
-            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-              <div className="lg:hidden">
+            {/* Direita: Seletor de Mês acima de Sync & Botão de Funções Extras */}
+            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+              <MonthNavigator
+                month={month}
+                onChangeMonth={handleMonthChange}
+                minMonth={startMonth}
+              />
+
+              <div className="flex items-center gap-1.5">
                 <SyncStatusBadge compact={true} />
-              </div>
 
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowMenu(s => !s)}
-                  disabled={isProcessingBudget}
-                  className={`p-2 rounded-lg transition-all duration-150 border ${
-                    showMenu
-                      ? 'bg-slate-800 border-indigo-500/50 text-indigo-300 shadow-sm'
-                      : 'bg-slate-800/70 hover:bg-slate-800 border-slate-700/70 text-slate-400 hover:text-slate-200'
-                  } ${isProcessingBudget ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  title="Ações do orçamento do mês"
-                  aria-label="Opções do orçamento"
-                >
-                  {isProcessingBudget ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
-                  ) : (
-                    <MoreHorizontal className="w-4 h-4" />
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowMenu(s => !s)}
+                    disabled={isProcessingBudget}
+                    className={`p-1.5 rounded-lg transition-all duration-150 border ${
+                      showMenu
+                        ? 'bg-slate-800 border-indigo-500/50 text-indigo-300 shadow-sm'
+                        : 'bg-slate-800/70 hover:bg-slate-800 border-slate-700/70 text-slate-400 hover:text-slate-200'
+                    } ${isProcessingBudget ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title="Funções extras do orçamento"
+                    aria-label="Opções do orçamento"
+                  >
+                    {isProcessingBudget ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+                    ) : (
+                      <MoreHorizontal className="w-4 h-4" />
+                    )}
+                  </button>
+
+                  {showMenu && (
+                    <>
+                      <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)} />
+                      <div className="absolute right-0 top-full mt-1.5 bg-slate-900/95 backdrop-blur-md border border-slate-700/90 rounded-xl shadow-2xl z-40 p-1.5 min-w-[210px] animate-in fade-in zoom-in-95 duration-150">
+                        <button
+                          onClick={handleCoverSpent}
+                          disabled={isProcessingBudget}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          <CheckCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          <span>Cobrir gastos do mês</span>
+                        </button>
+                        <button
+                          onClick={handleCopy}
+                          disabled={isProcessingBudget}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2 disabled:opacity-50"
+                        >
+                          <Copy className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                          <span>Copiar mês anterior</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowMenu(false)
+                            setShowReplicateModal(true)
+                          }}
+                          disabled={isProcessingBudget}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-amber-300 hover:bg-amber-950/30 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2 disabled:opacity-50"
+                        >
+                          <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                          <span>Replicar para meses futuros</span>
+                        </button>
+                        <button
+                          onClick={handleClear}
+                          disabled={isProcessingBudget}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2 disabled:opacity-50"
+                        >
+                          <Trash2 className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                          <span>Zerar orçamento</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowMenu(false)
+                            setShowHelpModal(true)
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-indigo-300 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
+                        >
+                          <HelpCircle className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                          <span>Como funciona o Orçamento</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowMenu(false)
+                            toggleAdvancedMode()
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-400 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
+                        >
+                          <SlidersHorizontal className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                          <span>{showAdvancedMode ? 'Ocultar Modo Avançado' : 'Modo Avançado (Regimes)'}</span>
+                        </button>
+                      </div>
+                    </>
                   )}
-                </button>
-
-                {showMenu && (
-                  <>
-                    <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)} />
-                    <div className="absolute right-0 top-full mt-1.5 bg-slate-900/95 backdrop-blur-md border border-slate-700/90 rounded-xl shadow-2xl z-40 p-1.5 min-w-[210px] animate-in fade-in zoom-in-95 duration-150">
-                      <button
-                        onClick={handleCoverSpent}
-                        disabled={isProcessingBudget}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        <CheckCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                        <span>Cobrir gastos do mês</span>
-                      </button>
-                      <button
-                        onClick={handleCopy}
-                        disabled={isProcessingBudget}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2 disabled:opacity-50"
-                      >
-                        <Copy className="w-4 h-4 text-indigo-400 flex-shrink-0" />
-                        <span>Copiar mês anterior</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowMenu(false)
-                          setShowReplicateModal(true)
-                        }}
-                        disabled={isProcessingBudget}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-amber-300 hover:bg-amber-950/30 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2 disabled:opacity-50"
-                      >
-                        <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                        <span>Replicar para meses futuros</span>
-                      </button>
-                      <button
-                        onClick={handleClear}
-                        disabled={isProcessingBudget}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2 disabled:opacity-50"
-                      >
-                        <Trash2 className="w-4 h-4 text-rose-400 flex-shrink-0" />
-                        <span>Zerar orçamento</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowMenu(false)
-                          setShowHelpModal(true)
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-indigo-300 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
-                      >
-                        <HelpCircle className="w-4 h-4 text-indigo-400 flex-shrink-0" />
-                        <span>Como funciona o Orçamento</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowMenu(false)
-                          toggleAdvancedMode()
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-400 hover:bg-slate-800/80 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2"
-                      >
-                        <SlidersHorizontal className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                        <span>{showAdvancedMode ? 'Ocultar Modo Avançado' : 'Modo Avançado (Regimes)'}</span>
-                      </button>
-                    </div>
-                  </>
-                )}
+                </div>
               </div>
             </div>
 
