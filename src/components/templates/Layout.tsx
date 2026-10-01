@@ -4,7 +4,6 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutGrid,
   Wallet,
-  ArrowLeftRight,
   BarChart3,
   Settings,
   LogOut,
@@ -24,7 +23,6 @@ import { APP_VERSION } from '@/version'
 const NAV = [
   { to: '/budget', label: 'Orçamento', icon: LayoutGrid },
   { to: '/accounts', label: 'Contas', icon: Wallet },
-  { to: '/transactions', label: 'Transações', icon: ArrowLeftRight },
   { to: '/reports', label: 'Relatórios', icon: BarChart3 },
   { to: '/settings', label: 'Config.', icon: Settings },
 ]

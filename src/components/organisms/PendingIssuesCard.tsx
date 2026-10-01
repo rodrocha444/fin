@@ -4,9 +4,11 @@ import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, ChevronDown, ChevronUp, Tag, Pencil } from 'lucide-react'
 import { usePendingIssues } from '@/hooks/usePendingIssues'
 import { useCategoriesWithGroups } from '@/hooks/useBudget'
+import { useFinancialData } from '@/context/FinancialDataContext'
+import TransactionForm from '@/components/organisms/TransactionForm'
 import { updateTransaction } from '@/services/api/transactions'
 import { formatCurrency } from '@/utils/format'
-import type { PendingIssue } from '@/types'
+import type { PendingIssue, Transaction } from '@/types'
 import type { AccountingRegime } from '@/utils/accountingRegime'
 
 interface PendingIssuesCardProps {
@@ -17,8 +19,10 @@ interface PendingIssuesCardProps {
 export default function PendingIssuesCard({ month, regime = 'cash' }: PendingIssuesCardProps = {}) {
   const navigate = useNavigate()
   const issues = usePendingIssues(month, regime) ?? []
+  const { transactions: allTransactions } = useFinancialData()
   const [isExpanded, setIsExpanded] = useState(false)
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null)
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const { categories, groups } = useCategoriesWithGroups() ?? { categories: [], groups: [] }
 
   if (issues.length === 0) return null
@@ -35,9 +39,10 @@ export default function PendingIssuesCard({ month, regime = 'cash' }: PendingIss
 
   const handleItemClick = (issue: PendingIssue, itemId: string) => {
     if (issue.ruleId === 'uncategorized_transactions') {
-      navigate(`/transactions?edit=${itemId}`)
+      const tx = allTransactions?.find(t => t.id === itemId)
+      if (tx) setEditingTx(tx)
     } else if (issue.ruleId === 'overspent_categories') {
-      navigate('/')
+      navigate('/budget')
     }
   }
 
@@ -165,11 +170,14 @@ export default function PendingIssuesCard({ month, regime = 'cash' }: PendingIss
                       </div>
                     )}
 
-                    {/* Botão de edição / navegação */}
+                    {/* Botão de edição */}
                     {activeIssue.ruleId === 'uncategorized_transactions' && (
                       <button
                         type="button"
-                        onClick={() => navigate(`/transactions?edit=${item.id}`)}
+                        onClick={() => {
+                          const tx = allTransactions?.find(t => t.id === item.id)
+                          if (tx) setEditingTx(tx)
+                        }}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-amber-300 hover:bg-slate-800 transition-colors"
                         title="Abrir e editar transação"
                       >
@@ -182,6 +190,13 @@ export default function PendingIssuesCard({ month, regime = 'cash' }: PendingIss
             </div>
           </div>
         </div>
+      )}
+
+      {editingTx && (
+        <TransactionForm
+          transaction={editingTx}
+          onClose={() => setEditingTx(null)}
+        />
       )}
     </div>
   )

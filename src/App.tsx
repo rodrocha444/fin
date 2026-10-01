@@ -14,7 +14,6 @@ const BudgetPage = lazy(() => import('@/components/pages/BudgetPage'))
 const AccountsPage = lazy(() => import('@/components/pages/AccountsPage'))
 const AccountDetailPage = lazy(() => import('@/components/pages/AccountDetailPage'))
 const AccountInvoicePage = lazy(() => import('@/components/pages/AccountInvoicePage'))
-const TransactionsPage = lazy(() => import('@/components/pages/TransactionsPage'))
 const DebtAccountPage = lazy(() => import('@/components/pages/DebtAccountPage'))
 const ReportsPage = lazy(() => import('@/components/pages/ReportsPage'))
 const SettingsPage = lazy(() => import('@/components/pages/SettingsPage'))
@@ -56,7 +55,7 @@ export default function App() {
                       <Route path="accounts/:id" element={<AccountDetailPage />} />
                       <Route path="accounts/:id/invoice" element={<AccountInvoicePage />} />
                       <Route path="accounts/debt/:id" element={<DebtAccountPage />} />
-                      <Route path="transactions" element={<TransactionsPage />} />
+                      <Route path="transactions" element={<Navigate to="/accounts" replace />} />
                       <Route path="debts" element={<Navigate to="/accounts" replace />} />
                       <Route path="debts/:id" element={<DebtAccountPage />} />
                       <Route path="scheduled" element={<Navigate to="/budget" replace />} />
