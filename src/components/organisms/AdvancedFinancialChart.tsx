@@ -124,7 +124,7 @@ export default function AdvancedFinancialChart() {
     if (preset === 'all') {
       const accStart = getAccountingStartDate()
       const start = accStart ? new Date(accStart) : subMonths(today, 36)
-      return { startDate: start, endDate: maxFutureDate }
+      return { startDate: start, endDate: includeFuture ? maxFutureDate : today }
     }
     return {
       startDate: new Date(customStart + 'T00:00:00'),
@@ -257,7 +257,9 @@ export default function AdvancedFinancialChart() {
       }
     }
     const start = getPointValue(points[0])
-    const current = getPointValue(points[points.length - 1])
+    const todayOrPast = [...points].reverse().find(p => !p.isFuture)
+    const currentPoint = todayOrPast ?? points[points.length - 1]
+    const current = getPointValue(currentPoint)
     const diff = current - start
     const pct = start !== 0 ? (diff / Math.abs(start)) * 100 : 0
     const values = points.map(p => getPointValue(p))
@@ -269,13 +271,15 @@ export default function AdvancedFinancialChart() {
     return { current, start, diff, pct, min, max, avg, currentSMA }
   }, [points, smaPoints, getPointValue])
 
-  // Ponto ativo sob inspeção
-  const activePoint: NetWorthPoint | null =
-    activePointIndex !== null && points[activePointIndex]
-      ? points[activePointIndex]
-      : points.length > 0
-      ? points[points.length - 1]
-      : null
+  // Ponto ativo sob inspeção (quando não estiver inspecionando, seleciona o ponto de Hoje ou último ponto histórico)
+  const activePoint: NetWorthPoint | null = useMemo(() => {
+    if (activePointIndex !== null && points[activePointIndex]) {
+      return points[activePointIndex]
+    }
+    if (points.length === 0) return null
+    const todayOrPast = [...points].reverse().find(p => !p.isFuture)
+    return todayOrPast ?? points[points.length - 1]
+  }, [activePointIndex, points])
 
   const activePointVal = activePoint ? getPointValue(activePoint) : stats.current
 

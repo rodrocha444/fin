@@ -128,13 +128,16 @@ export function useDebtAccountWithItems(accountId: string | undefined): {
   }, [debtAccounts, debtItems, accountId, isLoading])
 }
 
-/** Resumo geral de todas as pendências ativas */
+/** Resumo geral de todas as pendências ativas vinculadas a contas ativas */
 export function useDebtsSummary(): DebtSummary | undefined {
-  const { data: debtItems = [], isLoading } = useDebtItemsQuery()
+  const { data: debtAccounts = [], isLoading: l1 } = useDebtAccountsQuery()
+  const { data: debtItems = [], isLoading: l2 } = useDebtItemsQuery()
+  const isLoading = l1 || l2
 
   return useMemo(() => {
     if (isLoading && debtItems.length === 0) return undefined
-    const items = debtItems.filter(i => i.status === 'pending')
+    const activeAccountIds = new Set(debtAccounts.filter(d => d.isActive !== false).map(d => d.id))
+    const items = debtItems.filter(i => i.status === 'pending' && activeAccountIds.has(i.debtAccountId))
 
     let totalReceivable = 0
     let totalPayable = 0
@@ -160,5 +163,5 @@ export function useDebtsSummary(): DebtSummary | undefined {
       netBalance: finalNet,
       pendingCount: items.length,
     }
-  }, [debtItems, isLoading])
+  }, [debtAccounts, debtItems, isLoading])
 }

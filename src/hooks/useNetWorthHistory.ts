@@ -6,7 +6,7 @@ import {
   useDebtAccountsQuery,
   useDebtItemsQuery,
 } from '@/hooks/queries'
-import { format, addDays, addWeeks, addMonths } from 'date-fns'
+import { format, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { getAccountingStartDate } from '@/utils/accountingPeriod'
 import { getDebtItemAmountAtDate } from '@/utils/debts'
@@ -54,8 +54,6 @@ export function useNetWorthHistory(
     const today = new Date()
     today.setHours(23, 59, 59, 999)
 
-    const points: NetWorthPoint[] = []
-
     const accountingStartStr = getAccountingStartDate()
     let effectiveStart = new Date(startDate)
     if (accountingStartStr) {
@@ -65,23 +63,99 @@ export function useNetWorthHistory(
         effectiveStart = accStartDate
       }
     }
-
-    let current = new Date(effectiveStart)
-    current.setHours(23, 59, 59, 999)
+    effectiveStart.setHours(23, 59, 59, 999)
 
     const limit = new Date(endDate)
     limit.setHours(23, 59, 59, 999)
 
-    if (current > limit) {
-      current = new Date(limit)
+    if (effectiveStart > limit) {
+      effectiveStart = new Date(limit)
     }
 
-    let count = 0
-    const maxPoints = 200
+    // ── Geração de Datas Ancoradas em "Hoje" ───────────────────────────
+    // Garante que a data atual ("Hoje") seja um ponto exato no gráfico e que,
+    // quando a projeção futura estiver desativada (limit <= today), o último ponto
+    // corresponda a Hoje com 100% de paridade contábil com a página de Contas.
+    const dateSet = new Set<string>()
+    const targetDates: Date[] = []
 
-    while (current <= limit && count < maxPoints) {
-      count++
-      const pDate = new Date(current)
+    const addDate = (d: Date) => {
+      const clone = new Date(d)
+      clone.setHours(23, 59, 59, 999)
+      const key = format(clone, 'yyyy-MM-dd')
+      if (!dateSet.has(key)) {
+        dateSet.add(key)
+        targetDates.push(clone)
+      }
+    }
+
+    if (limit <= today) {
+      // Período puramente passado/presente: ancoramos em limit (que normalmente é today) e retrocedemos
+      addDate(limit)
+      let curr = new Date(limit)
+      let safety = 0
+      while (safety++ < 200) {
+        if (granularity === 'daily') curr = subDays(curr, 1)
+        else if (granularity === 'weekly') curr = subWeeks(curr, 1)
+        else curr = subMonths(curr, 1)
+
+        if (curr < effectiveStart) break
+        addDate(curr)
+      }
+      addDate(effectiveStart)
+    } else if (effectiveStart >= today) {
+      // Período puramente futuro (ex: presets de projeção)
+      addDate(effectiveStart)
+      let curr = new Date(effectiveStart)
+      let safety = 0
+      while (safety++ < 200) {
+        if (granularity === 'daily') curr = addDays(curr, 1)
+        else if (granularity === 'weekly') curr = addWeeks(curr, 1)
+        else curr = addMonths(curr, 1)
+
+        if (curr > limit) break
+        addDate(curr)
+      }
+      addDate(limit)
+    } else {
+      // Período híbrido (passado + futuro): Hoje é a âncora central
+      addDate(today)
+
+      let currPast = new Date(today)
+      let safetyPast = 0
+      while (safetyPast++ < 150) {
+        if (granularity === 'daily') currPast = subDays(currPast, 1)
+        else if (granularity === 'weekly') currPast = subWeeks(currPast, 1)
+        else currPast = subMonths(currPast, 1)
+
+        if (currPast < effectiveStart) break
+        addDate(currPast)
+      }
+      addDate(effectiveStart)
+
+      let currFuture = new Date(today)
+      let safetyFuture = 0
+      while (safetyFuture++ < 150) {
+        if (granularity === 'daily') currFuture = addDays(currFuture, 1)
+        else if (granularity === 'weekly') currFuture = addWeeks(currFuture, 1)
+        else currFuture = addMonths(currFuture, 1)
+
+        if (currFuture > limit) break
+        addDate(currFuture)
+      }
+      addDate(limit)
+    }
+
+    targetDates.sort((a, b) => a.getTime() - b.getTime())
+
+    const round2 = (v: number) => {
+      const r = Math.round(v * 100) / 100
+      return Math.abs(r) < 0.005 ? 0 : r
+    }
+
+    const points: NetWorthPoint[] = []
+
+    for (const pDate of targetDates) {
       const isFuture = pDate > today
 
       let totalNetWorth = 0
@@ -128,21 +202,22 @@ export function useNetWorthHistory(
           }
         }
 
-        accountBalances[acc.id] = bal
-        totalNetWorth += bal
+        const roundedBal = round2(bal)
+        accountBalances[acc.id] = roundedBal
+        totalNetWorth += roundedBal
 
-        if (bal >= 0) totalAssets += bal
-        else totalLiabilities += Math.abs(bal)
+        if (roundedBal >= 0) totalAssets += roundedBal
+        else totalLiabilities += Math.abs(roundedBal)
 
         if (acc.type === 'checking') {
-          checkingTotal += bal
-          onBudgetTotal += bal
+          checkingTotal += roundedBal
+          onBudgetTotal += roundedBal
         } else if (acc.type === 'credit_card') {
-          creditCardTotal += bal
-          onBudgetTotal += bal
+          creditCardTotal += roundedBal
+          onBudgetTotal += roundedBal
         } else if (acc.type === 'off_budget') {
-          offBudgetAccountsTotal += bal
-          offBudgetTotal += bal
+          offBudgetAccountsTotal += roundedBal
+          offBudgetTotal += roundedBal
         }
       }
 
@@ -156,31 +231,37 @@ export function useNetWorthHistory(
           const itemCreatedAt = new Date(item.createdAt)
           if (itemCreatedAt > pDate) continue
 
-          // Verifica se o item ainda estava pendente ou se já havia sido liquidado na data pDate
-          const isSettledAtDate =
-            item.status === 'settled' && item.settledDate && new Date(item.settledDate) <= pDate
+          // Se estiver cancelado, ignora
+          if (item.status === 'cancelled') continue
 
-          if (!isSettledAtDate && item.status !== 'cancelled') {
-            const effectiveAmount = getDebtItemAmountAtDate(item, pDate)
-            if (effectiveAmount > 0) {
-              if (item.type === 'receivable') {
-                dBal += effectiveAmount
-                debtReceivableTotal += effectiveAmount
-                totalAssets += effectiveAmount
-                totalNetWorth += effectiveAmount
-                offBudgetTotal += effectiveAmount
-              } else if (item.type === 'payable') {
-                dBal -= effectiveAmount
-                debtPayableTotal += effectiveAmount
-                totalLiabilities += effectiveAmount
-                totalNetWorth -= effectiveAmount
-                offBudgetTotal -= effectiveAmount
-              }
+          // Se estiver liquidado:
+          if (item.status === 'settled') {
+            // Se não tem data de liquidação informada, considera liquidado e não entra no saldo
+            if (!item.settledDate) continue
+            // Se foi liquidado antes ou na data do ponto, já foi quitado
+            if (new Date(item.settledDate) <= pDate) continue
+          }
+
+          const effectiveAmount = getDebtItemAmountAtDate(item, pDate)
+          if (effectiveAmount > 0) {
+            if (item.type === 'receivable') {
+              dBal += effectiveAmount
+              debtReceivableTotal += effectiveAmount
+              totalAssets += effectiveAmount
+              totalNetWorth += effectiveAmount
+              offBudgetTotal += effectiveAmount
+            } else if (item.type === 'payable') {
+              dBal -= effectiveAmount
+              debtPayableTotal += effectiveAmount
+              totalLiabilities += effectiveAmount
+              totalNetWorth -= effectiveAmount
+              offBudgetTotal -= effectiveAmount
             }
           }
         }
 
-        accountBalances[dAcc.id] = dBal
+        const roundedDBal = round2(dBal)
+        accountBalances[dAcc.id] = roundedDBal
       }
 
       let dateLabel = ''
@@ -195,27 +276,19 @@ export function useNetWorthHistory(
       points.push({
         date: pDate,
         dateLabel,
-        netWorth: totalNetWorth,
-        assets: totalAssets,
-        liabilities: totalLiabilities,
+        netWorth: round2(totalNetWorth),
+        assets: round2(totalAssets),
+        liabilities: round2(totalLiabilities),
         isFuture,
-        onBudgetTotal,
-        offBudgetTotal,
-        checkingTotal,
-        creditCardTotal,
-        offBudgetAccountsTotal,
-        debtReceivableTotal,
-        debtPayableTotal,
+        onBudgetTotal: round2(onBudgetTotal),
+        offBudgetTotal: round2(offBudgetTotal),
+        checkingTotal: round2(checkingTotal),
+        creditCardTotal: round2(creditCardTotal),
+        offBudgetAccountsTotal: round2(offBudgetAccountsTotal),
+        debtReceivableTotal: round2(debtReceivableTotal),
+        debtPayableTotal: round2(debtPayableTotal),
         accounts: accountBalances,
       })
-
-      if (granularity === 'daily') {
-        current = addDays(current, 1)
-      } else if (granularity === 'weekly') {
-        current = addWeeks(current, 1)
-      } else {
-        current = addMonths(current, 1)
-      }
     }
 
     // Se gerou apenas 1 ponto (ex: início contábil é hoje), cria um ponto inicial complementar para desenhar a curva
