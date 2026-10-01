@@ -136,24 +136,54 @@ export interface CopyBudgetResult {
   targetMonth: string
 }
 
+export interface ReplicateBudgetResult {
+  success: boolean
+  sourceMonth: string
+  replicatedMonths: string[]
+  copiedCategoriesCount: number
+}
+
 export async function copyFromPreviousMonth(
   targetMonth: string,
-  budgetType: BudgetType = 'cash'
+  budgetType: BudgetType = 'cash',
+  sourceMonthOverride?: string,
+  notify: boolean = true
 ): Promise<CopyBudgetResult> {
   const client = getClient()
-  const prevMonth = shiftMonth(targetMonth, -1)
+  let prevMonth = sourceMonthOverride || shiftMonth(targetMonth, -1)
 
-  const { data: prevBudgets, error: prevErr } = await client
+  let { data: prevBudgets, error: prevErr } = await client
     .from('budget_months')
     .select('*')
     .eq('month', prevMonth)
 
   if (prevErr) throw new Error(`Erro ao buscar orçamentos do mês anterior: ${prevErr.message}`)
-  if (!prevBudgets || prevBudgets.length === 0) {
-    return { success: false, copiedCount: 0, prevMonth, targetMonth }
+
+  let filtered = (prevBudgets || []).filter(b => getRowBudgetType(b) === budgetType)
+
+  // Se o mês anterior imediato não tiver dados e não foi forçado um mês específico,
+  // busca o mês mais recente anterior a targetMonth que tenha orçamento configurado
+  if (filtered.length === 0 && !sourceMonthOverride) {
+    const { data: recentRows } = await client
+      .from('budget_months')
+      .select('*')
+      .lt('month', targetMonth)
+      .order('month', { ascending: false })
+
+    const candidateMonths = Array.from(
+      new Set(
+        (recentRows || [])
+          .filter(r => getRowBudgetType(r) === budgetType && Number(r.budgeted ?? 0) > 0)
+          .map(r => r.month)
+      )
+    )
+
+    if (candidateMonths.length > 0) {
+      prevMonth = candidateMonths[0]
+      filtered = (recentRows || []).filter(r => r.month === prevMonth && getRowBudgetType(r) === budgetType)
+    }
   }
 
-  const filtered = prevBudgets.filter(b => getRowBudgetType(b) === budgetType)
   if (filtered.length === 0) {
     return { success: false, copiedCount: 0, prevMonth, targetMonth }
   }
@@ -260,7 +290,9 @@ export async function copyFromPreviousMonth(
   }
 
   await Promise.all(operations)
-  notifyDataChanged('budget_months', 'upsert')
+  if (notify) {
+    notifyDataChanged('budget_months', 'upsert')
+  }
 
   return {
     success: true,
@@ -270,6 +302,54 @@ export async function copyFromPreviousMonth(
   }
 }
 
+export async function replicateBudget(
+  sourceMonth: string,
+  targetMonthsCount: number,
+  budgetType: BudgetType = 'cash'
+): Promise<ReplicateBudgetResult> {
+  const client = getClient()
+
+  // 1. Obter registros do mês de origem
+  const { data: sourceBudgets, error: srcErr } = await client
+    .from('budget_months')
+    .select('*')
+    .eq('month', sourceMonth)
+
+  if (srcErr) throw new Error(`Erro ao buscar orçamento de origem: ${srcErr.message}`)
+
+  const filtered = (sourceBudgets || []).filter(b => getRowBudgetType(b) === budgetType)
+  if (filtered.length === 0) {
+    return { success: false, sourceMonth, replicatedMonths: [], copiedCategoriesCount: 0 }
+  }
+
+  const categoryBudgetMap = new Map<string, number>()
+  for (const prev of filtered) {
+    if (prev.category_id) {
+      categoryBudgetMap.set(prev.category_id, Number(prev.budgeted || 0))
+    }
+  }
+
+  if (categoryBudgetMap.size === 0) {
+    return { success: false, sourceMonth, replicatedMonths: [], copiedCategoriesCount: 0 }
+  }
+
+  // 2. Replicar para cada mês subsequente
+  const replicatedMonths: string[] = []
+  for (let i = 1; i <= targetMonthsCount; i++) {
+    const tMonth = shiftMonth(sourceMonth, i)
+    replicatedMonths.push(tMonth)
+    await copyFromPreviousMonth(tMonth, budgetType, sourceMonth, false)
+  }
+
+  notifyDataChanged('budget_months', 'upsert')
+
+  return {
+    success: true,
+    sourceMonth,
+    replicatedMonths,
+    copiedCategoriesCount: categoryBudgetMap.size,
+  }
+}
 
 export async function clearMonthBudgets(month: string, budgetType: BudgetType = 'cash'): Promise<void> {
   const client = getClient()
@@ -582,7 +662,7 @@ export function calculateIncomeBudgetRows(
  *     real      += 0                  − despesas_orçadas(m) − fatura_CC(m)
  *     projetado += renda_orçada(m)    − despesas_orçadas(m) − fatura_CC(m)
  *
- * O campo rolloverFromPreviousMonth expõe o TBB real do mês atual (a semente real).
+ * O campo rolloverFromPreviousMonth expõe o saldo livre acumulado trazido do mês imediatamente anterior (M - 1).
  */
 export function calculateBudgetSummary(
   month: string,
@@ -689,12 +769,14 @@ export function calculateBudgetSummary(
   }
 
   // ── Helper: despesas orçadas e renda orçada de um mês (para chaining) ─────
-  const computeMonthBudgetTotals = (m: string): { income: number; expense: number } => {
+  const computeMonthBudgetTotals = (m: string): { income: number; expense: number; hasExplicitBudget: boolean } => {
     let income = 0
     let expense = 0
+    let hasExplicitBudget = false
     for (const b of budgetMonths) {
       if (b.month !== m || isMonthBeforeAccountingStart(b.month)) continue
       if (getRowBudgetType(b) !== regime) continue
+      hasExplicitBudget = true
       const cat = catMap.get(b.categoryId)
       const grp = cat ? groupMap.get(cat.groupId) : undefined
       if (grp?.type === 'income') {
@@ -703,7 +785,7 @@ export function calculateBudgetSummary(
         expense += Number(b.budgeted ?? 0)
       }
     }
-    return { income, expense }
+    return { income, expense, hasExplicitBudget }
   }
 
   // ── Regime de Competência: cálculo econômico direto para qualquer mês (passado, atual ou futuro) ──
@@ -825,35 +907,73 @@ export function calculateBudgetSummary(
   let realSeed = curRealTBB
   let projSeed = curRealTBB + curPending
 
+  // Rastrear último orçamento mensal conhecido para servir de baseline para meses intermediários não preenchidos
+  const curTotals = computeMonthBudgetTotals(curMonth)
+  let lastKnownIncome = curTotals.income
+  let lastKnownExpense = curTotals.expense
+
+  // Se o mês atual ainda não tiver orçamento configurado, busca o mês mais recente anterior que possua orçamento
+  if (!curTotals.hasExplicitBudget || (lastKnownIncome === 0 && lastKnownExpense === 0)) {
+    const priorBudgets = budgetMonths
+      .filter(b => b.month <= curMonth && getRowBudgetType(b) === regime && !isMonthBeforeAccountingStart(b.month))
+      .sort((a, b) => b.month.localeCompare(a.month))
+
+    const candidateMonth = priorBudgets.find(b => Number(b.budgeted ?? 0) > 0)?.month
+    if (candidateMonth) {
+      const priorTotals = computeMonthBudgetTotals(candidateMonth)
+      lastKnownIncome = priorTotals.income
+      lastKnownExpense = priorTotals.expense
+    }
+  }
+
   // Iterar de curMonth+1 até o mês selecionado (inclusive)
   const [curY, curM] = curMonth.split('-').map(Number)
   let d = addMonths(new Date(curY, curM - 1, 1), 1)
   let selectedMonthCC = 0
   let selectedMonthTotalBudgeted = 0
   let selectedMonthTotalExpectedIncome = 0
+  let rolloverReal = curRealTBB
 
   while (format(d, 'yyyy-MM') <= month) {
     const m = format(d, 'yyyy-MM')
-    const { income: mBudgetedIncome, expense: mBudgetedExpense } = computeMonthBudgetTotals(m)
+    const mTotals = computeMonthBudgetTotals(m)
     const mCC = computeCCInvoices(m)
 
-    // real: assume 0 de renda futura (pessimista)
-    realSeed -= mBudgetedExpense + mCC
-    // projetado: inclui renda orçada (otimista)
-    projSeed += mBudgetedIncome - mBudgetedExpense - mCC
+    let mBudgetedIncome = mTotals.income
+    let mBudgetedExpense = mTotals.expense
+
+    if (mTotals.hasExplicitBudget) {
+      lastKnownIncome = mTotals.income
+      lastKnownExpense = mTotals.expense
+    } else if (m < month) {
+      // Mês intermediário não preenchido: propaga linha de base do último orçamento conhecido
+      mBudgetedIncome = lastKnownIncome
+      mBudgetedExpense = lastKnownExpense
+    }
 
     if (m === month) {
       selectedMonthCC = mCC
-      selectedMonthTotalBudgeted = mBudgetedExpense
-      selectedMonthTotalExpectedIncome = mBudgetedIncome
+      selectedMonthTotalBudgeted = mTotals.expense
+      selectedMonthTotalExpectedIncome = mTotals.income
+      // O saldo herdado do mês anterior é o realSeed acumulado antes de abater o mês selecionado
+      rolloverReal = realSeed
     }
+
+    const effectiveExpense = m === month ? selectedMonthTotalBudgeted : mBudgetedExpense
+    const effectiveIncome = m === month ? selectedMonthTotalExpectedIncome : mBudgetedIncome
+
+    // real: assume 0 de renda futura (pessimista)
+    realSeed -= effectiveExpense + mCC
+    // projetado: inclui renda orçada (otimista)
+    projSeed += effectiveIncome - effectiveExpense - mCC
+
     d = addMonths(d, 1)
   }
 
   return {
     month,
     isFutureMonth: true,
-    rolloverFromPreviousMonth: round(curRealTBB),
+    rolloverFromPreviousMonth: round(rolloverReal),
     totalIncome: 0,
     totalExpectedIncome: round(selectedMonthTotalExpectedIncome),
     pendingExpectedIncome: round(selectedMonthTotalExpectedIncome), // nada recebido ainda

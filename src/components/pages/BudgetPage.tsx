@@ -25,6 +25,7 @@ import SyncStatusBadge from '@/components/atoms/SyncStatusBadge'
 import PendingIssuesCard from '@/components/organisms/PendingIssuesCard'
 import CategoryTransactionsModal from '@/components/organisms/CategoryTransactionsModal'
 import AdjustEnvelopeModal from '@/components/organisms/AdjustEnvelopeModal'
+import ReplicateBudgetModal from '@/components/organisms/ReplicateBudgetModal'
 import OnboardingWizardModal from '@/components/organisms/OnboardingWizardModal'
 import Modal from '@/components/atoms/Modal'
 import type {
@@ -430,6 +431,7 @@ export default function BudgetPage() {
   } | null>(null)
   const [savingCategoryId, setSavingCategoryId] = useState<string | null>(null)
   const [showHelpModal, setShowHelpModal] = useState(false)
+  const [showReplicateModal, setShowReplicateModal] = useState(false)
   const [showOnboardingModal, setShowOnboardingModal] = useState(false)
   const [showAdvancedMode, setShowAdvancedMode] = useState<boolean>(() => {
     return localStorage.getItem('fin_advanced_mode') === 'true' || localStorage.getItem('finplan_advanced_mode') === 'true' || getSavedBudgetRegime() === 'accrual'
@@ -486,8 +488,14 @@ export default function BudgetPage() {
       if (!result.success || result.copiedCount === 0) {
         await alert({
           title: 'Nenhum Orçamento Encontrado',
-          message: `Não foram encontrados valores orçados no mês anterior (${prevLabel}) para o ${regimeLabel}.`,
+          message: `Não foram encontrados valores orçados anteriores para copiar no ${regimeLabel}.`,
           variant: 'info',
+        })
+      } else if (result.prevMonth !== prevMonth) {
+        await alert({
+          title: 'Orçamento Copiado',
+          message: `Como o mês imediatamente anterior estava em branco, copiamos os valores do último orçamento configurado (${formatMonthLabel(result.prevMonth)}) para ${currentLabel} (${result.copiedCount} categorias).`,
+          variant: 'success',
         })
       }
     } catch (err: any) {
@@ -698,22 +706,22 @@ export default function BudgetPage() {
                             <HelpCircle className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                        {/* Carryover do mês atual para meses futuros */}
+                        {/* Saldo transportado do mês anterior para meses futuros */}
                         {summary.isFutureMonth && (summary.rolloverFromPreviousMonth ?? 0) !== 0 && (
                           <span
                             className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60 flex-shrink-0"
-                            title={`Sobra real do mês atual que seria levada para este mês: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
+                            title={`Saldo livre acumulado do mês anterior: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
                           >
-                            Carryover: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
+                            Saldo Anterior: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
                           </span>
                         )}
 
-                        {/* Projeção com renda prevista */}
-                        {(summary.pendingExpectedIncome ?? 0) > 0 && (
+                        {/* Projeção com renda prevista / otimista */}
+                        {((summary.pendingExpectedIncome ?? 0) > 0 || (summary.isFutureMonth && Math.abs((summary.projectedToBeBudgeted ?? 0) - (summary.toBeBudgeted ?? 0)) > 0.005)) && (
                           <span
                             className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60 flex-shrink-0"
                             title={summary.isFutureMonth
-                              ? `Se toda a renda planejada para os meses até aqui entrar, o valor a orçar seria ${formatCurrency(summary.projectedToBeBudgeted)}`
+                              ? `Projeção Otimista: se toda a renda planejada para os meses até aqui entrar, o valor a orçar seria ${formatCurrency(summary.projectedToBeBudgeted)}`
                               : 'Saldo projetado incluindo receitas previstas que ainda não entraram'}
                           >
                             {summary.isFutureMonth ? 'Otimista:' : 'Previsto:'} {formatCurrency(summary.projectedToBeBudgeted)}
@@ -778,6 +786,17 @@ export default function BudgetPage() {
                       >
                         <Copy className="w-4 h-4 text-indigo-400 flex-shrink-0" />
                         <span>Copiar mês anterior</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowMenu(false)
+                          setShowReplicateModal(true)
+                        }}
+                        disabled={isProcessingBudget}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-amber-300 hover:bg-amber-950/30 rounded-lg transition-colors border-t border-slate-800/80 mt-1 pt-2 disabled:opacity-50"
+                      >
+                        <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                        <span>Replicar para meses futuros</span>
                       </button>
                       <button
                         onClick={handleClear}
@@ -913,17 +932,17 @@ export default function BudgetPage() {
                       {summary.isFutureMonth && (summary.rolloverFromPreviousMonth ?? 0) !== 0 && (
                         <span
                           className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60"
-                          title={`Sobra real do mês atual: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
+                          title={`Saldo livre acumulado do mês anterior: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
                         >
-                          Carryover: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
+                          Saldo Anterior: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
                         </span>
                       )}
 
-                      {(summary.pendingExpectedIncome ?? 0) > 0 && (
+                      {((summary.pendingExpectedIncome ?? 0) > 0 || (summary.isFutureMonth && Math.abs((summary.projectedToBeBudgeted ?? 0) - (summary.toBeBudgeted ?? 0)) > 0.005)) && (
                         <span
                           className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60"
                           title={summary.isFutureMonth
-                            ? `Se toda a renda planejada entrar, o valor seria ${formatCurrency(summary.projectedToBeBudgeted)}`
+                            ? `Projeção Otimista: se toda a renda planejada para os meses até aqui entrar, o valor seria ${formatCurrency(summary.projectedToBeBudgeted)}`
                             : 'Saldo projetado incluindo receitas previstas'}
                         >
                           {summary.isFutureMonth ? 'Otimista:' : 'Previsto:'} {formatCurrency(summary.projectedToBeBudgeted)}
@@ -932,7 +951,7 @@ export default function BudgetPage() {
                     </div>
                     <p className="text-[10px] text-slate-500 truncate">
                       {summary.isFutureMonth
-                        ? `Carryover: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)} · Pessimista (sem renda futura)`
+                        ? `Saldo Anterior: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)} · Pessimista (sem renda futura)`
                         : summary.toBeBudgeted > 0.005
                         ? 'Disponível para distribuir'
                         : summary.toBeBudgeted < -0.005
@@ -1198,6 +1217,16 @@ export default function BudgetPage() {
         isOpen={showOnboardingModal}
         onClose={() => setShowOnboardingModal(false)}
       />
+
+      {/* Modal de Replicação de Orçamento para o Futuro */}
+      {showReplicateModal && (
+        <ReplicateBudgetModal
+          isOpen={showReplicateModal}
+          onClose={() => setShowReplicateModal(false)}
+          sourceMonth={month}
+          budgetRegime={budgetRegime}
+        />
+      )}
     </div>
   )
 }
