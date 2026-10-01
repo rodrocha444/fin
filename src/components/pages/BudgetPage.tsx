@@ -949,15 +949,6 @@ export default function BudgetPage() {
                         </span>
                       )}
                     </div>
-                    <p className="text-[10px] text-slate-500 truncate">
-                      {summary.isFutureMonth
-                        ? `Saldo Anterior: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)} · Pessimista (sem renda futura)`
-                        : summary.toBeBudgeted > 0.005
-                        ? 'Disponível para distribuir'
-                        : summary.toBeBudgeted < -0.005
-                        ? 'Orçamento excedeu receitas'
-                        : 'Orçamento 100% equilibrado'}
-                    </p>
                   </div>
 
                   <div className="text-right flex-shrink-0">
