@@ -90,15 +90,8 @@ function IncomeCategoryRow({
           >
             {row.category.name}
           </span>
-          <span className="text-[10.5px] sm:text-[11px] text-slate-400 font-normal truncate mt-0.5">
-            {hasGoal
-              ? `Recebido ${formatCurrency(row.received)} de ${formatCurrency(row.expected)}`
-              : row.received > 0
-              ? `Recebido: ${formatCurrency(row.received)}`
-              : 'Sem entradas'}
-          </span>
           {hasGoal && (
-            <div className="w-full max-w-[170px] sm:max-w-[210px] h-1 bg-slate-800 rounded-full mt-1 overflow-hidden">
+            <div className="w-full max-w-[130px] sm:max-w-[180px] h-1 bg-slate-800 rounded-full mt-1.5 overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-300 bg-emerald-500"
                 style={{ width: `${percentReceived}%` }}
@@ -106,6 +99,24 @@ function IncomeCategoryRow({
             </div>
           )}
         </div>
+      </td>
+
+      {/* Coluna 2: Recebido */}
+      <td
+        onClick={() =>
+          onSelectCategory({
+            category: row.category,
+            budgeted: row.expected,
+            activity: row.received,
+            isIncome: true,
+          })
+        }
+        className="py-2.5 px-2 text-right cursor-pointer select-none"
+        title="Total já recebido nesta receita"
+      >
+        <span className="text-xs sm:text-sm font-semibold tabular-nums text-slate-200">
+          {row.received > 0.005 ? formatCurrency(row.received) : <span className="text-slate-500 font-normal">R$ 0,00</span>}
+        </span>
       </td>
 
       {/* Coluna 2: A Receber / Status */}
@@ -185,7 +196,7 @@ function IncomeGroupRow({
         className="cursor-pointer select-none bg-emerald-950/60 border-t-2 border-emerald-900/70 border-b border-emerald-900/50 hover:bg-emerald-950/80 active:bg-emerald-900/50 transition-colors group/grow"
         onClick={() => setOpen(o => !o)}
       >
-        <td colSpan={2} className="py-2.5 pl-3 sm:pl-6 pr-3 sm:pr-6">
+        <td colSpan={3} className="py-2.5 pl-3 sm:pl-6 pr-3 sm:pr-6">
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
             <div className="w-1 h-3.5 sm:h-4 rounded-full bg-emerald-500 flex-shrink-0" />
             <span className="text-emerald-400 group-hover/grow:text-emerald-200 transition-transform flex-shrink-0">
@@ -280,15 +291,8 @@ function CategoryRow({
           >
             {row.category.name}
           </span>
-          <span className="text-[10.5px] sm:text-[11px] text-slate-400 font-normal truncate mt-0.5">
-            {hasBudget
-              ? `Gasto ${formatCurrency(spent)} de ${formatCurrency(budgeted)}`
-              : spent > 0
-              ? `Gasto: ${formatCurrency(spent)} (sem teto)`
-              : 'Sem gastos'}
-          </span>
           {(hasBudget || spent > 0) && (
-            <div className="w-full max-w-[170px] sm:max-w-[210px] h-1 bg-slate-800 rounded-full mt-1 overflow-hidden">
+            <div className="w-full max-w-[130px] sm:max-w-[180px] h-1 bg-slate-800 rounded-full mt-1.5 overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-300 ${progressBarColor}`}
                 style={{ width: `${percentSpent}%` }}
@@ -298,7 +302,26 @@ function CategoryRow({
         </div>
       </td>
 
-      {/* Coluna 2: Saldo Disponível (Toque para ajustar envelope) */}
+      {/* Coluna 2: Gasto */}
+      <td
+        onClick={() =>
+          onSelectCategory({
+            category: row.category,
+            budgeted: row.budgeted,
+            activity: row.activity,
+            available: row.available,
+            isIncome: false,
+          })
+        }
+        className="py-2.5 px-2 text-right cursor-pointer select-none"
+        title="Total gasto no mês nesta categoria"
+      >
+        <span className="text-xs sm:text-sm font-semibold tabular-nums text-slate-200">
+          {spent > 0.005 ? formatCurrency(spent) : <span className="text-slate-500 font-normal">R$ 0,00</span>}
+        </span>
+      </td>
+
+      {/* Coluna 3: Saldo Disponível (Toque para ajustar envelope) */}
       <td
         onClick={(e) => {
           if (isRowSaving) return
@@ -360,7 +383,7 @@ function GroupRow({
         className="cursor-pointer select-none bg-indigo-950/50 border-t-2 border-indigo-900/60 border-b border-indigo-900/40 hover:bg-indigo-950/70 active:bg-indigo-900/50 transition-colors group/grow"
         onClick={() => setOpen(o => !o)}
       >
-        <td colSpan={2} className="py-2.5 pl-3 sm:pl-6 pr-3 sm:pr-6">
+        <td colSpan={3} className="py-2.5 pl-3 sm:pl-6 pr-3 sm:pr-6">
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
             <div className="w-1 h-3.5 sm:h-4 rounded-full bg-indigo-500 flex-shrink-0" />
             <span className="text-indigo-400 group-hover/grow:text-indigo-200 transition-transform flex-shrink-0">
@@ -972,11 +995,12 @@ export default function BudgetPage() {
         ) : (
           <table className="w-full table-fixed">
             <colgroup>
-              <col className="w-[62%] sm:w-[65%]" />
-              <col className="w-[38%] sm:w-[35%]" />
+              <col className="w-[46%] sm:w-[48%]" />
+              <col className="w-[27%] sm:w-[26%]" />
+              <col className="w-[27%] sm:w-[26%]" />
             </colgroup>
             <tbody>
-              {/* ── Seção de Despesas (2 Colunas) ── */}
+              {/* ── Seção de Despesas (3 Colunas) ── */}
               {rows && rows.length > 0 && (
                 <>
                   <tr className="bg-slate-900/95 text-[10px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider border-b-2 border-indigo-500/40 sticky top-0 backdrop-blur-md z-10 select-none shadow-md shadow-black/30">
@@ -987,6 +1011,9 @@ export default function BudgetPage() {
                           Despesas
                         </span>
                       </div>
+                    </th>
+                    <th className="py-2.5 sm:py-3 px-2 text-right text-slate-300 font-bold" title="Total já gasto no mês nesta categoria">
+                      Gasto
                     </th>
                     <th className="py-2.5 sm:py-3 pl-2 pr-3 sm:pr-6 text-right text-slate-300 font-bold" title="Saldo restante no envelope (verde = sobrou, vermelho = estourou o teto)">
                       Disponível
@@ -1017,11 +1044,11 @@ export default function BudgetPage() {
               {/* ── Espaçamento entre Seções ── */}
               {rows && rows.length > 0 && incomeRows && incomeRows.length > 0 && (
                 <tr className="h-4 bg-slate-950/60 select-none" aria-hidden="true">
-                  <td colSpan={2} />
+                  <td colSpan={3} />
                 </tr>
               )}
 
-              {/* ── Seção de Renda / Receitas (2 Colunas) ── */}
+              {/* ── Seção de Renda / Receitas (3 Colunas) ── */}
               {incomeRows && incomeRows.length > 0 && (
                 <>
                   <tr className="bg-slate-900/95 text-[10px] sm:text-xs font-bold text-emerald-300 uppercase tracking-wider border-t-2 border-emerald-500/50 border-b border-emerald-900/40 select-none shadow-md shadow-black/30">
@@ -1032,6 +1059,9 @@ export default function BudgetPage() {
                           Receitas
                         </span>
                       </div>
+                    </th>
+                    <th className="py-2.5 sm:py-3 px-2 text-right text-emerald-300 font-bold" title="Total já recebido no mês nesta categoria">
+                      Recebido
                     </th>
                     <th className="py-2.5 sm:py-3 pl-2 pr-3 sm:pr-6 text-right text-emerald-300 font-bold" title="Diferença ou saldo a receber">
                       A Receber
