@@ -590,13 +590,13 @@ export default function BudgetPage() {
         className="bg-slate-900/95 backdrop-blur-sm border-b border-slate-800/90 flex-shrink-0 relative z-20"
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
       >
-        <div className="px-3 sm:px-6 pb-3 space-y-2 sm:space-y-0">
+        <div className="px-2.5 sm:px-6 py-2">
           
-          {/* Barra Principal: Mês + Regime + Hero Card (sm+) + Sync & Menu */}
-          <div className="flex items-center justify-between gap-2">
+          {/* Barra Principal: Mês + Regime + Hero Card Unificado + Sync & Menu */}
+          <div className="flex items-center justify-between gap-1.5 sm:gap-3">
             
-            {/* Esquerda: Navegação de Mês + Seletor de Regime (se ativado) */}
-            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-shrink-0">
+            {/* Esquerda: Navegação de Mês + Seletor de Regime (se ativado) + Card Unificado à Esquerda */}
+            <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
               <MonthNavigator
                 month={month}
                 onChangeMonth={handleMonthChange}
@@ -605,141 +605,84 @@ export default function BudgetPage() {
               {(showAdvancedMode || budgetRegime === 'accrual') && (
                 <BudgetRegimeSelector regime={budgetRegime} onChangeRegime={handleBudgetRegimeChange} />
               )}
-            </div>
 
-            {/* Centro no Desktop (sm+): Card Hero ("Disponível a Orçar" no Caixa / 3 Pilares na Competência) */}
-            {summary && (
-              <div className="hidden sm:flex flex-1 items-center justify-center px-2 min-w-0">
-                {isAccrual ? (
-                  <div
-                    className={`px-3.5 py-1.5 rounded-xl border flex items-center justify-center gap-3 sm:gap-4 shadow-sm transition-all duration-200 ${heroBgBorder}`}
-                  >
-                    {/* 1. Receitas */}
-                    <div className="flex flex-col text-right min-w-0">
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                        Receitas
-                      </span>
-                      <span className="text-xs sm:text-sm font-bold text-emerald-400 tabular-nums">
-                        {formatCurrency(isFuture ? (summary.totalExpectedIncome ?? 0) : summary.totalIncome)}
-                      </span>
-                      <span className="text-[9px] text-slate-500 truncate" title="Meta de receita prevista orçada">
-                        {isFuture ? 'Previstas' : `Meta: ${formatCurrency(summary.totalExpectedIncome ?? 0)}`}
-                      </span>
-                    </div>
-
-                    <span className="text-slate-600 font-bold text-xs select-none">−</span>
-
-                    {/* 2. Despesas */}
-                    <div className="flex flex-col text-right min-w-0">
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                        Despesas
-                      </span>
-                      <span className="text-xs sm:text-sm font-bold text-rose-400 tabular-nums">
-                        {formatCurrency(isFuture ? summary.totalBudgeted : (summary.totalSpent ?? 0))}
-                      </span>
-                      <span className="text-[9px] text-slate-500 truncate" title="Teto de despesas orçado">
-                        {isFuture ? 'Orçadas' : `Orçado: ${formatCurrency(summary.totalBudgeted)}`}
-                      </span>
-                    </div>
-
-                    <span className="text-slate-600 font-bold text-xs select-none">=</span>
-
-                    {/* 3. Resultado Final */}
-                    <div className="flex flex-col text-right pl-2 border-l border-slate-700/60 min-w-0">
-                      <span className={`text-[10px] uppercase font-bold tracking-wider truncate ${heroValue < -0.005 ? 'text-rose-400' : 'text-slate-400'}`}>
-                        {isFuture ? 'Resultado Previsto' : 'Resultado Real'}
-                      </span>
-                      <span className={`text-sm sm:text-base font-extrabold tabular-nums tracking-tight ${heroColor}`}>
-                        {heroValue > 0.005 ? `+${formatCurrency(heroValue)}` : formatCurrency(heroValue)}
-                      </span>
-                      <div className="flex items-center justify-end gap-1 text-[9px] truncate">
-                        {isFuture ? (
-                          <span
-                            className={`font-semibold ${
-                              heroValue > 0.005 ? 'text-emerald-400' : heroValue < -0.005 ? 'text-rose-400 font-bold' : 'text-slate-400'
-                            }`}
-                          >
-                            {heroValue > 0.005 ? 'Previsto: Positivo' : heroValue < -0.005 ? 'Previsto: Negativo' : 'Previsto: Equilibrado'}
-                          </span>
-                        ) : hasExpectedIncome ? (
-                          <span
-                            className={`font-semibold ${
-                              (summary.plannedNetResult ?? 0) < -0.005
-                                ? 'text-rose-400 font-bold'
-                                : (summary.plannedNetResult ?? 0) > 0.005
-                                ? 'text-emerald-400'
-                                : 'text-slate-400'
-                            }`}
-                            title={`Resultado Previsto do orçamento (Receitas Previstas − Despesas Orçadas): ${formatCurrency(summary.plannedNetResult ?? 0)}`}
-                          >
-                            Previsto: {(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}{formatCurrency(summary.plannedNetResult ?? 0)}
-                          </span>
-                        ) : (
-                          <span
-                            className={`font-semibold ${
-                              heroValue > 0.005 ? 'text-emerald-400' : heroValue < -0.005 ? 'text-rose-400 font-bold' : 'text-slate-400'
-                            }`}
-                          >
-                            {heroValue > 0.005 ? 'Positivo' : heroValue < -0.005 ? 'Negativo' : 'Equilibrado'}
-                          </span>
-                        )}
+              {/* Card Disponível a Orçar / Resultado Unificado — todas informações concentradas à esquerda */}
+              {summary && (
+                <div
+                  className={`px-2.5 py-1 sm:px-3 sm:py-1 rounded-xl border flex flex-col justify-center min-w-0 shadow-sm transition-all duration-200 ${heroBgBorder}`}
+                >
+                  {isAccrual ? (
+                    /* Regime de Competência: Resultado + Métricas */
+                    <div className="flex flex-col items-start min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className={`text-sm sm:text-base font-extrabold tabular-nums tracking-tight truncate ${heroColor}`}>
+                          {heroValue > 0.005 ? `+${formatCurrency(heroValue)}` : formatCurrency(heroValue)}
+                        </span>
+                        <span className={`text-[9px] sm:text-[10px] uppercase font-bold tracking-wider truncate ${heroValue < -0.005 ? 'text-rose-400' : 'text-slate-400'}`}>
+                          {isFuture ? 'Resultado Previsto' : 'Resultado Real'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[8.5px] sm:text-[9px] text-slate-400 font-medium truncate">
+                        <span className="text-emerald-400 truncate">
+                          Rec: {formatCurrency(isFuture ? (summary.totalExpectedIncome ?? 0) : summary.totalIncome)}
+                        </span>
+                        <span className="text-slate-600 select-none">−</span>
+                        <span className="text-rose-400 truncate">
+                          Desp: {formatCurrency(isFuture ? summary.totalBudgeted : (summary.totalSpent ?? 0))}
+                        </span>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div
-                    className={`px-4 py-1.5 rounded-xl border flex items-center justify-center gap-3 shadow-sm transition-all duration-200 ${heroBgBorder}`}
-                  >
-                    <div className="text-right min-w-0">
-                      <div className="flex flex-col items-end gap-1">
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate">
-                            {summary.isFutureMonth ? 'Projeção a Orçar' : 'Disponível a Orçar'}
-                          </span>
+                  ) : (
+                    /* Regime de Caixa: Disponível a Orçar / Projeção com todas informações concentradas à esquerda */
+                    <div className="flex flex-col items-start min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className={`text-sm sm:text-base font-extrabold tabular-nums tracking-tight truncate ${heroColor}`}>
+                          {formatCurrency(summary.toBeBudgeted)}
+                        </span>
+                        <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate flex items-center gap-0.5">
+                          {summary.isFutureMonth ? 'Projeção a Orçar' : 'Disponível a Orçar'}
                           <button
                             type="button"
                             onClick={() => setShowHelpModal(true)}
-                            className="text-slate-500 hover:text-indigo-400 p-0.5 rounded transition-colors"
+                            className="text-slate-500 hover:text-indigo-400 p-0.5 rounded transition-colors flex-shrink-0"
                             title="Como funciona o Disponível a Orçar?"
                             aria-label="Explicação sobre Disponível a Orçar"
                           >
-                            <HelpCircle className="w-3.5 h-3.5" />
+                            <HelpCircle className="w-3 h-3" />
                           </button>
-                        </div>
-                        {/* Saldo transportado do mês anterior para meses futuros */}
-                        {summary.isFutureMonth && (summary.rolloverFromPreviousMonth ?? 0) !== 0 && (
-                          <span
-                            className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60 flex-shrink-0"
-                            title={`Saldo livre acumulado do mês anterior: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
-                          >
-                            Saldo Anterior: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
-                          </span>
-                        )}
-
-                        {/* Projeção com renda prevista / otimista */}
-                        {((summary.pendingExpectedIncome ?? 0) > 0 || (summary.isFutureMonth && Math.abs((summary.projectedToBeBudgeted ?? 0) - (summary.toBeBudgeted ?? 0)) > 0.005)) && (
-                          <span
-                            className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60 flex-shrink-0"
-                            title={summary.isFutureMonth
-                              ? `Projeção Otimista: se toda a renda planejada para os meses até aqui entrar, o valor a orçar seria ${formatCurrency(summary.projectedToBeBudgeted)}`
-                              : 'Saldo projetado incluindo receitas previstas que ainda não entraram'}
-                          >
-                            {summary.isFutureMonth ? 'Otimista:' : 'Previsto:'} {formatCurrency(summary.projectedToBeBudgeted)}
-                          </span>
-                        )}
+                        </span>
                       </div>
-                    </div>
 
-                    <div className="text-right flex-shrink-0">
-                      <span className={`text-base lg:text-lg font-extrabold tabular-nums tracking-tight ${heroColor}`}>
-                        {formatCurrency(summary.toBeBudgeted)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+                      {/* Badges de Projeção / Saldo Anterior */}
+                      {(Boolean(summary.isFutureMonth && (summary.rolloverFromPreviousMonth ?? 0) !== 0) ||
+                        Boolean((summary.pendingExpectedIncome ?? 0) > 0 || (summary.isFutureMonth && Math.abs((summary.projectedToBeBudgeted ?? 0) - (summary.toBeBudgeted ?? 0)) > 0.005))) && (
+                        <div className="flex items-center gap-1 pt-0.5 flex-wrap">
+                          {summary.isFutureMonth && (summary.rolloverFromPreviousMonth ?? 0) !== 0 && (
+                            <span
+                              className="text-[8.5px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60 flex-shrink-0"
+                              title={`Saldo livre acumulado do mês anterior: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
+                            >
+                              Anterior: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
+                            </span>
+                          )}
 
+                          {((summary.pendingExpectedIncome ?? 0) > 0 || (summary.isFutureMonth && Math.abs((summary.projectedToBeBudgeted ?? 0) - (summary.toBeBudgeted ?? 0)) > 0.005)) && (
+                            <span
+                              className="text-[8.5px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60 flex-shrink-0"
+                              title={summary.isFutureMonth
+                                ? `Projeção Otimista: se toda a renda planejada para os meses até aqui entrar, o valor seria ${formatCurrency(summary.projectedToBeBudgeted)}`
+                                : 'Saldo projetado incluindo receitas previstas que ainda não entraram'}
+                            >
+                              {summary.isFutureMonth ? 'Otimista:' : 'Previsto:'} {formatCurrency(summary.projectedToBeBudgeted)}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Direita: Status de Sync + Menu de Ações (Unificado para todas as telas) */}
             <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
@@ -833,133 +776,6 @@ export default function BudgetPage() {
             </div>
 
           </div>
-
-          {/* Mobile (< sm): Card Hero posicionado logo abaixo */}
-          {summary && (
-            <div className="sm:hidden pt-0.5">
-              {isAccrual ? (
-                <div
-                  className={`w-full px-2.5 py-2 rounded-xl border grid grid-cols-3 divide-x divide-slate-800/80 shadow-sm transition-all duration-200 ${heroBgBorder}`}
-                >
-                  {/* Coluna 1: Receitas */}
-                  <div className="flex flex-col items-center justify-center text-center px-1 min-w-0">
-                    <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 truncate">
-                      Receitas
-                    </span>
-                    <span className="text-xs font-bold text-emerald-400 tabular-nums truncate">
-                      {formatCurrency(isFuture ? (summary.totalExpectedIncome ?? 0) : summary.totalIncome)}
-                    </span>
-                    <span className="text-[8.5px] text-slate-500 truncate" title="Meta prevista">
-                      {isFuture ? 'Previstas' : `Meta: ${formatCurrency(summary.totalExpectedIncome ?? 0)}`}
-                    </span>
-                  </div>
-
-                  {/* Coluna 2: Despesas */}
-                  <div className="flex flex-col items-center justify-center text-center px-1 min-w-0">
-                    <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 truncate">
-                      Despesas
-                    </span>
-                    <span className="text-xs font-bold text-rose-400 tabular-nums truncate">
-                      {formatCurrency(isFuture ? summary.totalBudgeted : (summary.totalSpent ?? 0))}
-                    </span>
-                    <span className="text-[8.5px] text-slate-500 truncate" title="Teto orçado">
-                      {isFuture ? 'Orçadas' : `Orç: ${formatCurrency(summary.totalBudgeted)}`}
-                    </span>
-                  </div>
-
-                  {/* Coluna 3: Resultado */}
-                  <div className="flex flex-col items-center justify-center text-center px-1 min-w-0">
-                    <span className={`text-[9px] uppercase font-bold tracking-wider truncate ${heroValue < -0.005 ? 'text-rose-400' : 'text-slate-400'}`}>
-                      {isFuture ? 'Previsto' : 'Resultado'}
-                    </span>
-                    <span className={`text-xs font-extrabold tabular-nums tracking-tight truncate ${heroColor}`}>
-                      {heroValue > 0.005 ? `+${formatCurrency(heroValue)}` : formatCurrency(heroValue)}
-                    </span>
-                    <div className="flex items-center justify-center gap-1 text-[8.5px] truncate max-w-full">
-                      {isFuture ? (
-                        <span
-                          className={`font-semibold truncate ${
-                            heroValue > 0.005 ? 'text-emerald-400' : heroValue < -0.005 ? 'text-rose-400 font-bold' : 'text-slate-400'
-                          }`}
-                        >
-                          {heroValue > 0.005 ? 'Positivo' : heroValue < -0.005 ? 'Negativo' : 'Equil.'}
-                        </span>
-                      ) : hasExpectedIncome ? (
-                        <span
-                          className={`font-semibold truncate ${
-                            (summary.plannedNetResult ?? 0) < -0.005
-                              ? 'text-rose-400 font-bold'
-                              : (summary.plannedNetResult ?? 0) > 0.005
-                              ? 'text-emerald-400'
-                              : 'text-slate-400'
-                          }`}
-                          title={`Resultado Previsto do orçamento: ${formatCurrency(summary.plannedNetResult ?? 0)}`}
-                        >
-                          Prev: {(summary.plannedNetResult ?? 0) > 0.005 ? '+' : ''}{formatCurrency(summary.plannedNetResult ?? 0)}
-                        </span>
-                      ) : (
-                        <span
-                          className={`font-semibold truncate ${
-                            heroValue > 0.005 ? 'text-emerald-400' : heroValue < -0.005 ? 'text-rose-400 font-bold' : 'text-slate-400'
-                          }`}
-                        >
-                          {heroValue > 0.005 ? 'Positivo' : heroValue < -0.005 ? 'Negativo' : 'Equil.'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className={`w-full px-3.5 py-2 rounded-xl border flex items-center justify-between gap-3 shadow-sm transition-all duration-200 ${heroBgBorder}`}
-                >
-                  <div className="text-left min-w-0">
-                    <div className="flex flex-col items-start gap-1">
-                      <div className="flex items-center gap-1">
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                          {summary.isFutureMonth ? 'Projeção a Orçar' : 'Disponível a Orçar'}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setShowHelpModal(true)}
-                          className="text-slate-500 hover:text-indigo-400 p-0.5 rounded transition-colors"
-                          title="Como funciona o Disponível a Orçar?"
-                          aria-label="Explicação sobre Disponível a Orçar"
-                        >
-                          <HelpCircle className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                      {summary.isFutureMonth && (summary.rolloverFromPreviousMonth ?? 0) !== 0 && (
-                        <span
-                          className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-300 border border-slate-600/60"
-                          title={`Saldo livre acumulado do mês anterior: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
-                        >
-                          Saldo Anterior: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
-                        </span>
-                      )}
-
-                      {((summary.pendingExpectedIncome ?? 0) > 0 || (summary.isFutureMonth && Math.abs((summary.projectedToBeBudgeted ?? 0) - (summary.toBeBudgeted ?? 0)) > 0.005)) && (
-                        <span
-                          className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-800/60"
-                          title={summary.isFutureMonth
-                            ? `Projeção Otimista: se toda a renda planejada para os meses até aqui entrar, o valor seria ${formatCurrency(summary.projectedToBeBudgeted)}`
-                            : 'Saldo projetado incluindo receitas previstas'}
-                        >
-                          {summary.isFutureMonth ? 'Otimista:' : 'Previsto:'} {formatCurrency(summary.projectedToBeBudgeted)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="text-right flex-shrink-0">
-                    <span className={`text-base font-extrabold tabular-nums tracking-tight ${heroColor}`}>
-                      {formatCurrency(summary.toBeBudgeted)}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
         </div>
       </div>
