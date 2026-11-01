@@ -898,16 +898,16 @@ export function calculateBudgetSummary(
   }
 
   // ── Mês futuro: encadeamento a partir do mês atual ───────────────────────
-  // Semente = TBB real do mês atual.
-  // Não adicionamos pending(mêsAtual) à semente projetada: a renda pendente do mês
-  // atual já está orçada via rendaOrçada(mêsAtual) no loop abaixo, e somar o pending
-  // aqui inflaria a projeção (renda do mês atual contada duas vezes).
+  // Semente = TBB real + renda pendente do mês atual.
+  // A renda pendente do mês corrente (expected − received) representa fluxos de caixa
+  // que ainda devem entrar antes dos meses futuros — deve estar na projeção.
   const curPositiveAvailable = computePositiveAvailable(curMonth)
   const curCCInvoices = computeCCInvoices(curMonth)
+  const { pending: curPending } = computeIncomeStats(curMonth)
 
   const curRealTBB = checkingBalance - curPositiveAvailable - curCCInvoices
   let realSeed = curRealTBB
-  let projSeed = curRealTBB
+  let projSeed = curRealTBB + curPending
 
   // Rastrear último orçamento mensal conhecido para servir de baseline para meses intermediários não preenchidos
   const curTotals = computeMonthBudgetTotals(curMonth)
