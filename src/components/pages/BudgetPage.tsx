@@ -88,6 +88,11 @@ function IncomeCategoryRow({
           >
             {row.category.name}
           </span>
+          {row.expected > 0.005 && (
+            <span className="text-[10px] text-slate-500 font-normal">
+              Meta: {formatCurrency(row.expected)}
+            </span>
+          )}
         </div>
       </td>
 
@@ -281,6 +286,11 @@ function CategoryRow({
           >
             {row.category.name}
           </span>
+          {budgeted > 0.005 && (
+            <span className="text-[10px] text-slate-500 font-normal">
+              Orçado: {formatCurrency(budgeted)}
+            </span>
+          )}
         </div>
       </td>
 
@@ -413,6 +423,23 @@ export default function BudgetPage() {
   const [savingCategoryId, setSavingCategoryId] = useState<string | null>(null)
   const [showHelpModal, setShowHelpModal] = useState(false)
   const [showOnboardingModal, setShowOnboardingModal] = useState(false)
+  const [viewMode, setViewMode] = useState<'projected' | 'cash'>(() => {
+    try {
+      const saved = localStorage.getItem('fin_budget_view_mode')
+      return saved === 'cash' || saved === 'projected' ? saved : 'projected'
+    } catch {
+      return 'projected'
+    }
+  })
+
+  const handleViewModeChange = (mode: 'projected' | 'cash') => {
+    setViewMode(mode)
+    try {
+      localStorage.setItem('fin_budget_view_mode', mode)
+    } catch {
+      // ignore
+    }
+  }
 
   const { startMonth } = useAccountingPeriod()
 
@@ -528,16 +555,21 @@ export default function BudgetPage() {
   const isAccrual = budgetRegime === 'accrual'
   const isFuture = Boolean(summary?.isFutureMonth)
   const hasExpectedIncome = (summary?.totalExpectedIncome ?? 0) > 0
+  const isProjectedView = isFuture || viewMode === 'projected'
+
+  const cashHeroValue = isProjectedView
+    ? (summary?.projectedToBeBudgeted ?? 0)
+    : (summary?.toBeBudgeted ?? 0)
 
   // Valor principal exibido no card Hero:
   // - Competência mês futuro: Resultado Planejado (Receita Prevista − Despesa Orçada)
   // - Competência mês atual/passado: Resultado Realizado (Receitas Reais que entraram − Despesas Reais)
-  // - Caixa: Disponível a Orçar
+  // - Caixa: Projetado a Orçar (se isProjectedView) ou Disponível em Caixa (se !isProjectedView)
   const heroValue = !summary
     ? 0
     : isAccrual
     ? (isFuture ? (summary.plannedNetResult ?? 0) : (summary.actualNetResult ?? 0))
-    : summary.toBeBudgeted
+    : cashHeroValue
 
   const heroColor =
     heroValue > 0.005 ? 'text-emerald-400' :
@@ -653,20 +685,72 @@ export default function BudgetPage() {
                 </div>
               ) : (
                 /* Regime de Caixa */
-                <div className="flex flex-col min-w-0">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-0.5 flex items-center gap-1">
-                    Disponível a Orçar
-                    <button
-                      type="button"
-                      onClick={() => setShowHelpModal(true)}
-                      className="text-slate-500 hover:text-indigo-400 transition-colors"
-                      title="Como funciona o Disponível a Orçar?"
-                    >
-                      <HelpCircle className="w-3 h-3" />
-                    </button>
-                  </span>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-1 flex-wrap">
+                    {!isFuture && (
+                      <div className="inline-flex items-center p-0.5 rounded-lg bg-slate-900/90 border border-slate-700/80 shadow-inner">
+                        <button
+                          type="button"
+                          onClick={() => handleViewModeChange('projected')}
+                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all ${
+                            isProjectedView
+                              ? 'bg-indigo-600 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                          title="Considera o saldo em conta somado às receitas previstas pendentes para o mês"
+                        >
+                          Com Previsto
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleViewModeChange('cash')}
+                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all ${
+                            !isProjectedView
+                              ? 'bg-indigo-600 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                          title="Considera estritamente o dinheiro físico disponível no banco hoje"
+                        >
+                          Em Caixa
+                        </button>
+                      </div>
+                    )}
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 flex items-center gap-1">
+                      {isFuture ? 'Projetado a Orçar' : isProjectedView ? 'A Orçar no Mês' : 'Disponível em Caixa'}
+                      <button
+                        type="button"
+                        onClick={() => setShowHelpModal(true)}
+                        className="text-slate-500 hover:text-indigo-400 transition-colors"
+                        title="Como funciona o Orçamento?"
+                      >
+                        <HelpCircle className="w-3 h-3" />
+                      </button>
+                    </span>
+                  </div>
+
                   <span className={`text-xl sm:text-2xl font-extrabold tabular-nums tracking-tight leading-none ${heroColor}`}>
-                    {formatCurrency(summary.toBeBudgeted)}
+                    {formatCurrency(heroValue)}
+                  </span>
+
+                  {/* Legenda explicativa contextual */}
+                  <span className="text-[10px] text-slate-400 mt-1 truncate">
+                    {isProjectedView ? (
+                      Math.abs(heroValue) <= 0.005 ? (
+                        <span className="text-emerald-400 font-semibold">✓ Orçamento 100% equilibrado</span>
+                      ) : heroValue > 0.005 ? (
+                        <span className="text-slate-300">Resta alocar: <strong className="text-emerald-400">{formatCurrency(heroValue)}</strong></span>
+                      ) : (
+                        <span className="text-rose-400 font-medium">Excede receitas em {formatCurrency(Math.abs(heroValue))}</span>
+                      )
+                    ) : (
+                      (summary.pendingExpectedIncome ?? 0) > 0 ? (
+                        <span className="text-slate-400">
+                          +{formatCurrency(summary.pendingExpectedIncome ?? 0)} de receitas a receber
+                        </span>
+                      ) : (
+                        <span className="text-slate-500">Saldo líquido em contas bancárias</span>
+                      )
+                    )}
                   </span>
                 </div>
               )}
@@ -698,18 +782,37 @@ export default function BudgetPage() {
                         Saldo Anterior: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
                       </span>
                     )}
-                    <div className="flex items-center gap-1 text-[10px] tabular-nums">
-                      <span className="text-slate-500">Rec</span>
-                      <span className="font-semibold text-emerald-400">
-                        {formatCurrency(summary.totalIncome)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 text-[10px] tabular-nums">
-                      <span className="text-slate-500">Desp</span>
-                      <span className="font-semibold text-rose-400">
-                        {formatCurrency(isFuture ? summary.totalBudgeted : (summary.totalSpent ?? 0))}
-                      </span>
-                    </div>
+                    {isProjectedView ? (
+                      <>
+                        <div className="flex items-center gap-1 text-[10px] tabular-nums" title="Receita total prevista para o mês">
+                          <span className="text-slate-500">Prev</span>
+                          <span className="font-semibold text-emerald-400">
+                            {formatCurrency(summary.totalExpectedIncome ?? 0)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] tabular-nums" title="Despesas totais orçadas nos envelopes">
+                          <span className="text-slate-500">Orçado</span>
+                          <span className="font-semibold text-rose-400">
+                            {formatCurrency(summary.totalBudgeted)}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-1 text-[10px] tabular-nums" title="Receita efetivamente recebida no mês">
+                          <span className="text-slate-500">Rec</span>
+                          <span className="font-semibold text-emerald-400">
+                            {formatCurrency(summary.totalIncome)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] tabular-nums" title="Total gasto no mês">
+                          <span className="text-slate-500">Gasto</span>
+                          <span className="font-semibold text-rose-400">
+                            {formatCurrency(isFuture ? summary.totalBudgeted : (summary.totalSpent ?? 0))}
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </>
                 )}
               </div>
@@ -882,6 +985,15 @@ export default function BudgetPage() {
           currentBudgeted={adjustEnvelopeData.budgeted}
           currentActivity={adjustEnvelopeData.activity}
           currentAvailable={adjustEnvelopeData.available}
+          availableToBudget={
+            summary
+              ? isAccrual
+                ? summary.plannedNetResult
+                : isProjectedView
+                ? summary.projectedToBeBudgeted
+                : summary.toBeBudgeted
+              : undefined
+          }
           budgetRegime={budgetRegime}
           isIncome={adjustEnvelopeData.isIncome}
           onSave={async (newBudgeted) => {
@@ -906,23 +1018,33 @@ export default function BudgetPage() {
           title={
             <div className="flex items-center gap-2 text-indigo-400">
               <HelpCircle className="w-5 h-5" />
-              <span className="text-slate-100 font-semibold text-base">Entenda o Orçamento Base Zero</span>
+              <span className="text-slate-100 font-semibold text-base">Entenda o Orçamento</span>
             </div>
           }
         >
           <div className="p-5 space-y-4 text-xs leading-relaxed text-slate-300">
-            <div className="p-3.5 bg-indigo-950/30 border border-indigo-500/30 rounded-2xl space-y-1.5">
+            <div className="p-3.5 bg-indigo-950/30 border border-indigo-500/30 rounded-2xl space-y-2">
               <h4 className="font-bold text-slate-100 flex items-center gap-1.5 text-sm">
-                💡 O que é "Disponível a Orçar"?
+                💡 Como orçar o mês com Receitas Previstas?
               </h4>
               <p className="text-slate-300 text-[11px] leading-relaxed">
-                É a soma de todo o dinheiro líquido em suas contas correntes que ainda não tem destinação definida.
+                Você pode planejar todos os seus gastos do mês antes mesmo do salário cair na conta!
               </p>
+              <div className="space-y-1.5 pt-1 text-[11px]">
+                <div className="flex items-start gap-1.5">
+                  <span className="text-indigo-400 font-bold whitespace-nowrap">• Com Previsto:</span>
+                  <span className="text-slate-300">Soma o saldo atual com as receitas previstas que ainda vão entrar no mês. Permite planejar seus envelopes até zerar o valor a orçar (<strong>R$ 0,00</strong>).</span>
+                </div>
+                <div className="flex items-start gap-1.5">
+                  <span className="text-indigo-400 font-bold whitespace-nowrap">• Em Caixa:</span>
+                  <span className="text-slate-300">Mostra estritamente o dinheiro físico que você já tem na conta hoje. Conforme os recebimentos entram, o caixa físico é preenchido.</span>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-3">
               <h4 className="font-bold text-slate-200 text-xs uppercase tracking-wider">
-                As 3 Colunas do seu Mês:
+                As 3 Colunas dos seus Envelopes:
               </h4>
 
               <div className="space-y-2 bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800">
@@ -944,7 +1066,7 @@ export default function BudgetPage() {
             </div>
 
             <div className="p-3 bg-emerald-950/20 border border-emerald-800/40 rounded-xl text-[11px] text-emerald-300">
-              🎯 <strong>A Regra de Ouro:</strong> Distribua seu dinheiro até o "Disponível a Orçar" ficar <strong>R$ 0,00</strong>. Assim cada real tem um trabalho e você tem controle total.
+              🎯 <strong>A Regra de Ouro do Orçamento Base Zero:</strong> Distribua seu dinheiro até o valor a orçar ficar <strong>R$ 0,00</strong>. Assim cada real da sua receita tem uma destinação definida!
             </div>
 
             <button

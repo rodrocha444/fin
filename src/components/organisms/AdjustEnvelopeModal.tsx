@@ -16,6 +16,7 @@ export interface AdjustEnvelopeModalProps {
   currentBudgeted?: number
   currentActivity: number
   currentAvailable: number
+  availableToBudget?: number
   budgetRegime?: AccountingRegime
   isIncome?: boolean
   onSave?: (newBudgeted: number) => Promise<void>
@@ -29,6 +30,7 @@ export default function AdjustEnvelopeModal({
   currentBudgeted = 0,
   currentActivity,
   currentAvailable,
+  availableToBudget,
   budgetRegime = 'cash',
   isIncome = false,
   onSave,
@@ -186,6 +188,26 @@ export default function AdjustEnvelopeModal({
           </div>
         </div>
 
+        {/* Disponível para orçar no mês */}
+        {availableToBudget !== undefined && !isIncome && (
+          <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-indigo-950/30 border border-indigo-800/40 text-xs">
+            <span className="text-slate-300">
+              Disponível a orçar no mês:
+            </span>
+            <span
+              className={`font-bold tabular-nums ${
+                availableToBudget > 0.005
+                  ? 'text-emerald-400'
+                  : availableToBudget < -0.005
+                  ? 'text-rose-400'
+                  : 'text-slate-400'
+              }`}
+            >
+              {formatCurrency(availableToBudget)}
+            </span>
+          </div>
+        )}
+
         {/* Input principal conforme o modo selecionado */}
         <div>
           <label className="text-xs font-medium text-slate-200 mb-1.5 block">
@@ -219,6 +241,24 @@ export default function AdjustEnvelopeModal({
               allowNegative={false}
               className="input-base text-right text-xl font-bold py-2.5 bg-slate-900/90 border-slate-700 focus:border-indigo-500 tabular-nums"
             />
+          )}
+
+          {availableToBudget !== undefined && availableToBudget > 0.005 && !isIncome && (
+            <div className="flex items-center gap-1.5 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (mode === 'available') {
+                    setTargetAvailable(Math.max(0, Math.round((currentAvailable + availableToBudget) * 100) / 100))
+                  } else {
+                    setTargetBudgeted(Math.max(0, Math.round((currentBudgeted + availableToBudget) * 100) / 100))
+                  }
+                }}
+                className="text-[11px] font-semibold text-indigo-300 hover:text-indigo-100 bg-indigo-950/70 hover:bg-indigo-900/80 border border-indigo-700/60 rounded-lg px-2.5 py-1 transition-colors flex items-center gap-1 active:scale-95"
+              >
+                <span>+ Alocar restante ({formatCurrency(availableToBudget)})</span>
+              </button>
+            </div>
           )}
         </div>
 

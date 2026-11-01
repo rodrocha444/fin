@@ -828,7 +828,7 @@ export function calculateBudgetSummary(
       rolloverFromPreviousMonth: 0,
       totalIncome: round(totalIncome),
       totalExpectedIncome: round(totalExpected),
-      pendingExpectedIncome: 0,
+      pendingExpectedIncome: round(isFutureMonth ? totalExpected : pendingExpected),
       totalBudgeted: round(totalBudgeted),
       totalSpent: round(totalSpent),
       currentInvoicesDue: 0,
@@ -884,12 +884,12 @@ export function calculateBudgetSummary(
       rolloverFromPreviousMonth: 0,
       totalIncome: round(totalIncome),
       totalExpectedIncome: round(totalExpected),
-      pendingExpectedIncome: 0,
+      pendingExpectedIncome: round(pendingExpected),
       totalBudgeted: round(totalBudgeted),
       totalSpent: round(totalSpent),
       currentInvoicesDue: round(ccInvoices),
       toBeBudgeted: round(rawTBB),
-      projectedToBeBudgeted: round(rawTBB),
+      projectedToBeBudgeted: round(rawTBB + pendingExpected),
       plannedNetResult: round(totalExpected - totalBudgeted),
       actualNetResult: round(totalIncome - totalSpent),
     }
@@ -899,9 +899,11 @@ export function calculateBudgetSummary(
   // Semente = TBB real do mês atual.
   const curPositiveAvailable = computePositiveAvailable(curMonth)
   const curCCInvoices = computeCCInvoices(curMonth)
+  const { pending: curPending } = computeIncomeStats(curMonth)
 
   const curRealTBB = checkingBalance - curPositiveAvailable - curCCInvoices
   let realSeed = curRealTBB
+  let projSeed = curRealTBB + curPending
 
   // Rastrear último orçamento mensal conhecido para servir de baseline para meses intermediários não preenchidos
   const curTotals = computeMonthBudgetTotals(curMonth)
@@ -929,6 +931,7 @@ export function calculateBudgetSummary(
   let selectedMonthTotalBudgeted = 0
   let selectedMonthTotalExpectedIncome = 0
   let rolloverReal = curRealTBB
+  let rolloverProj = projSeed
 
   while (format(d, 'yyyy-MM') <= month) {
     const m = format(d, 'yyyy-MM')
@@ -951,14 +954,18 @@ export function calculateBudgetSummary(
       selectedMonthCC = mCC
       selectedMonthTotalBudgeted = mTotals.expense
       selectedMonthTotalExpectedIncome = mTotals.income
-      // O saldo herdado do mês anterior é o realSeed acumulado antes de abater o mês selecionado
+      // O saldo herdado do mês anterior é o acumulado antes de abater o mês selecionado
       rolloverReal = realSeed
+      rolloverProj = projSeed
     }
 
     const effectiveExpense = m === month ? selectedMonthTotalBudgeted : mBudgetedExpense
+    const effectiveIncome = m === month ? selectedMonthTotalExpectedIncome : mBudgetedIncome
 
     // real: assume saldo real a orçar deduzindo despesas e faturas
     realSeed -= effectiveExpense + mCC
+    // projetado: inclui renda orçada
+    projSeed += effectiveIncome - effectiveExpense - mCC
 
     d = addMonths(d, 1)
   }
@@ -966,15 +973,15 @@ export function calculateBudgetSummary(
   return {
     month,
     isFutureMonth: true,
-    rolloverFromPreviousMonth: round(rolloverReal),
+    rolloverFromPreviousMonth: round(rolloverProj),
     totalIncome: 0,
     totalExpectedIncome: round(selectedMonthTotalExpectedIncome),
-    pendingExpectedIncome: 0,
+    pendingExpectedIncome: round(selectedMonthTotalExpectedIncome),
     totalBudgeted: round(selectedMonthTotalBudgeted),
     totalSpent: 0,
     currentInvoicesDue: round(selectedMonthCC),
     toBeBudgeted: round(realSeed),
-    projectedToBeBudgeted: round(realSeed),
+    projectedToBeBudgeted: round(projSeed),
     plannedNetResult: round(selectedMonthTotalExpectedIncome - selectedMonthTotalBudgeted),
     actualNetResult: 0,
   }
