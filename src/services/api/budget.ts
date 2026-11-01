@@ -768,25 +768,6 @@ export function calculateBudgetSummary(
     return { totalExpected, pending, received }
   }
 
-  // ── Helper: soma de rendas previstas NÃO recebidas em todos os meses anteriores ao atual ──
-  // Representa receitas que foram orçadas mas nunca chegaram — carry-forward de pendências.
-  const computeAccumulatedPastPending = (): number => {
-    // Coleta todos os meses com orçamento de renda anteriores ao mês atual
-    const pastMonths = Array.from(
-      new Set(
-        budgetMonths
-          .filter(b => b.month < curMonth && getRowBudgetType(b) === regime && !isMonthBeforeAccountingStart(b.month))
-          .map(b => b.month)
-      )
-    )
-    let accumulated = 0
-    for (const m of pastMonths) {
-      const { pending } = computeIncomeStats(m)
-      accumulated += pending
-    }
-    return accumulated
-  }
-
   // ── Helper: despesas orçadas e renda orçada de um mês (para chaining) ─────
   const computeMonthBudgetTotals = (m: string): { income: number; expense: number; hasExplicitBudget: boolean } => {
     let income = 0
@@ -899,22 +880,18 @@ export function calculateBudgetSummary(
 
     const rawTBB = checkingBalance - positiveAvailable - ccInvoices
 
-    // Acumula pendências de meses anteriores (receitas previstas que nunca chegaram)
-    const pastPending = computeAccumulatedPastPending()
-    const totalPending = pendingExpected + pastPending
-
     return {
       month,
       isFutureMonth: false,
       rolloverFromPreviousMonth: 0,
       totalIncome: round(totalIncome),
       totalExpectedIncome: round(totalExpected),
-      pendingExpectedIncome: round(totalPending),
+      pendingExpectedIncome: round(pendingExpected),
       totalBudgeted: round(totalBudgeted),
       totalSpent: round(totalSpent),
       currentInvoicesDue: round(ccInvoices),
       toBeBudgeted: round(rawTBB),
-      projectedToBeBudgeted: round(rawTBB + totalPending),
+      projectedToBeBudgeted: round(rawTBB + pendingExpected),
       plannedNetResult: round(totalExpected - totalBudgeted),
       actualNetResult: round(totalIncome - totalSpent),
     }
@@ -926,12 +903,9 @@ export function calculateBudgetSummary(
   const curCCInvoices = computeCCInvoices(curMonth)
   const { pending: curPending } = computeIncomeStats(curMonth)
 
-  // Acumula pendências de meses anteriores (receitas previstas que nunca chegaram)
-  const pastPendingForFuture = computeAccumulatedPastPending()
-
   const curRealTBB = checkingBalance - curPositiveAvailable - curCCInvoices
   let realSeed = curRealTBB
-  let projSeed = curRealTBB + curPending + pastPendingForFuture
+  let projSeed = curRealTBB + curPending
 
   // Rastrear último orçamento mensal conhecido para servir de baseline para meses intermediários não preenchidos
   const curTotals = computeMonthBudgetTotals(curMonth)
