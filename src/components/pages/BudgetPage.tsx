@@ -530,9 +530,9 @@ export default function BudgetPage() {
   const hasExpectedIncome = (summary?.totalExpectedIncome ?? 0) > 0
 
   // Valor principal exibido no card Hero:
-  // - Competência mês futuro: Resultado Previsto (Receita Prevista − Despesa Orçada)
+  // - Competência mês futuro: Resultado Planejado (Receita Prevista − Despesa Orçada)
   // - Competência mês atual/passado: Resultado Realizado (Receitas Reais que entraram − Despesas Reais)
-  // - Caixa: Disponível a Orçar / Projeção a Orçar
+  // - Caixa: Disponível a Orçar
   const heroValue = !summary
     ? 0
     : isAccrual
@@ -645,7 +645,7 @@ export default function BudgetPage() {
                 /* Regime de Competência */
                 <div className="flex flex-col min-w-0">
                   <span className={`text-[10px] uppercase font-bold tracking-wider ${heroValue < -0.005 ? 'text-rose-400' : 'text-slate-400'} mb-0.5`}>
-                    {isFuture ? 'Resultado Previsto' : 'Resultado Real'}
+                    {isFuture ? 'Resultado Planejado' : 'Resultado Real'}
                   </span>
                   <span className={`text-xl sm:text-2xl font-extrabold tabular-nums tracking-tight leading-none ${heroColor}`}>
                     {heroValue > 0.005 ? `+${formatCurrency(heroValue)}` : formatCurrency(heroValue)}
@@ -655,7 +655,7 @@ export default function BudgetPage() {
                 /* Regime de Caixa */
                 <div className="flex flex-col min-w-0">
                   <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-0.5 flex items-center gap-1">
-                    {summary.isFutureMonth ? 'Projeção a Orçar' : 'Disponível a Orçar'}
+                    Disponível a Orçar
                     <button
                       type="button"
                       onClick={() => setShowHelpModal(true)}
@@ -698,16 +698,18 @@ export default function BudgetPage() {
                         Saldo Anterior: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
                       </span>
                     )}
-                    {((summary.pendingExpectedIncome ?? 0) > 0 || (summary.isFutureMonth && Math.abs((summary.projectedToBeBudgeted ?? 0) - (summary.toBeBudgeted ?? 0)) > 0.005)) && (
-                      <span
-                        className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md bg-sky-950/90 text-sky-300 border border-sky-800/60"
-                        title={summary.isFutureMonth
-                          ? `Projeção Otimista: se toda a renda planejada entrar, o valor seria ${formatCurrency(summary.projectedToBeBudgeted)}`
-                          : 'Saldo projetado incluindo receitas previstas que ainda não entraram'}
-                      >
-                        {summary.isFutureMonth ? 'Otimista:' : 'Previsto:'} {formatCurrency(summary.projectedToBeBudgeted)}
+                    <div className="flex items-center gap-1 text-[10px] tabular-nums">
+                      <span className="text-slate-500">Rec</span>
+                      <span className="font-semibold text-emerald-400">
+                        {formatCurrency(summary.totalIncome)}
                       </span>
-                    )}
+                    </div>
+                    <div className="flex items-center gap-1 text-[10px] tabular-nums">
+                      <span className="text-slate-500">Desp</span>
+                      <span className="font-semibold text-rose-400">
+                        {formatCurrency(isFuture ? summary.totalBudgeted : (summary.totalSpent ?? 0))}
+                      </span>
+                    </div>
                   </>
                 )}
               </div>

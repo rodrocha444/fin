@@ -656,11 +656,9 @@ export function calculateIncomeBudgetRows(
  *   TBB = Σ(saldo checking) − disponível_positivo_nas_categorias − fatura_CC_fechando_no_mês
  *
  * Meses futuros — encadeamento:
- *   Semente real      = TBB(mês_atual)
- *   Semente projetada = TBB(mês_atual) + renda_pendente_mês_atual
+ *   Semente real = TBB(mês_atual)
  *   Para cada mês de curMonth+1 até M:
- *     real      += 0                  − despesas_orçadas(m) − fatura_CC(m)
- *     projetado += renda_orçada(m)    − despesas_orçadas(m) − fatura_CC(m)
+ *     real += 0 − despesas_orçadas(m) − fatura_CC(m)
  *
  * O campo rolloverFromPreviousMonth expõe o saldo livre acumulado trazido do mês imediatamente anterior (M - 1).
  */
@@ -830,7 +828,7 @@ export function calculateBudgetSummary(
       rolloverFromPreviousMonth: 0,
       totalIncome: round(totalIncome),
       totalExpectedIncome: round(totalExpected),
-      pendingExpectedIncome: round(isFutureMonth ? totalExpected : pendingExpected),
+      pendingExpectedIncome: 0,
       totalBudgeted: round(totalBudgeted),
       totalSpent: round(totalSpent),
       currentInvoicesDue: 0,
@@ -886,28 +884,24 @@ export function calculateBudgetSummary(
       rolloverFromPreviousMonth: 0,
       totalIncome: round(totalIncome),
       totalExpectedIncome: round(totalExpected),
-      pendingExpectedIncome: round(pendingExpected),
+      pendingExpectedIncome: 0,
       totalBudgeted: round(totalBudgeted),
       totalSpent: round(totalSpent),
       currentInvoicesDue: round(ccInvoices),
       toBeBudgeted: round(rawTBB),
-      projectedToBeBudgeted: round(rawTBB + pendingExpected),
+      projectedToBeBudgeted: round(rawTBB),
       plannedNetResult: round(totalExpected - totalBudgeted),
       actualNetResult: round(totalIncome - totalSpent),
     }
   }
 
   // ── Mês futuro: encadeamento a partir do mês atual ───────────────────────
-  // Semente = TBB real + renda pendente do mês atual.
-  // A renda pendente do mês corrente (expected − received) representa fluxos de caixa
-  // que ainda devem entrar antes dos meses futuros — deve estar na projeção.
+  // Semente = TBB real do mês atual.
   const curPositiveAvailable = computePositiveAvailable(curMonth)
   const curCCInvoices = computeCCInvoices(curMonth)
-  const { pending: curPending } = computeIncomeStats(curMonth)
 
   const curRealTBB = checkingBalance - curPositiveAvailable - curCCInvoices
   let realSeed = curRealTBB
-  let projSeed = curRealTBB + curPending
 
   // Rastrear último orçamento mensal conhecido para servir de baseline para meses intermediários não preenchidos
   const curTotals = computeMonthBudgetTotals(curMonth)
@@ -962,12 +956,9 @@ export function calculateBudgetSummary(
     }
 
     const effectiveExpense = m === month ? selectedMonthTotalBudgeted : mBudgetedExpense
-    const effectiveIncome = m === month ? selectedMonthTotalExpectedIncome : mBudgetedIncome
 
-    // real: assume 0 de renda futura (pessimista)
+    // real: assume saldo real a orçar deduzindo despesas e faturas
     realSeed -= effectiveExpense + mCC
-    // projetado: inclui renda orçada (otimista)
-    projSeed += effectiveIncome - effectiveExpense - mCC
 
     d = addMonths(d, 1)
   }
@@ -978,12 +969,12 @@ export function calculateBudgetSummary(
     rolloverFromPreviousMonth: round(rolloverReal),
     totalIncome: 0,
     totalExpectedIncome: round(selectedMonthTotalExpectedIncome),
-    pendingExpectedIncome: round(selectedMonthTotalExpectedIncome), // nada recebido ainda
+    pendingExpectedIncome: 0,
     totalBudgeted: round(selectedMonthTotalBudgeted),
     totalSpent: 0,
     currentInvoicesDue: round(selectedMonthCC),
     toBeBudgeted: round(realSeed),
-    projectedToBeBudgeted: round(projSeed),
+    projectedToBeBudgeted: round(realSeed),
     plannedNetResult: round(selectedMonthTotalExpectedIncome - selectedMonthTotalBudgeted),
     actualNetResult: 0,
   }
