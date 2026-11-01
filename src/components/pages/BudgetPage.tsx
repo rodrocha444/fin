@@ -731,27 +731,6 @@ export default function BudgetPage() {
                   <span className={`text-xl sm:text-2xl font-extrabold tabular-nums tracking-tight leading-none ${heroColor}`}>
                     {formatCurrency(heroValue)}
                   </span>
-
-                  {/* Legenda explicativa contextual */}
-                  <span className="text-[10px] text-slate-400 mt-1 truncate">
-                    {isProjectedView ? (
-                      Math.abs(heroValue) <= 0.005 ? (
-                        <span className="text-emerald-400 font-semibold">✓ Orçamento 100% equilibrado</span>
-                      ) : heroValue > 0.005 ? (
-                        <span className="text-slate-300">Resta alocar: <strong className="text-emerald-400">{formatCurrency(heroValue)}</strong></span>
-                      ) : (
-                        <span className="text-rose-400 font-medium">Excede receitas em {formatCurrency(Math.abs(heroValue))}</span>
-                      )
-                    ) : (
-                      (summary.pendingExpectedIncome ?? 0) > 0 ? (
-                        <span className="text-slate-400">
-                          +{formatCurrency(summary.pendingExpectedIncome ?? 0)} de receitas a receber
-                        </span>
-                      ) : (
-                        <span className="text-slate-500">Saldo líquido em contas bancárias</span>
-                      )
-                    )}
-                  </span>
                 </div>
               )}
 
