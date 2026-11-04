@@ -1,5 +1,5 @@
 // src/components/atoms/Modal.tsx — Componente base reutilizável de Modal e Bottom Sheet com Focus Trap
-import React, { useEffect, useCallback, useRef } from 'react'
+import React, { useEffect, useCallback, useRef, useSyncExternalStore } from 'react'
 import { X } from 'lucide-react'
 
 export interface ModalProps {
@@ -18,6 +18,7 @@ export interface ModalProps {
   className?: string
   contentClassName?: string
   initialFocusRef?: React.RefObject<HTMLElement | null>
+  zIndex?: string
 }
 
 const SIZE_CLASSES = {
@@ -27,6 +28,20 @@ const SIZE_CLASSES = {
   xl: 'sm:max-w-xl',
   '2xl': 'sm:max-w-2xl',
   full: 'sm:max-w-4xl',
+}
+
+let modalStack: string[] = []
+const modalStackListeners = new Set<() => void>()
+
+function subscribeModalStack(listener: () => void) {
+  modalStackListeners.add(listener)
+  return () => {
+    modalStackListeners.delete(listener)
+  }
+}
+
+function getModalStackSnapshot() {
+  return modalStack
 }
 
 const FOCUSABLE_SELECTORS = [
@@ -68,9 +83,31 @@ export default function Modal({
   className = '',
   contentClassName = '',
   initialFocusRef,
+  zIndex,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const previousActiveElementRef = useRef<HTMLElement | null>(null)
+  const modalIdRef = useRef<string>('')
+  if (!modalIdRef.current) {
+    modalIdRef.current = 'modal_' + Math.random().toString(36).substring(2, 9)
+  }
+
+  const stack = useSyncExternalStore(subscribeModalStack, getModalStackSnapshot, () => [])
+
+  // Registra modal na pilha de modais ativos
+  useEffect(() => {
+    if (isOpen) {
+      const id = modalIdRef.current
+      if (!modalStack.includes(id)) {
+        modalStack = [...modalStack, id]
+        modalStackListeners.forEach(listener => listener())
+      }
+      return () => {
+        modalStack = modalStack.filter(item => item !== id)
+        modalStackListeners.forEach(listener => listener())
+      }
+    }
+  }, [isOpen])
 
   // Captura o elemento ativo anterior e define o foco inicial no modal
   useEffect(() => {
@@ -114,6 +151,11 @@ export default function Modal({
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (!isOpen || !dialogRef.current) return
+
+      // Se há modais empilhados, apenas o do topo responde aos atalhos de teclado
+      if (modalStack.length > 0 && modalStack[modalStack.length - 1] !== modalIdRef.current) {
+        return
+      }
 
       if (closeOnEsc && e.key === 'Escape') {
         e.preventDefault()
@@ -169,17 +211,24 @@ export default function Modal({
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
-      document.body.style.overflow = originalStyle
+      if (modalStack.length <= 1) {
+        document.body.style.overflow = originalStyle
+      }
     }
   }, [isOpen, handleKeyDown])
 
   if (!isOpen) return null
 
+  const currentStackIndex = stack.indexOf(modalIdRef.current)
+  const stackIndex = currentStackIndex >= 0 ? currentStackIndex : stack.length
+  const computedNumericZIndex = 50 + stackIndex * 10
+
   return (
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 animate-in fade-in duration-200 print:static print:p-0 print:m-0 print:bg-transparent print:backdrop-blur-none print:z-auto print:block print:w-full print:h-auto"
+      style={{ zIndex: computedNumericZIndex }}
+      className={`fixed inset-0 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200 print:static print:p-0 print:m-0 print:bg-transparent print:backdrop-blur-none print:z-auto print:block print:w-full print:h-auto ${zIndex || ''}`}
       onClick={e => {
         if (closeOnOverlayClick && e.target === e.currentTarget) {
           onClose()

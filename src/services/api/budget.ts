@@ -834,6 +834,7 @@ export function calculateBudgetSummary(
       currentInvoicesDue: 0,
       toBeBudgeted: round(isFutureMonth ? plannedNetResult : actualNetResult),
       projectedToBeBudgeted: round(plannedNetResult),
+      isolatedToBeBudgeted: round(plannedNetResult),
       plannedNetResult: round(plannedNetResult),
       actualNetResult: round(actualNetResult),
     }
@@ -890,6 +891,7 @@ export function calculateBudgetSummary(
       currentInvoicesDue: round(ccInvoices),
       toBeBudgeted: round(rawTBB),
       projectedToBeBudgeted: round(rawTBB + pendingExpected),
+      isolatedToBeBudgeted: round(rawTBB + pendingExpected),
       plannedNetResult: round(totalExpected - totalBudgeted),
       actualNetResult: round(totalIncome - totalSpent),
     }
@@ -982,6 +984,7 @@ export function calculateBudgetSummary(
     currentInvoicesDue: round(selectedMonthCC),
     toBeBudgeted: round(realSeed),
     projectedToBeBudgeted: round(projSeed),
+    isolatedToBeBudgeted: round(selectedMonthTotalExpectedIncome - selectedMonthTotalBudgeted - selectedMonthCC),
     plannedNetResult: round(selectedMonthTotalExpectedIncome - selectedMonthTotalBudgeted),
     actualNetResult: 0,
   }

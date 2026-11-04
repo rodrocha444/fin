@@ -52,7 +52,8 @@ export default function PendingIssuesCard({ month, regime = 'cash' }: PendingIss
   })).filter(g => g.cats.length > 0) ?? []
 
   return (
-    <div className="rounded-2xl border border-amber-500/30 bg-amber-950/20 backdrop-blur-md overflow-hidden transition-all shadow-lg shadow-amber-950/10">
+    <div className="px-3 sm:px-6 pt-3 pb-2">
+      <div className="rounded-2xl border border-amber-500/30 bg-amber-950/20 backdrop-blur-md overflow-hidden transition-all shadow-lg shadow-amber-950/10">
       {/* Header bar */}
       <div
         className="flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-amber-950/30 active:bg-amber-950/40 transition-colors"
@@ -199,5 +200,6 @@ export default function PendingIssuesCard({ month, regime = 'cash' }: PendingIss
         />
       )}
     </div>
-  )
+  </div>
+)
 }

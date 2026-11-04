@@ -144,6 +144,7 @@ export default function TransactionItem({
 
         {onEdit && (
           <button
+            type="button"
             onClick={onEdit}
             className="p-2 rounded-lg text-slate-500 hover:text-indigo-300 hover:bg-indigo-950/40 active:bg-indigo-950/60 transition-colors"
             title="Editar transação"
@@ -152,6 +153,7 @@ export default function TransactionItem({
           </button>
         )}
         <button
+          type="button"
           onClick={onDelete}
           className="p-2 rounded-lg text-slate-700 hover:text-rose-400 hover:bg-rose-900/20 active:bg-rose-900/30 transition-colors"
           title="Excluir transação"

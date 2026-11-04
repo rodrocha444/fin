@@ -138,6 +138,8 @@ export interface BudgetSummary {
   toBeBudgeted: number
   /** Saldo projetado a orçar considerando as receitas previstas restantes */
   projectedToBeBudgeted: number
+  /** Saldo a orçar projetado isoladamente no mês (sem saldos herdados de meses anteriores) */
+  isolatedToBeBudgeted?: number
   /** Resultado planejado/econômico (Receita Prevista - Despesa Orçada) */
   plannedNetResult?: number
   /** Resultado real operacional (Receita Real - Despesa Real) */

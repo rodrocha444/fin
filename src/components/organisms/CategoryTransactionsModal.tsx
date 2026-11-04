@@ -566,6 +566,17 @@ export default function CategoryTransactionsModal({
                                   </span>
                                   <button
                                     type="button"
+                                    onClick={() => {
+                                      setEditingTx(subTx)
+                                      setShowForm(true)
+                                    }}
+                                    className="p-1 text-slate-500 hover:text-indigo-300"
+                                    title="Editar parcela individual"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
                                     onClick={() => handleDeleteSingle(subTx)}
                                     className="p-1 text-slate-600 hover:text-rose-400"
                                     title="Excluir apenas esta parcela individual"
@@ -612,6 +623,7 @@ export default function CategoryTransactionsModal({
       {/* Form modal */}
       {showForm && (
         <TransactionForm
+          key={editingTx?.id ?? 'new-tx'}
           transaction={editingTx ?? undefined}
           defaultCategoryId={category?.id}
           defaultMode={isIncome ? 'income' : 'expense'}

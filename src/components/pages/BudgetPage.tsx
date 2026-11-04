@@ -88,11 +88,6 @@ function IncomeCategoryRow({
           >
             {row.category.name}
           </span>
-          {row.expected > 0.005 && (
-            <span className="text-[10px] text-slate-500 font-normal">
-              Meta: {formatCurrency(row.expected)}
-            </span>
-          )}
         </div>
       </td>
 
@@ -286,11 +281,6 @@ function CategoryRow({
           >
             {row.category.name}
           </span>
-          {budgeted > 0.005 && (
-            <span className="text-[10px] text-slate-500 font-normal">
-              Orçado: {formatCurrency(budgeted)}
-            </span>
-          )}
         </div>
       </td>
 
@@ -431,11 +421,28 @@ export default function BudgetPage() {
       return 'projected'
     }
   })
+  const [futureViewMode, setFutureViewMode] = useState<'accumulated' | 'isolated'>(() => {
+    try {
+      const saved = localStorage.getItem('fin_budget_future_view_mode')
+      return saved === 'isolated' || saved === 'accumulated' ? saved : 'accumulated'
+    } catch {
+      return 'accumulated'
+    }
+  })
 
   const handleViewModeChange = (mode: 'projected' | 'cash') => {
     setViewMode(mode)
     try {
       localStorage.setItem('fin_budget_view_mode', mode)
+    } catch {
+      // ignore
+    }
+  }
+
+  const handleFutureViewModeChange = (mode: 'accumulated' | 'isolated') => {
+    setFutureViewMode(mode)
+    try {
+      localStorage.setItem('fin_budget_future_view_mode', mode)
     } catch {
       // ignore
     }
@@ -554,17 +561,23 @@ export default function BudgetPage() {
 
   const isAccrual = budgetRegime === 'accrual'
   const isFuture = Boolean(summary?.isFutureMonth)
-  const hasExpectedIncome = (summary?.totalExpectedIncome ?? 0) > 0
-  const isProjectedView = isFuture || viewMode === 'projected'
+  const isProjectedView = isFuture
+    ? futureViewMode === 'accumulated'
+    : viewMode === 'projected'
 
-  const cashHeroValue = isProjectedView
-    ? (summary?.projectedToBeBudgeted ?? 0)
-    : (summary?.toBeBudgeted ?? 0)
+  const cashHeroValue = isFuture
+    ? (futureViewMode === 'accumulated'
+        ? (summary?.projectedToBeBudgeted ?? 0)
+        : (summary?.isolatedToBeBudgeted ?? (summary?.plannedNetResult ?? 0)))
+    : (isProjectedView
+        ? (summary?.projectedToBeBudgeted ?? 0)
+        : (summary?.toBeBudgeted ?? 0))
 
   // Valor principal exibido no card Hero:
   // - Competência mês futuro: Resultado Planejado (Receita Prevista − Despesa Orçada)
   // - Competência mês atual/passado: Resultado Realizado (Receitas Reais que entraram − Despesas Reais)
-  // - Caixa: Projetado a Orçar (se isProjectedView) ou Disponível em Caixa (se !isProjectedView)
+  // - Caixa mês futuro: Projetado com Saldos Anteriores ou Isolado no Mês
+  // - Caixa mês atual/passado: A Orçar no Mês (Com Previsto) ou Disponível em Caixa (Em Caixa)
   const heroValue = !summary
     ? 0
     : isAccrual
@@ -672,51 +685,87 @@ export default function BudgetPage() {
         {summary && (
           <div className="px-3 sm:px-6 pb-3 flex items-center gap-2">
             {/* Hero card — valor principal */}
-            <div className={`flex-1 flex items-center justify-between px-3 py-2.5 rounded-xl border shadow-sm transition-all duration-300 ${heroBgBorder}`}>
-              {isAccrual ? (
-                /* Regime de Competência */
-                <div className="flex flex-col min-w-0">
-                  <span className={`text-[10px] uppercase font-bold tracking-wider ${heroValue < -0.005 ? 'text-rose-400' : 'text-slate-400'} mb-0.5`}>
-                    {isFuture ? 'Resultado Planejado' : 'Resultado Real'}
-                  </span>
-                  <span className={`text-xl sm:text-2xl font-extrabold tabular-nums tracking-tight leading-none ${heroColor}`}>
-                    {heroValue > 0.005 ? `+${formatCurrency(heroValue)}` : formatCurrency(heroValue)}
-                  </span>
+            <div className={`flex-1 flex flex-col px-3.5 py-2.5 rounded-xl border shadow-sm transition-all duration-300 ${heroBgBorder}`}>
+              {/* Seletor de visualização full width */}
+              {!isAccrual && (
+                <div className="w-full grid grid-cols-2 p-0.5 rounded-lg bg-slate-900/90 border border-slate-700/80 shadow-inner mb-2.5">
+                  {isFuture ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleFutureViewModeChange('accumulated')}
+                        className={`w-full py-1 text-center text-[10px] sm:text-xs font-bold rounded-md transition-all whitespace-nowrap truncate px-1 ${
+                          futureViewMode === 'accumulated'
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                        title="Considera os saldos dos meses anteriores com receitas previstas somados a este mês"
+                      >
+                        Com Saldos Anteriores
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleFutureViewModeChange('isolated')}
+                        className={`w-full py-1 text-center text-[10px] sm:text-xs font-bold rounded-md transition-all whitespace-nowrap truncate px-1 ${
+                          futureViewMode === 'isolated'
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                        title="Considera apenas as receitas e despesas previstas deste mês isoladamente"
+                      >
+                        Isolado no Mês
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleViewModeChange('projected')}
+                        className={`w-full py-1 text-center text-[10px] sm:text-xs font-bold rounded-md transition-all whitespace-nowrap truncate px-1 ${
+                          isProjectedView
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                        title="Considera o saldo em conta somado às receitas previstas pendentes para o mês"
+                      >
+                        Com Previsto
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleViewModeChange('cash')}
+                        className={`w-full py-1 text-center text-[10px] sm:text-xs font-bold rounded-md transition-all whitespace-nowrap truncate px-1 ${
+                          !isProjectedView
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                        title="Considera estritamente o dinheiro físico disponível no banco hoje"
+                      >
+                        Em Caixa
+                      </button>
+                    </>
+                  )}
                 </div>
-              ) : (
-                /* Regime de Caixa */
-                <div className="flex flex-col min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 sm:gap-2 mb-1 flex-wrap">
-                    {!isFuture && (
-                      <div className="inline-flex items-center p-0.5 rounded-lg bg-slate-900/90 border border-slate-700/80 shadow-inner">
-                        <button
-                          type="button"
-                          onClick={() => handleViewModeChange('projected')}
-                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all ${
-                            isProjectedView
-                              ? 'bg-indigo-600 text-white shadow-sm'
-                              : 'text-slate-400 hover:text-slate-200'
-                          }`}
-                          title="Considera o saldo em conta somado às receitas previstas pendentes para o mês"
-                        >
-                          Com Previsto
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleViewModeChange('cash')}
-                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all ${
-                            !isProjectedView
-                              ? 'bg-indigo-600 text-white shadow-sm'
-                              : 'text-slate-400 hover:text-slate-200'
-                          }`}
-                          title="Considera estritamente o dinheiro físico disponível no banco hoje"
-                        >
-                          Em Caixa
-                        </button>
-                      </div>
-                    )}
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 flex items-center gap-1">
-                      {isFuture ? 'Projetado a Orçar' : isProjectedView ? 'A Orçar no Mês' : 'Disponível em Caixa'}
+              )}
+
+              {/* Linha principal: valores à esquerda | métricas à direita */}
+              <div className="flex items-center justify-between w-full">
+                {isAccrual ? (
+                  /* Regime de Competência */
+                  <div className="flex flex-col min-w-0">
+                    <span className={`text-[10px] uppercase font-bold tracking-wider ${heroValue < -0.005 ? 'text-rose-400' : 'text-slate-400'} mb-0.5`}>
+                      {isFuture ? 'Resultado Planejado' : 'Resultado Real'}
+                    </span>
+                    <span className={`text-xl sm:text-2xl font-extrabold tabular-nums tracking-tight leading-none ${heroColor}`}>
+                      {heroValue > 0.005 ? `+${formatCurrency(heroValue)}` : formatCurrency(heroValue)}
+                    </span>
+                  </div>
+                ) : (
+                  /* Regime de Caixa */
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 flex items-center gap-1 mb-0.5">
+                      {isFuture
+                        ? (futureViewMode === 'accumulated' ? 'Projetado Acumulado' : 'A Orçar no Mês')
+                        : (isProjectedView ? 'A Orçar no Mês' : 'Disponível em Caixa')}
                       <button
                         type="button"
                         onClick={() => setShowHelpModal(true)}
@@ -726,87 +775,83 @@ export default function BudgetPage() {
                         <HelpCircle className="w-3 h-3" />
                       </button>
                     </span>
+                    <span className={`text-xl sm:text-2xl font-extrabold tabular-nums tracking-tight leading-none ${heroColor}`}>
+                      {formatCurrency(heroValue)}
+                    </span>
                   </div>
-
-                  <span className={`text-xl sm:text-2xl font-extrabold tabular-nums tracking-tight leading-none ${heroColor}`}>
-                    {formatCurrency(heroValue)}
-                  </span>
-                </div>
-              )}
-
-              {/* Métricas secundárias — lado direito */}
-              <div className="flex flex-col items-end gap-1 ml-3 flex-shrink-0">
-                {isAccrual ? (
-                  <>
-                    <div className="flex items-center gap-1 text-[10px] tabular-nums">
-                      <span className="text-slate-500">Rec</span>
-                      <span className="font-semibold text-emerald-400">
-                        {formatCurrency(isFuture ? (summary.totalExpectedIncome ?? 0) : summary.totalIncome)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 text-[10px] tabular-nums">
-                      <span className="text-slate-500">Desp</span>
-                      <span className="font-semibold text-rose-400">
-                        {formatCurrency(isFuture ? summary.totalBudgeted : (summary.totalSpent ?? 0))}
-                      </span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    {summary.isFutureMonth && (summary.rolloverFromPreviousMonth ?? 0) !== 0 && (
-                      <span
-                        className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md bg-slate-700/80 text-slate-300 border border-slate-600/60"
-                        title={`Saldo livre acumulado do mês anterior: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
-                      >
-                        Saldo Anterior: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
-                      </span>
-                    )}
-                    {isProjectedView ? (
-                      <>
-                        <div className="flex items-center gap-1 text-[10px] tabular-nums" title="Receita total prevista para o mês">
-                          <span className="text-slate-500">Prev</span>
-                          <span className="font-semibold text-emerald-400">
-                            {formatCurrency(summary.totalExpectedIncome ?? 0)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1 text-[10px] tabular-nums" title="Despesas totais orçadas nos envelopes">
-                          <span className="text-slate-500">Orçado</span>
-                          <span className="font-semibold text-rose-400">
-                            {formatCurrency(summary.totalBudgeted)}
-                          </span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-1 text-[10px] tabular-nums" title="Receita efetivamente recebida no mês">
-                          <span className="text-slate-500">Rec</span>
-                          <span className="font-semibold text-emerald-400">
-                            {formatCurrency(summary.totalIncome)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1 text-[10px] tabular-nums" title="Total gasto no mês">
-                          <span className="text-slate-500">Gasto</span>
-                          <span className="font-semibold text-rose-400">
-                            {formatCurrency(isFuture ? summary.totalBudgeted : (summary.totalSpent ?? 0))}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </>
                 )}
+
+                {/* Métricas secundárias — lado direito */}
+                <div className="flex flex-col items-end gap-1 ml-3 flex-shrink-0">
+                  {isAccrual ? (
+                    <>
+                      <div className="flex items-center gap-1 text-[10px] tabular-nums">
+                        <span className="text-slate-500">Rec</span>
+                        <span className="font-semibold text-emerald-400">
+                          {formatCurrency(isFuture ? (summary.totalExpectedIncome ?? 0) : summary.totalIncome)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px] tabular-nums">
+                        <span className="text-slate-500">Desp</span>
+                        <span className="font-semibold text-rose-400">
+                          {formatCurrency(isFuture ? summary.totalBudgeted : (summary.totalSpent ?? 0))}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {isFuture && futureViewMode === 'accumulated' && (summary.rolloverFromPreviousMonth ?? 0) !== 0 && (
+                        <span
+                          className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md bg-slate-700/80 text-slate-300 border border-slate-600/60 whitespace-nowrap"
+                          title={`Saldo acumulado dos meses anteriores com previsto: ${formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}`}
+                        >
+                          Saldo Anterior: {formatCurrency(summary.rolloverFromPreviousMonth ?? 0)}
+                        </span>
+                      )}
+                      {isFuture || isProjectedView ? (
+                        <>
+                          <div className="flex items-center gap-1 text-[10px] tabular-nums" title="Receita total prevista para o mês">
+                            <span className="text-slate-500">Prev</span>
+                            <span className="font-semibold text-emerald-400">
+                              {formatCurrency(summary.totalExpectedIncome ?? 0)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 text-[10px] tabular-nums" title="Despesas totais orçadas nos envelopes">
+                            <span className="text-slate-500">Orçado</span>
+                            <span className="font-semibold text-rose-400">
+                              {formatCurrency(summary.totalBudgeted)}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-1 text-[10px] tabular-nums" title="Receita efetivamente recebida no mês">
+                            <span className="text-slate-500">Rec</span>
+                            <span className="font-semibold text-emerald-400">
+                              {formatCurrency(summary.totalIncome)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 text-[10px] tabular-nums" title="Total gasto no mês">
+                            <span className="text-slate-500">Gasto</span>
+                            <span className="font-semibold text-rose-400">
+                              {formatCurrency(summary.totalSpent ?? 0)}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
-
           </div>
         )}
       </div>
 
       {/* ── Tabela ─────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-3">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {/* Banner de inconsistências / pendências */}
-        <div className="px-3 sm:px-6 pt-3">
-          <PendingIssuesCard month={month} regime={budgetRegime} />
-        </div>
+        <PendingIssuesCard month={month} regime={budgetRegime} />
 
         {!rows && !incomeRows ? (
           <div className="flex items-center justify-center h-32 text-slate-600 text-sm">Carregando…</div>
@@ -968,9 +1013,7 @@ export default function BudgetPage() {
             summary
               ? isAccrual
                 ? summary.plannedNetResult
-                : isProjectedView
-                ? summary.projectedToBeBudgeted
-                : summary.toBeBudgeted
+                : cashHeroValue
               : undefined
           }
           budgetRegime={budgetRegime}
@@ -1017,6 +1060,12 @@ export default function BudgetPage() {
                 <div className="flex items-start gap-1.5">
                   <span className="text-indigo-400 font-bold whitespace-nowrap">• Em Caixa:</span>
                   <span className="text-slate-300">Mostra estritamente o dinheiro físico que você já tem na conta hoje. Conforme os recebimentos entram, o caixa físico é preenchido.</span>
+                </div>
+                <div className="flex items-start gap-1.5 pt-1.5 border-t border-indigo-900/40">
+                  <span className="text-indigo-400 font-bold whitespace-nowrap">• Meses Futuros:</span>
+                  <span className="text-slate-300">
+                    Você pode alternar entre <strong>Com Saldos Anteriores</strong> (acumula sobras e déficits de meses anteriores com receitas previstas) e <strong>Isolado no Mês</strong> (considera apenas as receitas e despesas previstas deste mês).
+                  </span>
                 </div>
               </div>
             </div>

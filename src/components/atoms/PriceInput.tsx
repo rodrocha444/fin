@@ -1,6 +1,8 @@
-// src/components/atoms/PriceInput.tsx — Input de valor monetário formatado para BRL
+// src/components/atoms/PriceInput.tsx — Input de valor monetário formatado para BRL com Calculadora integrada
 import { useState, useEffect, forwardRef } from 'react'
+import { Calculator } from 'lucide-react'
 import { formatCurrency } from '@/utils/format'
+import CalculatorModal from '@/components/atoms/CalculatorModal'
 
 interface PriceInputProps {
   value?: number
@@ -12,6 +14,7 @@ interface PriceInputProps {
   autoFocus?: boolean
   disabled?: boolean
   allowNegative?: boolean
+  showCalculator?: boolean
 }
 
 /**
@@ -42,11 +45,13 @@ const PriceInput = forwardRef<HTMLInputElement, PriceInputProps>(function PriceI
     autoFocus = false,
     disabled = false,
     allowNegative = false,
+    showCalculator = true,
   },
   ref
 ) {
   const [centsStr, setCentsStr] = useState<string>(() => formatValueToCentsStr(value))
   const [isNegative, setIsNegative] = useState<boolean>(() => (value ?? 0) < 0)
+  const [isCalcOpen, setIsCalcOpen] = useState<boolean>(false)
 
   // Sincronizar se o valor externo mudar
   useEffect(() => {
@@ -127,71 +132,142 @@ const PriceInput = forwardRef<HTMLInputElement, PriceInputProps>(function PriceI
 
   if (allowNegative) {
     return (
-      <div className="relative flex items-center gap-2">
-        <div className="flex bg-slate-950/80 p-0.5 rounded-xl border border-slate-800 flex-shrink-0">
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => setSign(false)}
-            className={`w-9 h-9 rounded-lg text-base font-bold flex items-center justify-center transition-all ${
-              !isNegative
-                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm'
-                : 'text-slate-500 hover:text-slate-300'
-            } ${disabled ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
-            title="Saldo Positivo (+)"
-          >
-            +
-          </button>
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => setSign(true)}
-            className={`w-9 h-9 rounded-lg text-base font-bold flex items-center justify-center transition-all ${
-              isNegative
-                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 shadow-sm'
-                : 'text-slate-500 hover:text-slate-300'
-            } ${disabled ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
-            title="Saldo Negativo / Devedor (−)"
-          >
-            −
-          </button>
+      <>
+        <div className="relative flex items-center gap-2">
+          <div className="flex bg-slate-950/80 p-0.5 rounded-xl border border-slate-800 flex-shrink-0">
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => setSign(false)}
+              className={`w-9 h-9 rounded-lg text-base font-bold flex items-center justify-center transition-all ${
+                !isNegative
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-300'
+              } ${disabled ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
+              title="Saldo Positivo (+)"
+            >
+              +
+            </button>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => setSign(true)}
+              className={`w-9 h-9 rounded-lg text-base font-bold flex items-center justify-center transition-all ${
+                isNegative
+                  ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-300'
+              } ${disabled ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
+              title="Saldo Negativo / Devedor (−)"
+            >
+              −
+            </button>
+          </div>
+
+          <div className="relative flex-1">
+            {showCalculator && (
+              <button
+                type="button"
+                tabIndex={-1}
+                disabled={disabled}
+                onClick={e => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setIsCalcOpen(true)
+                }}
+                title="Abrir calculadora"
+                aria-label="Abrir calculadora"
+                className="absolute left-1.5 sm:left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-slate-800/80 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none cursor-pointer flex items-center justify-center group"
+              >
+                <Calculator className="w-4 h-4 text-slate-400 group-hover:text-indigo-400 transition-colors" />
+              </button>
+            )}
+            <input
+              ref={ref}
+              type="text"
+              inputMode="numeric"
+              value={displayStr}
+              placeholder={placeholder}
+              onKeyDown={handleKeyDown}
+              onBlur={onBlur}
+              onChange={() => {}}
+              autoFocus={autoFocus}
+              disabled={disabled}
+              className={`${className} ${showCalculator ? '!pl-11' : ''} ${isNegative && centsStr !== '' ? 'text-rose-400 font-semibold' : ''}`}
+              autoComplete="off"
+            />
+          </div>
         </div>
 
-        <div className="relative flex-1">
-          <input
-            ref={ref}
-            type="text"
-            inputMode="numeric"
-            value={displayStr}
-            placeholder={placeholder}
-            onKeyDown={handleKeyDown}
-            onBlur={onBlur}
-            onChange={() => {}}
-            autoFocus={autoFocus}
-            disabled={disabled}
-            className={`${className} ${isNegative && centsStr !== '' ? 'text-rose-400 font-semibold' : ''}`}
-            autoComplete="off"
+        {isCalcOpen && (
+          <CalculatorModal
+            isOpen={isCalcOpen}
+            onClose={() => setIsCalcOpen(false)}
+            initialValue={absNum * (isNegative ? -1 : 1)}
+            allowNegative={true}
+            onApply={result => {
+              setIsNegative(result < 0)
+              const abs = Math.abs(result)
+              setCentsStr(formatValueToCentsStr(abs))
+              onChange?.(result)
+              setIsCalcOpen(false)
+            }}
           />
-        </div>
-      </div>
+        )}
+      </>
     )
   }
 
   return (
-    <input
-      ref={ref}
-      type="text"
-      inputMode="numeric"
-      value={displayStr}
-      placeholder={placeholder}
-      onKeyDown={handleKeyDown}
-      onBlur={onBlur}
-      onChange={() => {}}
-      autoFocus={autoFocus}
-      disabled={disabled}
-      className={className}
-      autoComplete="off"
-    />
+    <>
+      <div className="relative w-full flex items-center">
+        {showCalculator && (
+          <button
+            type="button"
+            tabIndex={-1}
+            disabled={disabled}
+            onClick={e => {
+              e.preventDefault()
+              e.stopPropagation()
+              setIsCalcOpen(true)
+            }}
+            title="Abrir calculadora"
+            aria-label="Abrir calculadora"
+            className="absolute left-1.5 sm:left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-slate-800/80 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none cursor-pointer flex items-center justify-center group"
+          >
+            <Calculator className="w-4 h-4 text-slate-400 group-hover:text-indigo-400 transition-colors" />
+          </button>
+        )}
+        <input
+          ref={ref}
+          type="text"
+          inputMode="numeric"
+          value={displayStr}
+          placeholder={placeholder}
+          onKeyDown={handleKeyDown}
+          onBlur={onBlur}
+          onChange={() => {}}
+          autoFocus={autoFocus}
+          disabled={disabled}
+          className={`${className} ${showCalculator ? '!pl-11' : ''}`}
+          autoComplete="off"
+        />
+      </div>
+
+      {isCalcOpen && (
+        <CalculatorModal
+          isOpen={isCalcOpen}
+          onClose={() => setIsCalcOpen(false)}
+          initialValue={absNum}
+          allowNegative={false}
+          onApply={result => {
+            const positiveVal = Math.max(0, result)
+            setCentsStr(formatValueToCentsStr(positiveVal))
+            onChange?.(positiveVal)
+            setIsCalcOpen(false)
+          }}
+        />
+      )}
+    </>
   )
 })
 
